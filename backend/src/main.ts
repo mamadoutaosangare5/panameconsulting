@@ -8,6 +8,7 @@ import {
   Logger,
   BadRequestException,
 } from "@nestjs/common";
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { NestFactory } from "@nestjs/core";
 import {
   NestExpressApplication,
@@ -96,6 +97,16 @@ async function bootstrap() {
     AppModule,
     new ExpressAdapter(server),
   );
+
+  // Utiliser Winston comme logger global si disponible
+  try {
+    const winstonLogger = app.get(WINSTON_MODULE_NEST_PROVIDER);
+    if (winstonLogger) {
+      app.useLogger(winstonLogger);
+    }
+  } catch (e) {
+    // fallback: conserver le logger Nest par défaut
+  }
 
   const logger = new Logger('Bootstrap');
 

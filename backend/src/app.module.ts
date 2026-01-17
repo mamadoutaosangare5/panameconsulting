@@ -16,6 +16,7 @@ import { RendezvousModule } from "./rendez-vous/rendez-vous.module";
 import { NotificationModule } from "./notification/notification.module";
 import { ProcedureModule } from "./procedure/procedure.module";
 import { SmtpService } from "./config/smtp.service";
+import { LoggingModule } from './logging/logging.module';
 
 
 @Module({
@@ -68,6 +69,8 @@ import { SmtpService } from "./config/smtp.service";
     }),
 
     // 4. Modules fonctionnels
+    // Logging (doit être importé tôt pour initialiser le logger global)
+    LoggingModule,
     AuthModule,
     UsersModule,
     DestinationModule,
