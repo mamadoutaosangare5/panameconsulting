@@ -19,24 +19,24 @@
 import { apiFetch } from "../context/AuthContext";
 import { toast } from "react-hot-toast";
 import type {
-  // DTOs backend (réponses brutes)
-  BackendDTO_ApiResponse,
-  BackendDTO_UserResponse,
-  BackendDTO_UsersListResponse,
-  BackendDTO_UserStatistics,
-  BackendDTO_CreateUserBody,
-  BackendDTO_AdminUpdateProfileBody,
-  BackendDTO_AdminUpdateUserBody,
-  // Types applicatifs
-  AppUser,
-  AppUserList,
-  AppUserStatistics,
-  // Params d'appel
-  GetUsersParams,
-  CreateUserParams,
-  UpdateAdminProfileParams,
-  UpdateUserParams,
-  UpdateUserStatusParams,
+	// DTOs backend (réponses brutes)
+	BackendDTO_ApiResponse,
+	BackendDTO_UserResponse,
+	BackendDTO_UsersListResponse,
+	BackendDTO_UserStatistics,
+	BackendDTO_CreateUserBody,
+	BackendDTO_AdminUpdateProfileBody,
+	BackendDTO_AdminUpdateUserBody,
+	// Types applicatifs
+	AppUser,
+	AppUserList,
+	AppUserStatistics,
+	// Params d'appel
+	GetUsersParams,
+	CreateUserParams,
+	UpdateAdminProfileParams,
+	UpdateUserParams,
+	UpdateUserStatusParams,
 } from "../types/user.types";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -48,25 +48,25 @@ const API_URL = import.meta.env.VITE_API_URL as string;
 // ─────────────────────────────────────────────────────────────
 
 function mapUserResponseToAppUser(dto: BackendDTO_UserResponse): AppUser {
-  return {
-    id: dto.id,
-    email: dto.email,
-    firstName: dto.firstName,
-    lastName: dto.lastName,
-    fullName: dto.fullName,
-    telephone: dto.telephone,
-    role: dto.role,
-    isActive: dto.isActive,
-    canLogin: dto.canLogin,
-    isTemporarilyLoggedOut: dto.isTemporarilyLoggedOut,
-    logoutUntil: dto.logoutUntil,
-    lastLogout: dto.lastLogout,
-    lastLogin: dto.lastLogin,
-    loginCount: dto.loginCount,
-    logoutCount: dto.logoutCount,
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt,
-  };
+	return {
+		id: dto.id,
+		email: dto.email,
+		firstName: dto.firstName,
+		lastName: dto.lastName,
+		fullName: dto.fullName,
+		telephone: dto.telephone,
+		role: dto.role,
+		isActive: dto.isActive,
+		canLogin: dto.canLogin,
+		isTemporarilyLoggedOut: dto.isTemporarilyLoggedOut,
+		logoutUntil: dto.logoutUntil,
+		lastLogout: dto.lastLogout,
+		lastLogin: dto.lastLogin,
+		loginCount: dto.loginCount,
+		logoutCount: dto.logoutCount,
+		createdAt: dto.createdAt,
+		updatedAt: dto.updatedAt,
+	};
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -78,17 +78,17 @@ function mapUserResponseToAppUser(dto: BackendDTO_UserResponse): AppUser {
  * Retourne body.data typé.
  */
 async function parseResponse<T>(response: Response): Promise<T> {
-  const body: BackendDTO_ApiResponse<T> = await response.json();
-  console.log("[users.service] parseResponse:", {
-    status: response.status,
-    ok: response.ok,
-    body: body,
-  });
+	const body: BackendDTO_ApiResponse<T> = await response.json();
+	console.log("[users.service] parseResponse:", {
+		status: response.status,
+		ok: response.ok,
+		body: body,
+	});
 
-  if (!response.ok) {
-    throw new Error(body.message || `Erreur HTTP ${response.status}`);
-  }
-  return body.data;
+	if (!response.ok) {
+		throw new Error(body.message || `Erreur HTTP ${response.status}`);
+	}
+	return body.data;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -105,38 +105,36 @@ async function parseResponse<T>(response: Response): Promise<T> {
  * L'email est ABSENT : AdminUpdateUserDto backend ne l'expose pas.
  * Correspond à AdminUpdateUserDto backend.
  */
-export async function updateAdminProfile(
-  params: UpdateAdminProfileParams,
-): Promise<AppUser> {
-  const body: BackendDTO_AdminUpdateProfileBody = {
-    ...(params.firstName !== undefined && { firstName: params.firstName }),
-    ...(params.lastName !== undefined && { lastName: params.lastName }),
-    ...(params.telephone !== undefined && { telephone: params.telephone }),
-    ...(params.password !== undefined && { password: params.password }),
-  };
+export async function updateAdminProfile(params: UpdateAdminProfileParams): Promise<AppUser> {
+	const body: BackendDTO_AdminUpdateProfileBody = {
+		...(params.firstName !== undefined && { firstName: params.firstName }),
+		...(params.lastName !== undefined && { lastName: params.lastName }),
+		...(params.telephone !== undefined && { telephone: params.telephone }),
+		...(params.password !== undefined && { password: params.password }),
+	};
 
-  try {
-    const response = await apiFetch(`${API_URL}/admin/profile`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
+	try {
+		const response = await apiFetch(`${API_URL}/admin/profile`, {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		});
 
-    const dto = await parseResponse<BackendDTO_UserResponse>(response);
-    const user = mapUserResponseToAppUser(dto);
+		const dto = await parseResponse<BackendDTO_UserResponse>(response);
+		const user = mapUserResponseToAppUser(dto);
 
-    // Toast de succès
-    toast.success("Profil administrateur mis à jour avec succès", {
-      duration: 4000,
-    });
+		// Toast de succès
+		toast.success("Profil administrateur mis à jour avec succès", {
+			duration: 4000,
+		});
 
-    return user;
-  } catch (error) {
-    // Toast d'erreur
-    toast.error("Erreur lors de la mise à jour du profil administrateur", {
-      duration: 4000,
-    });
-    throw error;
-  }
+		return user;
+	} catch (error) {
+		// Toast d'erreur
+		toast.error("Erreur lors de la mise à jour du profil administrateur", {
+			duration: 4000,
+		});
+		throw error;
+	}
 }
 
 /**
@@ -145,39 +143,36 @@ export async function updateAdminProfile(
  * Correspond à CreateUserDto backend (tous les champs requis).
  */
 export async function createUser(params: CreateUserParams): Promise<AppUser> {
-  const body: BackendDTO_CreateUserBody = {
-    firstName: params.firstName,
-    lastName: params.lastName,
-    email: params.email,
-    password: params.password,
-    telephone: params.telephone,
-  };
+	const body: BackendDTO_CreateUserBody = {
+		firstName: params.firstName,
+		lastName: params.lastName,
+		email: params.email,
+		password: params.password,
+		telephone: params.telephone,
+	};
 
-  try {
-    const response = await apiFetch(`${API_URL}/admin/users/create`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+	try {
+		const response = await apiFetch(`${API_URL}/admin/users/create`, {
+			method: "POST",
+			body: JSON.stringify(body),
+		});
 
-    const dto = await parseResponse<BackendDTO_UserResponse>(response);
-    const user = mapUserResponseToAppUser(dto);
+		const dto = await parseResponse<BackendDTO_UserResponse>(response);
+		const user = mapUserResponseToAppUser(dto);
 
-    // Toast de succès
-    toast.success(
-      `Utilisateur ${user.firstName} ${user.lastName} créé avec succès`,
-      {
-        duration: 4000,
-      },
-    );
+		// Toast de succès
+		toast.success(`Utilisateur ${user.firstName} ${user.lastName} créé avec succès`, {
+			duration: 4000,
+		});
 
-    return user;
-  } catch (error) {
-    // Toast d'erreur
-    toast.error("Erreur lors de la création de l'utilisateur", {
-      duration: 4000,
-    });
-    throw error;
-  }
+		return user;
+	} catch (error) {
+		// Toast d'erreur
+		toast.error("Erreur lors de la création de l'utilisateur", {
+			duration: 4000,
+		});
+		throw error;
+	}
 }
 
 /**
@@ -185,40 +180,38 @@ export async function createUser(params: CreateUserParams): Promise<AppUser> {
  * Retourne la liste paginée des utilisateurs.
  * Le backend retourne directement la structure sans enveloppe ApiResponse.
  */
-export async function getUsers(
-  params: GetUsersParams = {},
-): Promise<AppUserList> {
-  const { page = 1, limit = 10 } = params;
+export async function getUsers(params: GetUsersParams = {}): Promise<AppUserList> {
+	const { page = 1, limit = 10 } = params;
 
-  console.log("[users.service] getUsers called:", { page, limit });
+	console.log("[users.service] getUsers called:", { page, limit });
 
-  const url = new URL(`${API_URL}/admin/users/all`);
-  url.searchParams.set("page", String(page));
-  url.searchParams.set("limit", String(limit));
+	const url = new URL(`${API_URL}/admin/users/all`);
+	url.searchParams.set("page", String(page));
+	url.searchParams.set("limit", String(limit));
 
-  console.log("[users.service] Fetching URL:", url.toString());
+	console.log("[users.service] Fetching URL:", url.toString());
 
-  const response = await apiFetch(url, { method: "GET" });
+	const response = await apiFetch(url, { method: "GET" });
 
-  console.log("[users.service] Response status:", response.status);
+	console.log("[users.service] Response status:", response.status);
 
-  // Pour cette route spécifique, le backend retourne directement la structure
-  // sans enveloppe ApiResponse, donc on parse directement
-  const listDto: BackendDTO_UsersListResponse = await response.json();
+	// Pour cette route spécifique, le backend retourne directement la structure
+	// sans enveloppe ApiResponse, donc on parse directement
+	const listDto: BackendDTO_UsersListResponse = await response.json();
 
-  console.log("[users.service] Parsed DTO (direct):", listDto);
+	console.log("[users.service] Parsed DTO (direct):", listDto);
 
-  const result = {
-    items: listDto.data.map(mapUserResponseToAppUser),
-    total: listDto.total,
-    page: listDto.page,
-    limit: listDto.limit,
-    totalPages: Math.ceil(listDto.total / listDto.limit),
-  };
+	const result = {
+		items: listDto.data.map(mapUserResponseToAppUser),
+		total: listDto.total,
+		page: listDto.page,
+		limit: listDto.limit,
+		totalPages: Math.ceil(listDto.total / listDto.limit),
+	};
 
-  console.log("[users.service] Final result:", result);
+	console.log("[users.service] Final result:", result);
 
-  return result;
+	return result;
 }
 
 /**
@@ -227,23 +220,23 @@ export async function getUsers(
  * Correspond à la forme retournée par getStatistics() backend.
  */
 export async function getStatistics(): Promise<AppUserStatistics> {
-  const response = await apiFetch(`${API_URL}/admin/users/statistics`, {
-    method: "GET",
-  });
+	const response = await apiFetch(`${API_URL}/admin/users/statistics`, {
+		method: "GET",
+	});
 
-  // Le backend retourne la structure directement dans body.data
-  const dto = await parseResponse<BackendDTO_UserStatistics>(response);
+	// Le backend retourne la structure directement dans body.data
+	const dto = await parseResponse<BackendDTO_UserStatistics>(response);
 
-  // Pas de transformation nécessaire : les noms de champs sont identiques
-  return {
-    totalUsers: dto.totalUsers,
-    activeUsers: dto.activeUsers,
-    inactiveUsers: dto.inactiveUsers,
-    adminUsers: dto.adminUsers,
-    userUsers: dto.userUsers,
-    recentlyCreated: dto.recentlyCreated,
-    recentlyActive: dto.recentlyActive,
-  };
+	// Pas de transformation nécessaire : les noms de champs sont identiques
+	return {
+		totalUsers: dto.totalUsers,
+		activeUsers: dto.activeUsers,
+		inactiveUsers: dto.inactiveUsers,
+		adminUsers: dto.adminUsers,
+		userUsers: dto.userUsers,
+		recentlyCreated: dto.recentlyCreated,
+		recentlyActive: dto.recentlyActive,
+	};
 }
 
 /**
@@ -251,15 +244,12 @@ export async function getStatistics(): Promise<AppUserStatistics> {
  * Récupère un utilisateur par son ID.
  */
 export async function getUserById(id: string): Promise<AppUser> {
-  const response = await apiFetch(
-    `${API_URL}/admin/user/${encodeURIComponent(id)}`,
-    {
-      method: "GET",
-    },
-  );
+	const response = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}`, {
+		method: "GET",
+	});
 
-  const dto = await parseResponse<BackendDTO_UserResponse>(response);
-  return mapUserResponseToAppUser(dto);
+	const dto = await parseResponse<BackendDTO_UserResponse>(response);
+	return mapUserResponseToAppUser(dto);
 }
 
 /**
@@ -267,46 +257,37 @@ export async function getUserById(id: string): Promise<AppUser> {
  * Met à jour un utilisateur quelconque.
  * Correspond à UpdateUserDto backend (tous les champs optionnels).
  */
-export async function updateUser(
-  id: string,
-  params: UpdateUserParams,
-): Promise<AppUser> {
-  const body: BackendDTO_AdminUpdateUserBody = {
-    ...(params.firstName !== undefined && { firstName: params.firstName }),
-    ...(params.lastName !== undefined && { lastName: params.lastName }),
-    ...(params.email !== undefined && { email: params.email }),
-    ...(params.telephone !== undefined && { telephone: params.telephone }),
-    ...(params.password !== undefined && { password: params.password }),
-  };
+export async function updateUser(id: string, params: UpdateUserParams): Promise<AppUser> {
+	const body: BackendDTO_AdminUpdateUserBody = {
+		...(params.firstName !== undefined && { firstName: params.firstName }),
+		...(params.lastName !== undefined && { lastName: params.lastName }),
+		...(params.email !== undefined && { email: params.email }),
+		...(params.telephone !== undefined && { telephone: params.telephone }),
+		...(params.password !== undefined && { password: params.password }),
+	};
 
-  try {
-    const response = await apiFetch(
-      `${API_URL}/admin/user/${encodeURIComponent(id)}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
-    );
+	try {
+		const response = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}`, {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		});
 
-    const dto = await parseResponse<BackendDTO_UserResponse>(response);
-    const user = mapUserResponseToAppUser(dto);
+		const dto = await parseResponse<BackendDTO_UserResponse>(response);
+		const user = mapUserResponseToAppUser(dto);
 
-    // Toast de succès
-    toast.success(
-      `Utilisateur ${user.firstName} ${user.lastName} mis à jour avec succès`,
-      {
-        duration: 4000,
-      },
-    );
+		// Toast de succès
+		toast.success(`Utilisateur ${user.firstName} ${user.lastName} mis à jour avec succès`, {
+			duration: 4000,
+		});
 
-    return user;
-  } catch (error) {
-    // Toast d'erreur
-    toast.error("Erreur lors de la mise à jour de l'utilisateur", {
-      duration: 4000,
-    });
-    throw error;
-  }
+		return user;
+	} catch (error) {
+		// Toast d'erreur
+		toast.error("Erreur lors de la mise à jour de l'utilisateur", {
+			duration: 4000,
+		});
+		throw error;
+	}
 }
 
 /**
@@ -316,74 +297,84 @@ export async function updateUser(
  * Interdit de supprimer son propre compte (ForbiddenException backend).
  */
 export async function deleteUser(id: string): Promise<void> {
-  try {
-    const response = await apiFetch(
-      `${API_URL}/admin/user/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
-    );
+	try {
+		const response = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}`, { method: "DELETE" });
 
-    // 204 No Content — on ne parse pas le body
-    if (!response.ok) {
-      // Cas d'erreur (403, 404) : on lit le body pour le message
-      const body: BackendDTO_ApiResponse<never> = await response.json();
-      throw new Error(body.message || `Erreur HTTP ${response.status}`);
-    }
+		// 204 No Content — on ne parse pas le body
+		if (!response.ok) {
+			// Cas d'erreur (403, 404) : on lit le body pour le message
+			const body: BackendDTO_ApiResponse<never> = await response.json();
+			throw new Error(body.message || `Erreur HTTP ${response.status}`);
+		}
 
-    // Toast de succès
-    toast.success("Utilisateur supprimé avec succès", {
-      duration: 4000,
-    });
-  } catch (error) {
-    // Toast d'erreur
-    toast.error("Erreur lors de la suppression de l'utilisateur", {
-      duration: 4000,
-    });
-    throw error;
-  }
+		// Toast de succès
+		toast.success("Utilisateur supprimé avec succès", {
+			duration: 4000,
+		});
+	} catch (error) {
+		// Toast d'erreur
+		toast.error("Erreur lors de la suppression de l'utilisateur", {
+			duration: 4000,
+		});
+		throw error;
+	}
 }
 
 /**
  * PATCH /admin/user/:id/status   [ADMIN]
  * Active ou désactive un utilisateur.
  */
-export async function updateUserStatus(
-  id: string,
-  params: UpdateUserStatusParams,
-): Promise<AppUser> {
-  const body = {
-    isActive: params.isActive,
-    ...(params.logoutUntil && { logoutUntil: params.logoutUntil }),
-    ...(params.reason && { reason: params.reason }),
-  };
+export async function updateUserStatus(id: string, params: UpdateUserStatusParams): Promise<AppUser> {
+	// Protection : empêcher la désactivation si isActive est false
+	if (!params.isActive) {
+		// Récupérer d'abord l'utilisateur pour vérifier si c'est un admin
+		try {
+			const userResponse = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}`, { method: "GET" });
 
-  try {
-    const response = await apiFetch(
-      `${API_URL}/admin/user/${encodeURIComponent(id)}/status`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
-    );
+			if (userResponse.ok) {
+				const userDto: BackendDTO_UserResponse = await userResponse.json();
+				if (userDto.role === "ADMIN") {
+					const error = new Error("Impossible de désactiver un compte administrateur");
+					toast.error(error.message, { duration: 4000 });
+					throw error;
+				}
+			}
+		} catch (error) {
+			// Si erreur de récupération, laisser le backend gérer la protection
+			if (error instanceof Error && error.message.includes("administrateur")) {
+				throw error;
+			}
+		}
+	}
 
-    const dto = await parseResponse<BackendDTO_UserResponse>(response);
-    const user = mapUserResponseToAppUser(dto);
+	const body = {
+		isActive: params.isActive,
+		...(params.logoutUntil && { logoutUntil: params.logoutUntil }),
+		...(params.reason && { reason: params.reason }),
+	};
 
-    // Toast de succès
-    const action = params.isActive ? "activé" : "désactivé";
-    toast.success(
-      `Utilisateur ${user.firstName} ${user.lastName} ${action} avec succès`,
-      {
-        duration: 4000,
-      },
-    );
+	try {
+		const response = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}/status`, {
+			method: "PATCH",
+			body: JSON.stringify(body),
+		});
 
-    return user;
-  } catch (error) {
-    // Toast d'erreur
-    const action = params.isActive ? "l'activation" : "la désactivation";
-    toast.error(`Erreur lors de ${action} de l'utilisateur`, {
-      duration: 4000,
-    });
-    throw error;
-  }
+		const dto = await parseResponse<BackendDTO_UserResponse>(response);
+		const user = mapUserResponseToAppUser(dto);
+
+		// Toast de succès
+		const action = params.isActive ? "activé" : "désactivé";
+		toast.success(`Utilisateur ${user.firstName} ${user.lastName} ${action} avec succès`, {
+			duration: 4000,
+		});
+
+		return user;
+	} catch (error) {
+		// Toast d'erreur
+		const action = params.isActive ? "l'activation" : "la désactivation";
+		toast.error(`Erreur lors de ${action} de l'utilisateur`, {
+			duration: 4000,
+		});
+		throw error;
+	}
 }

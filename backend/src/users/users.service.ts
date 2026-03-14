@@ -354,6 +354,14 @@ export class UsersService {
       throw new NotFoundException('Utilisateur non trouvé');
     }
 
+    // Interdire de désactiver le compte admin principal
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
+    if (updateStatusDto.isActive === false && user.email === adminEmail) {
+      throw new ForbiddenException(
+        'Impossible de désactiver le compte administrateur principal',
+      );
+    }
+
     // Interdire de désactiver son propre compte
     if (updateStatusDto.isActive === false && user.isDeleted) {
       throw new ForbiddenException(

@@ -1,0 +1,10 @@
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/engines'
+  - '@scarf/scarf'
+  - bcrypt
+  - core-js
+  - esbuild
+  - msgpackr-extract
+  - prisma
+  - unrs-resolver
