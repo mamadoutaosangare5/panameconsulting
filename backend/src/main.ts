@@ -1,0 +1,318 @@
+import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { AppModule } from './app.module';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as serveStatic from 'serve-static';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as cookieParser from 'cookie-parser';
+import * as compression from 'compression';
+import * as helmet from 'helmet';
+import * as path from 'path';
+import { join } from 'path';
+import { Request, Response, NextFunction } from 'express';
+import { PrismaService } from './prisma/prisma.service';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { JsonExceptionFilter } from './common/filters/json-exception.filter';
+import { LoggingMiddleware } from './common/middlewares/logging.middleware';
+
+const corsOrigins =
+  process.env.NODE_ENV === 'production'
+    ? ['https://panameconsulting.com', 'https://www.panameconsulting.com']
+    : ['http://localhost:5173', 'http://localhost:10000'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+function resolveFrontendDist(): string {
+  const cwd = process.cwd();
+  // Railway & dev local : lancé depuis backend/
+  return path.join(cwd, '../frontend', 'dist/');
+}
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: process.env.NODE_ENV === 'production',
+    cors: false,
+    abortOnError: false,
+  });
+
+  if (!app) {
+    throw new Error("L'application n'a pas pu être créée");
+  }
+
+  const configService = app.get(ConfigService);
+  const prismaService = app.get(PrismaService);
+  const logger = new Logger('Bootstrap');
+  app.useLogger(logger);
+
+  // ==================== SÉCURITÉ ====================
+
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  app.use(
+    helmet.default({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          scriptSrc: [`'self'`, `'unsafe-inline'`, `'unsafe-eval'`],
+          scriptSrcAttr: [`'unsafe-inline'`],
+          styleSrc: [
+            `'self'`,
+            `'unsafe-inline'`,
+            `https://fonts.googleapis.com`,
+          ],
+          fontSrc: [`'self'`, `https://fonts.gstatic.com`],
+          imgSrc: [
+            `'self'`,
+            'data:',
+            'validator.swagger.io',
+            'res.cloudinary.com',
+          ],
+          connectSrc: [`'self'`],
+          frameSrc: [`'self'`, `https://www.google.com`],
+        },
+      },
+      hsts:
+        process.env.NODE_ENV === 'production'
+          ? { maxAge: 31536000, includeSubDomains: true }
+          : false,
+    }),
+  );
+
+  app.use(compression({ level: 6, threshold: 1024 }));
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Cookie',
+    ],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 3600,
+  });
+
+  app.use(cookieParser(configService.get('COOKIE_SECRET')));
+
+  // ==================== LOGGING ====================
+
+  const loggingMiddleware = new LoggingMiddleware(configService);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    loggingMiddleware.use(req, res, next);
+  });
+
+  // ==================== PRÉFIXE GLOBAL ====================
+
+  app.setGlobalPrefix('api', {
+    exclude: [
+      '/',
+      '/api',
+      '/uploads',
+      '/uploads/*path',
+      '/uploads/destinations',
+      '/uploads/destinations/*path',
+      '/uploads/profiles',
+      '/uploads/profiles/*path',
+      '/docs',
+      '/swagger',
+      '/version',
+      '/debug/headers',
+      '/health',
+    ],
+  });
+
+  // ==================== PIPES ====================
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+      disableErrorMessages: process.env.NODE_ENV === 'production',
+      exceptionFactory: (errors) => ({
+        statusCode: 400,
+        message: 'Validation échouée',
+        errors: errors.map((err) => ({
+          field: err.property,
+          constraints: err.constraints,
+        })),
+      }),
+    }),
+  );
+
+  // ==================== FILTRES ====================
+
+  app.useGlobalFilters(
+    new JsonExceptionFilter(),
+    new PrismaExceptionFilter(),
+    new HttpExceptionFilter(),
+  );
+
+  // ==================== UPLOADS STATIQUES ====================
+
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads',
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
+  });
+
+  app.useStaticAssets(join(__dirname, '..', 'uploads', 'destinations'), {
+    prefix: '/uploads/destinations',
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
+  });
+
+  app.useStaticAssets(join(__dirname, '..', 'uploads', 'profiles'), {
+    prefix: '/uploads/profiles',
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
+  });
+
+  // ==================== SWAGGER (dev uniquement) ====================
+
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Paname Consulting API')
+      .setDescription("API de gestion des procédures d'études à l'étranger")
+      .setVersion('1.0')
+      .addTag('auth', 'Authentification')
+      .addTag('users', 'Gestion des utilisateurs')
+      .addTag('rendezvous', 'Gestion des rendez-vous')
+      .addTag('procedures', 'Gestion des procédures')
+      .addTag('destinations', 'Gestion des pays de destination')
+      .addTag('contacts', 'Messages de contact')
+      .addTag('files', 'Gestion des fichiers')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Entrez votre token JWT',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addCookieAuth('refresh_token')
+      .addServer(
+        `http://localhost:${configService.get('PORT', 10000)}`,
+        'Développement',
+      )
+      .addServer('https://panameconsulting.com', 'Production')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+      customSiteTitle: 'Paname Consulting API Documentation',
+    });
+  }
+
+  // ==================== GRACEFUL SHUTDOWN ====================
+
+  async function gracefulShutdown() {
+    try {
+      logger.log('Début de la fermeture graceful...');
+      await app.close();
+      logger.log('Fermeture graceful terminée avec succès');
+    } catch (error) {
+      logger.error(
+        `Erreur lors de la fermeture graceful: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  process.on('SIGTERM', () => {
+    logger.log('Signal SIGTERM reçu - Fermeture graceful en cours...');
+    void gracefulShutdown().then(() => process.exit(0));
+  });
+
+  process.on('SIGINT', () => {
+    logger.log('Signal SIGINT reçu - Fermeture graceful en cours...');
+    void gracefulShutdown().then(() => process.exit(0));
+  });
+
+  prismaService.enableShutdownHooks();
+
+  // ==================== FRONTEND REACT (avant listen) ====================
+
+  const FRONTEND_DIST = resolveFrontendDist();
+
+  // Assets React — cache long (les fichiers JS/CSS ont un hash dans leur nom)
+  app.use(
+    serveStatic(FRONTEND_DIST, {
+      maxAge: process.env.NODE_ENV === 'production' ? '1y' : '1h',
+      etag: true,
+      lastModified: true,
+      setHeaders: (res: Response, filePath: string) => {
+        if (/\.(js|css)$/.test(filePath)) {
+          res.setHeader(
+            'Cache-Control',
+            process.env.NODE_ENV === 'production'
+              ? 'public, max-age=31536000, immutable'
+              : 'public, max-age=3600',
+          );
+        } else if (/\.(png|jpg|jpeg|webp|avif)$/.test(filePath)) {
+          res.setHeader(
+            'Cache-Control',
+            process.env.NODE_ENV === 'production'
+              ? 'public, max-age=2592000, immutable'
+              : 'public, max-age=3600',
+          );
+        } else if (/\.(svg|ico)$/.test(filePath)) {
+          res.setHeader(
+            'Cache-Control',
+            process.env.NODE_ENV === 'production'
+              ? 'public, max-age=86400'
+              : 'public, max-age=3600',
+          );
+        }
+      },
+    }),
+  );
+
+  // Catch-all React Router — toutes les routes non-API/non-uploads/non-fichiers → index.html
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Ne pas intercepter les routes API et uploads
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+
+    // Ne pas intercepter les fichiers statiques (servis par serveStatic au-dessus)
+    if (req.path.includes('.')) {
+      return next();
+    }
+
+    // Servir index.html pour toutes les autres routes
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  });
+
+  // ==================== DÉMARRAGE ====================
+
+  const port = configService.get<number>('PORT', 10000);
+
+  // ⚠️ listen() APRÈS le bloc frontend
+  // 0.0.0.0 requis sur Railway (localhost bloquerait les requêtes entrantes)
+  await app.listen(port, '0.0.0.0');
+
+  // ==================== LOGS ====================
+
+  logger.log(`🚀 Serveur démarré sur : http://localhost:${port}`);
+  logger.log('📁 Uploads destinations : uploads/destinations');
+  logger.log(`📖 Swagger : http://localhost:${port}/docs`);
+  logger.log(`🌍 Environnement : ${process.env.NODE_ENV ?? 'development'}`);
+  logger.log(`📂 Frontend dist résolu : ${FRONTEND_DIST}`);
+}
+
+bootstrap().catch((error) => {
+  console.error('❌ Erreur fatale au démarrage:', error);
+  process.exit(1);
+});

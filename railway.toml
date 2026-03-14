@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd frontend && pnpm install && pnpm build && cd ../backend && pnpm install && pnpm run build"
+
+[deploy]
+startCommand = "cd backend && pnpm prisma migrate deploy && node dist/src/main.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
