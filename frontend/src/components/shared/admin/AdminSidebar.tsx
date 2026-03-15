@@ -196,48 +196,43 @@ export default function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProp
 					>
 						{/* Header avec logo et titre */}
 						<div className="relative px-4 py-5 border-b border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50">
-							<div className="flex items-center gap-3">
-								{/* Informations utilisateur */}
-								{user && (
-									<motion.div
-										initial={{ opacity: 1 }}
-										animate={{ opacity: 1 }}
-										className="mx-auto py-3 border-b border-sky-100 bg-sky-50/50"
-									>
-										<div className="flex items-center gap-3">
-											<div className="relative">
-												<Link
-													to="/"
-													className="w-9 h-9 bg-gradient-to-br from-sky-400 to-sky-600 rounded-lg flex items-center justify-center shadow-md shadow-sky-500/30"
-												>
-													{user.role === "ADMIN" ? (
-														<Settings className="w-4 h-4 text-white" />
-													) : (
-														<User className="w-4 h-4 text-white" />
-													)}
-												</Link>
-												<div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></div>
-											</div>
-									      <div className="overflow-hidden flex-1">
-                          <h2 className="font-bold text-sky-900">
-                              Gestionnaire
-                          </h2>
-                          <p className="text-xs text-sky-700">
-                              Paname Consulting
-                          </p>
-                          <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-sky-600 truncate">
-                                  {user.email}
-                              </span>
-                          </div>
-                          <span className="text-[9px] font-medium text-sky-500 uppercase tracking-wider">
-                              {user.role}
-                          </span>
-                      </div>
+							{/* Informations utilisateur - aligné à gauche */}
+							{user && (
+								<motion.div
+									initial={{ opacity: 1 }}
+									animate={{ opacity: 1 }}
+									className="flex flex-col items-center space-y-3"
+								>
+									{/* Icône settings en haut */}
+									<div className="relative">
+										<Link
+											to="/"
+											className="w-10 h-10 bg-gradient-to-br from-sky-400 to-sky-600 rounded-lg flex items-center justify-center shadow-md shadow-sky-500/30"
+										>
+											{user.role === "ADMIN" ? (
+												<Settings className="w-5 h-5 text-white" />
+											) : (
+												<User className="w-5 h-5 text-white" />
+											)}
+										</Link>
+										<div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></div>
+									</div>
+
+									{/* Informations utilisateur en dessous */}
+									<div className="text-center">
+										<h2 className="font-bold text-sky-900 text-sm">Gestionnaire</h2>
+										<p className="text-xs text-sky-700">Paname Consulting</p>
+										<div className="flex flex-col items-center gap-1 mt-1">
+											<span className="text-[10px] text-sky-600 truncate max-w-[200px]">
+												{user.email}
+											</span>
+											<span className="text-[9px] font-medium text-sky-500 uppercase tracking-wider">
+												{user.role}
+											</span>
 										</div>
-									</motion.div>
-								)}
-							</div>
+									</div>
+								</motion.div>
+							)}
 
 							{/* Bouton de rétraction */}
 							<motion.button

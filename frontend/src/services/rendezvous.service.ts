@@ -4,7 +4,7 @@
 // ============================================================
 
 import { apiFetch } from "../context/AuthContext";
-import { toast } from "react-toastify";
+import { toast } from "react-hot-toast";
 import type {
 	// Enums
 	TimeSlot,
@@ -75,7 +75,6 @@ class RendezvousService {
 			if (errorData.errors?.length) {
 				errorData.errors.forEach((err) => {
 					toast.error(`${err.field}: ${err.message}`);
-					console.error(`[API Error] ${err.field}: ${err.message}`, err.value);
 				});
 			} else {
 				toast.error(errorMessage);
@@ -142,13 +141,12 @@ class RendezvousService {
 		const dateStr = this.formatDate(date);
 		const url = `${this.baseUrl}/rendezvous/available-slots/${encodeURIComponent(dateStr)}`;
 
-		console.log(`[RendezvousService] GET ${url}`);
-
 		try {
 			const response = await apiFetch(url);
 			const result = await this.handleResponse<AvailableSlotsDto>(response);
 
 			console.log(`[RendezvousService]  ${result.availableSlots.length} créneaux disponibles pour ${dateStr}`);
+			toast.success(`${result.availableSlots.length} créneaux disponibles pour ${dateStr}`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService] Erreur getAvailableSlots:`, error);
@@ -182,6 +180,7 @@ class RendezvousService {
 			const result = await this.handleResponse<AvailableDatesResponseDto[]>(response);
 
 			console.log(`[RendezvousService]  ${result.length} dates disponibles trouvées`);
+			toast.success(`${result.length} dates disponibles`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur getAvailableDates:`, error);
@@ -202,10 +201,11 @@ class RendezvousService {
 		try {
 			const response = await apiFetch(url);
 			const result = await this.handleResponse<AvailabilityCheckDto>(response);
-
-			console.log(
-				`[RendezvousService] Créneau ${dateStr} ${time}: ${result.available ? "disponible" : "non disponible"}`,
-			);
+			if (result.available) {
+				toast.success(`Créneau ${dateStr} ${time} disponible`);
+			} else {
+				toast.error(`Créneau ${dateStr} ${time} non disponible`);
+			}
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur checkAvailability:`, error);
@@ -246,8 +246,7 @@ class RendezvousService {
 			});
 
 			const result = await this.handleResponse<RendezvousResponseDto>(response);
-			console.log(`[RendezvousService]  Rendez-vous créé avec ID: ${result.id}`);
-
+			toast.success(`Rendez-vous créé avec succès`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur createRendezvous:`, error);
@@ -266,8 +265,7 @@ class RendezvousService {
 		try {
 			const response = await apiFetch(url);
 			const result = await this.handleResponse<RendezvousResponseDto[]>(response);
-
-			console.log(`[RendezvousService]  ${result.length} rendez-vous trouvés pour ${email}`);
+			toast.success(`${result.length} rendez-vous trouvés`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur getRendezvousByEmail:`, error);
@@ -286,8 +284,7 @@ class RendezvousService {
 		try {
 			const response = await apiFetch(url);
 			const result = await this.handleResponse<RendezvousResponseDto>(response);
-
-			console.log(`[RendezvousService]  Rendez-vous trouvé: ${result.id}`);
+			toast.success(`Rendez-vous trouvé`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService] Erreur getRendezvousById:`, error);
@@ -311,8 +308,7 @@ class RendezvousService {
 			});
 
 			const result = await this.handleResponse<RendezvousResponseDto>(response);
-			console.log(`[RendezvousService] Rendez-vous ${id} annulé`);
-
+			toast.success(`Rendez-vous annulé`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur cancelRendezvous:`, error);
@@ -321,115 +317,6 @@ class RendezvousService {
 	}
 
 	// ==================== ROUTES ADMIN ====================
-
-	/**
-	 * GET /admin/rendezvous/all
-	 * Liste paginée de tous les rendez-vous
-	 */
-	async getAllRendezvous(params?: RendezvousQueryDto): Promise<PaginatedRendezvousResponseDto> {
-		const url = this.buildUrl("/admin/rendezvous/all", params);
-		console.log(`[RendezvousService] GET ${url}`);
-
-		try {
-			const response = await apiFetch(url);
-			const result = await this.handleResponse<PaginatedRendezvousResponseDto>(response);
-
-			// Vérification de sécurité
-			if (!result || !result.data) {
-				console.warn(`[RendezvousService] Réponse invalide:`, result);
-				return {
-					data: [],
-					total: 0,
-					page: params?.page || 1,
-					limit: params?.limit || 10,
-					totalPages: 0,
-					hasNext: false,
-					hasPrevious: false,
-				};
-			}
-
-			console.log(
-				`[RendezvousService] ${result.data.length} rendez-vous retournés (page ${result.page}/${result.totalPages})`,
-			);
-			return result;
-		} catch (error) {
-			console.error(`[RendezvousService] Erreur getAllRendezvous:`, error);
-
-			// Fallback
-			return {
-				data: [],
-				total: 0,
-				page: params?.page || 1,
-				limit: params?.limit || 10,
-				totalPages: 0,
-				hasNext: false,
-				hasPrevious: false,
-			};
-		}
-	}
-
-	/**
-	 * GET /admin/rendezvous/statistics
-	 * Statistiques des rendez-vous
-	 */
-	async getStatistics(): Promise<RendezvousStatisticsDto> {
-		const url = `${this.baseUrl}/admin/rendezvous/statistics`;
-		console.log(`[RendezvousService] GET ${url}`);
-
-		try {
-			const response = await apiFetch(url);
-			const result = await this.handleResponse<RendezvousStatisticsDto>(response);
-
-			// Vérification de sécurité
-			if (!result || !result.byStatus) {
-				console.warn(`[RendezvousService] Statistiques invalides:`, result);
-				return {
-					total: 0,
-					byStatus: { confirmed: 0, completed: 0, cancelled: 0, pending: 0 },
-					upcoming: { today: 0, tomorrow: 0, thisWeek: 0, thisMonth: 0 },
-					topDestinations: [],
-					completionRate: 0,
-					cancellationRate: 0,
-				};
-			}
-
-			console.log(`[RendezvousService] Statistiques récupérées`);
-			return result;
-		} catch (error) {
-			console.error(`[RendezvousService] Erreur getStatistics:`, error);
-
-			// Fallback
-			return {
-				total: 0,
-				byStatus: { confirmed: 0, completed: 0, cancelled: 0, pending: 0 },
-				upcoming: { today: 0, tomorrow: 0, thisWeek: 0, thisMonth: 0 },
-				topDestinations: [],
-				completionRate: 0,
-				cancellationRate: 0,
-			};
-		}
-	}
-
-	/**
-	 * GET /rendezvous/by-date/:date
-	 * Récupère les rendez-vous par date
-	 */
-	async getRendezvousByDate(date: Date | string): Promise<RendezvousResponseDto[]> {
-		const dateStr = this.formatDate(date);
-		const url = `${this.baseUrl}/rendezvous/by-date/${encodeURIComponent(dateStr)}`;
-		console.log(`[RendezvousService] GET ${url}`);
-
-		try {
-			const response = await apiFetch(url);
-			const result = await this.handleResponse<RendezvousResponseDto[]>(response);
-
-			console.log(`[RendezvousService] ${result.length} rendez-vous trouvés pour le ${dateStr}`);
-			return result;
-		} catch (error) {
-			console.error(`[RendezvousService] Erreur getRendezvousByDate:`, error);
-			return [];
-		}
-	}
 
 	/**
 	 * PATCH /admin/rendezvous/:id/patch
@@ -443,9 +330,6 @@ class RendezvousService {
 		const preparedData = this.prepareUpdateData(data);
 
 		const url = `${this.baseUrl}/admin/rendezvous/${id}/patch`;
-		const maskedData = this.maskSensitiveData(preparedData);
-
-		console.log(`[RendezvousService] PATCH ${url}`, maskedData);
 
 		try {
 			const response = await apiFetch(url, {
@@ -455,8 +339,7 @@ class RendezvousService {
 			});
 
 			const result = await this.handleResponse<RendezvousResponseDto>(response);
-			console.log(`[RendezvousService] Rendez-vous ${id} mis à jour`);
-
+			toast.success(`Rendez-vous mis à jour`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService] Erreur updateRendezvous:`, error);
@@ -470,7 +353,6 @@ class RendezvousService {
 	 */
 	async completeRendezvous(id: string, data: CompleteRendezvousDto): Promise<RendezvousResponseDto> {
 		const url = `${this.baseUrl}/admin/rendezvous/${id}/complete`;
-		console.log(`[RendezvousService] PATCH ${url}`, data);
 
 		try {
 			const response = await apiFetch(url, {
@@ -480,8 +362,7 @@ class RendezvousService {
 			});
 
 			const result = await this.handleResponse<RendezvousResponseDto>(response);
-			console.log(`[RendezvousService]  Rendez-vous ${id} marqué comme terminé avec avis: ${data.avisAdmin}`);
-
+			toast.success(`Rendez-vous marqué comme terminé`);
 			return result;
 		} catch (error) {
 			console.error(`[RendezvousService] Erreur completeRendezvous:`, error);
@@ -495,14 +376,38 @@ class RendezvousService {
 	 */
 	async deleteRendezvous(id: string): Promise<void> {
 		const url = `${this.baseUrl}/admin/rendezvous/${id}/delete`;
-		console.log(`[RendezvousService] DELETE ${url}`);
 
 		try {
 			const response = await apiFetch(url, { method: "DELETE" });
 			await this.handleResponse<void>(response);
-			console.log(`[RendezvousService] Rendez-vous ${id} supprimé`);
+			toast.success(`Rendez-vous supprimé`);
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur deleteRendezvous:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * GET /admin/rendezvous/statistics
+	 * Récupère les statistiques des rendez-vous (admin seulement)
+	 */
+	async getStatistics(): Promise<RendezvousStatisticsDto> {
+		try {
+			const response = await apiFetch(`${this.baseUrl}/admin/rendezvous/statistics`, {
+				method: "GET",
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la récupération des statistiques";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
+
+			const result = await response.json();
+			return result;
+		} catch (error) {
+			toast.error("Erreur lors de la récupération des statistiques");
 			throw error;
 		}
 	}
@@ -600,54 +505,100 @@ class RendezvousService {
 	 */
 	async getTodayRendezvous(): Promise<RendezvousResponseDto[]> {
 		const today = new Date();
-		return this.getRendezvousByDate(today);
+		const dateStr = this.formatDate(today);
+		const response = await apiFetch(`${this.baseUrl}/rendezvous/by-date/${dateStr}`, {
+			method: "GET",
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({}));
+			const errorMessage = errorData.message || "Erreur lors de la récupération des rendez-vous du jour";
+			toast.error(errorMessage);
+			throw new Error(errorMessage);
+		}
+
+		const result = await response.json();
+		return Array.isArray(result) ? result : [];
 	}
 
 	/**
 	 * Prochains rendez-vous confirmés (admin)
 	 */
 	async getUpcomingRendezvous(limit = 10): Promise<RendezvousResponseDto[]> {
-		const today = new Date();
-		const result = await this.getAllRendezvous({
-			status: "CONFIRMED",
-			startDate: this.formatDate(today),
-			sortBy: "date",
-			sortOrder: "asc",
-			limit,
-		});
-		return result.data;
+		try {
+			const today = new Date();
+			const dateStr = this.formatDate(today);
+			const response = await apiFetch(
+				`${this.baseUrl}/admin/rendezvous/all?status=CONFIRMED&startDate=${dateStr}&sortBy=date&sortOrder=asc&limit=${limit}`,
+				{
+					method: "GET",
+				},
+			);
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la récupération des prochains rendez-vous";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
+
+			const result = await response.json();
+			return result.data || [];
+		} catch (error) {
+			toast.error("Erreur lors de la récupération des prochains rendez-vous");
+			throw error;
+		}
 	}
 
 	/**
 	 * Recherche avancée avec filtres
 	 */
 	async searchRendezvous(filters: RendezvousFilters, page = 1, limit = 10): Promise<PaginatedRendezvousResponseDto> {
-		const params: RendezvousQueryDto = {
-			page,
-			limit,
-		};
+		try {
+			const params: RendezvousQueryDto = {
+				page,
+				limit,
+			};
 
-		if (filters.status) {
-			params.status = Array.isArray(filters.status) ? filters.status[0] : filters.status;
+			if (filters.status) {
+				params.status = Array.isArray(filters.status) ? filters.status[0] : filters.status;
+			}
+
+			if (filters.searchTerm) params.search = filters.searchTerm;
+			if (filters.hasProcedure !== undefined) params.hasProcedure = filters.hasProcedure;
+			if (filters.avisAdmin) {
+				params.hasAvis = true;
+			}
+
+			if (filters.dateRange) {
+				params.startDate = filters.dateRange.start;
+				params.endDate = filters.dateRange.end;
+			}
+
+			// Construire l'URL avec les paramètres
+			const searchParams = new URLSearchParams();
+			Object.entries(params).forEach(([key, value]) => {
+				if (value !== undefined && value !== null) {
+					searchParams.set(key, String(value));
+				}
+			});
+
+			const url = `${this.baseUrl}/admin/rendezvous/all${searchParams.toString() ? `?${searchParams}` : ""}`;
+			const response = await apiFetch(url, { method: "GET" });
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la recherche des rendez-vous";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
+
+			const result = await response.json();
+			return result;
+		} catch (error) {
+			toast.error("Erreur lors de la recherche des rendez-vous");
+			throw error;
 		}
-
-		if (filters.searchTerm) params.search = filters.searchTerm;
-		if (filters.hasProcedure !== undefined) params.hasProcedure = filters.hasProcedure;
-		if (filters.avisAdmin) {
-			params.hasAvis = true;
-			// Note: Le filtre par avisAdmin spécifique nécessiterait un endpoint dédié
-		}
-
-		if (filters.dateRange) {
-			params.startDate = filters.dateRange.start;
-			params.endDate = filters.dateRange.end;
-		}
-
-		if (filters.createdAfter) {
-			// À implémenter si le backend le supporte
-		}
-
-		return this.getAllRendezvous(params);
 	}
 
 	/**

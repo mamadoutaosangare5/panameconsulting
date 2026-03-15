@@ -1,399 +1,399 @@
 import { apiFetch } from "../context/AuthContext";
-import { toast } from "react-toastify";
+import { toast } from "react-hot-toast";
 import type {
-  Destination,
-  CreateDestinationData,
-  UpdateDestinationData,
-  ImageCleanupResponse,
-  DestinationFilters,
+	Destination,
+	CreateDestinationData,
+	UpdateDestinationData,
+	ImageCleanupResponse,
+	DestinationFilters,
 } from "../types/destination.types";
 
 class DestinationsService {
-  private readonly baseUrl = import.meta.env.VITE_API_URL;
+	private readonly baseUrl = import.meta.env.VITE_API_URL;
 
-  // ── ROUTES PUBLIQUES ────────────────────────────────────────────────────────
+	// ── ROUTES PUBLIQUES ────────────────────────────────────────────────────────
 
-  /**
-   * GET /destinations/all
-   * Backend retourne: {statusCode, message, data: Destination[]} avec imageUrl ajouté
-   */
-  async getAllDestinations(): Promise<Destination[]> {
-    const response = await apiFetch(`${this.baseUrl}/destinations/all`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message || "Erreur lors de la récupération des destinations";
-      throw new Error(errorMessage);
-    }
+	/**
+	 * GET /destinations/all
+	 * Backend retourne: {statusCode, message, data: Destination[]} avec imageUrl ajouté
+	 */
+	async getAllDestinations(): Promise<Destination[]> {
+		try {
+			const url = `${this.baseUrl}/destinations/all`;
+			const response = await apiFetch(url);
 
-    // Le backend retourne un objet enveloppé avec data contenant le tableau
-    const result = await response.json();
-    const data = result.data || result; // Fallback si format change
-    return Array.isArray(data) ? data : [];
-  }
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la récupération des destinations";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  /**
-   * GET /destinations/search?q=query
-   * Backend retourne: {statusCode, message, data: Destination[]} avec imageUrl ajouté
-   */
-  async searchDestinations(query: string): Promise<Destination[]> {
-    if (!query.trim()) return [];
+			// Le backend retourne un objet enveloppé avec data contenant le tableau
+			const result = await response.json();
+			const data = result.data || result; // Fallback si format change
+			return Array.isArray(data) ? data : [];
+		} catch (error) {
+			toast.error("Erreur lors du chargement des destinations");
+			throw error;
+		}
+	}
 
-    const response = await apiFetch(
-      `${this.baseUrl}/destinations/search?q=${encodeURIComponent(query)}`,
-    );
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message || "Erreur lors de la recherche des destinations";
-      throw new Error(errorMessage);
-    }
+	/**
+	 * GET /destinations/search?q=query
+	 * Backend retourne: {statusCode, message, data: Destination[]} avec imageUrl ajouté
+	 */
+	async searchDestinations(query: string): Promise<Destination[]> {
+		if (!query.trim()) return [];
 
-    // Le backend retourne un objet enveloppé avec data contenant le tableau
-    const result = await response.json();
-    const data = result.data || result; // Fallback si format change
-    return Array.isArray(data) ? data : [];
-  }
+		try {
+			const response = await apiFetch(`${this.baseUrl}/destinations/search?q=${encodeURIComponent(query)}`);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la recherche des destinations";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  // ── ROUTES ADMIN ────────────────────────────────────────────────────────────
+			// Le backend retourne un objet enveloppé avec data contenant le tableau
+			const result = await response.json();
+			const data = result.data || result; // Fallback si format change
+			return Array.isArray(data) ? data : [];
+		} catch (error) {
+			toast.error("Erreur lors de la recherche");
+			throw error;
+		}
+	}
 
-  /**
-   * POST /admin/destinations
-   * Backend attend: FormData avec country, text, image (fichier)
-   * Backend retourne: Destination avec imageUrl
-   */
-  async createDestination(data: CreateDestinationData): Promise<Destination> {
-    const formData = new FormData();
+	// ── ROUTES ADMIN ────────────────────────────────────────────────────────────
 
-    // Ajouter les champs requis selon le DTO
-    formData.append("country", data.country);
-    formData.append("text", data.text);
+	/**
+	 * POST /admin/destinations
+	 * Backend attend: FormData avec country, text, image (fichier)
+	 * Backend retourne: Destination avec imageUrl
+	 */
+	async createDestination(data: CreateDestinationData): Promise<Destination> {
+		const formData = new FormData();
 
-    // Ajouter imagePath si fourni (optionnel)
-    if (data.imagePath) {
-      formData.append("imagePath", data.imagePath);
-    }
+		// Ajouter les champs requis selon le DTO
+		formData.append("country", data.country);
+		formData.append("text", data.text);
 
-    // Ajouter l'image seulement si c'est un fichier valide
-    if (data.image && data.image instanceof File) {
-      formData.append("image", data.image);
-    }
+		// Ajouter imagePath si fourni (optionnel)
+		if (data.imagePath) {
+			formData.append("imagePath", data.imagePath);
+		}
 
-    // Utiliser fetch natif pour FormData avec auth via apiFetch
-    const response = await fetch(`${this.baseUrl}/admin/destinations`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        // Ne pas définir Content-Type pour FormData (le navigateur le fait automatiquement)
-      },
-      body: formData,
-    });
+		// Ajouter l'image seulement si c'est un fichier valide
+		if (data.image && data.image instanceof File) {
+			formData.append("image", data.image);
+		}
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      let errorMessage = "Erreur lors de la création de la destination";
+		try {
+			// Utiliser fetch natif pour FormData avec auth via apiFetch
+			const response = await fetch(`${this.baseUrl}/admin/destinations`, {
+				method: "POST",
+				credentials: "include",
+				headers: {
+					// Ne pas définir Content-Type pour FormData (le navigateur le fait automatiquement)
+				},
+				body: formData,
+			});
 
-      if (errorData.message) {
-        if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      }
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				let errorMessage = "Erreur lors de la création de la destination";
 
-      toast.error(errorMessage);
-      throw new Error(errorMessage);
-    }
+				if (errorData.message) {
+					if (Array.isArray(errorData.message)) {
+						errorMessage = errorData.message.join(", ");
+					} else {
+						errorMessage = errorData.message;
+					}
+				}
 
-    const result = await response.json();
-    toast.success("Destination créée avec succès !");
-    return result; // Le backend retourne directement la destination
-  }
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  /**
-   * GET /admin/destinations/:id
-   * Backend retourne: Destination avec imageUrl
-   */
-  async getDestinationById(id: string): Promise<Destination> {
-    const response = await apiFetch(`${this.baseUrl}/admin/destinations/${id}`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.message || "Destination non trouvée";
-      throw new Error(errorMessage);
-    }
+			const result = await response.json();
+			toast.success("Destination créée avec succès !");
+			return result; // Le backend retourne directement la destination
+		} catch (error) {
+			toast.error("Erreur lors de la création de la destination");
+			throw error;
+		}
+	}
 
-    const result = await response.json();
-    return result; // Le backend retourne directement la destination
-  }
+	/**
+	 * GET /admin/destinations/:id
+	 * Backend retourne: Destination avec imageUrl
+	 */
+	async getDestinationById(id: string): Promise<Destination> {
+		try {
+			const response = await apiFetch(`${this.baseUrl}/admin/destinations/${id}`);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Destination non trouvée";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  /**
-   * PUT /admin/destinations/:id
-   * Backend attend: FormData avec champs optionnels + image
-   * Backend retourne: Destination avec imageUrl
-   */
-  async updateDestination(
-    id: string,
-    data: UpdateDestinationData,
-  ): Promise<Destination> {
-    const formData = new FormData();
+			const result = await response.json();
+			return result; // Le backend retourne directement la destination
+		} catch (error) {
+			toast.error("Erreur lors du chargement de la destination");
+			throw error;
+		}
+	}
 
-    // Ajouter les champs seulement s'ils sont présents (PartialType)
-    if (data.country !== undefined) {
-      formData.append("country", data.country);
-    }
-    if (data.text !== undefined) {
-      formData.append("text", data.text);
-    }
-    if (data.imagePath !== undefined) {
-      formData.append("imagePath", data.imagePath);
-    }
+	/**
+	 * PUT /admin/destinations/:id
+	 * Backend attend: FormData avec champs optionnels + image
+	 * Backend retourne: Destination avec imageUrl
+	 */
+	async updateDestination(id: string, data: UpdateDestinationData): Promise<Destination> {
+		const formData = new FormData();
 
-    // Ajouter l'image si présente
-    if (data.image) {
-      formData.append("image", data.image);
-    }
+		// Ajouter les champs seulement s'ils sont présents (PartialType)
+		if (data.country !== undefined) {
+			formData.append("country", data.country);
+		}
+		if (data.text !== undefined) {
+			formData.append("text", data.text);
+		}
+		if (data.imagePath !== undefined) {
+			formData.append("imagePath", data.imagePath);
+		}
 
-    // Utiliser fetch natif pour FormData
-    const response = await fetch(`${this.baseUrl}/admin/destinations/${id}`, {
-      method: "PUT",
-      credentials: "include",
-      headers: {
-        // Ne pas définir Content-Type pour FormData
-      },
-      body: formData,
-    });
+		// Ajouter l'image si présente
+		if (data.image) {
+			formData.append("image", data.image);
+		}
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message || "Erreur lors de la mise à jour de la destination";
-      throw new Error(errorMessage);
-    }
+		try {
+			// Utiliser fetch natif pour FormData
+			const response = await fetch(`${this.baseUrl}/admin/destinations/${id}`, {
+				method: "PUT",
+				credentials: "include",
+				headers: {
+					// Ne pas définir Content-Type pour FormData
+				},
+				body: formData,
+			});
 
-    const result = await response.json();
-    return result; // Le backend retourne directement la destination
-  }
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la mise à jour de la destination";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  /**
-   * DELETE /admin/destinations/:id
-   * Backend retourne: { message: string }
-   */
-  async deleteDestination(id: string): Promise<{ message: string }> {
-    const response = await apiFetch(
-      `${this.baseUrl}/admin/destinations/${id}`,
-      {
-        method: "DELETE",
-      },
-    );
+			const result = await response.json();
+			toast.success("Destination mise à jour avec succès");
+			return result; // Le backend retourne directement la destination
+		} catch (error) {
+			toast.error("Erreur lors de la mise à jour de la destination");
+			throw error;
+		}
+	}
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message || "Erreur lors de la suppression de la destination";
-      throw new Error(errorMessage);
-    }
+	/**
+	 * DELETE /admin/destinations/:id
+	 * Backend retourne: { message: string }
+	 */
+	async deleteDestination(id: string): Promise<{ message: string }> {
+		try {
+			const response = await apiFetch(`${this.baseUrl}/admin/destinations/${id}`, {
+				method: "DELETE",
+			});
 
-    const result = await response.json();
-    return result; // Le backend retourne { message: string }
-  }
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors de la suppression de la destination";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  /**
-   * POST /admin/destinations/cleanup-images
-   * Backend retourne: { message: string, deletedFiles: string[] }
-   */
-  async cleanupOrphanedImages(): Promise<ImageCleanupResponse> {
-    const response = await apiFetch(
-      `${this.baseUrl}/admin/destinations/cleanup-images`,
-      {
-        method: "POST",
-      },
-    );
+			const result = await response.json();
+			toast.success("Destination supprimée avec succès");
+			return result; // Le backend retourne { message: string }
+		} catch (error) {
+			toast.error("Erreur lors de la suppression de la destination");
+			throw error;
+		}
+	}
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message || "Erreur lors du nettoyage des images";
-      throw new Error(errorMessage);
-    }
+	/**
+	 * POST /admin/destinations/cleanup-images
+	 * Backend retourne: { message: string, deletedFiles: string[] }
+	 */
+	async cleanupOrphanedImages(): Promise<ImageCleanupResponse> {
+		try {
+			const response = await apiFetch(`${this.baseUrl}/admin/destinations/cleanup-images`, {
+				method: "POST",
+			});
 
-    const result = await response.json();
-    return result; // Le backend retourne { message, deletedFiles }
-  }
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				const errorMessage = errorData.message || "Erreur lors du nettoyage des images";
+				toast.error(errorMessage);
+				throw new Error(errorMessage);
+			}
 
-  // ── MÉTHODES UTILITAIRES ─────────────────────────────────────────────────────
+			const result = await response.json();
+			toast.success("Nettoyage des images terminé");
+			return result; // Le backend retourne { message, deletedFiles }
+		} catch (error) {
+			toast.error("Erreur lors du nettoyage des images");
+			throw error;
+		}
+	}
 
-  // Récupérer les destinations avec filtres avancés
-  async getDestinationsWithFilters(
-    filters: DestinationFilters,
-  ): Promise<Destination[]> {
-    const allDestinations = await this.getAllDestinations();
+	// ── MÉTHODES UTILITAIRES ─────────────────────────────────────────────────────
 
-    return allDestinations.filter((dest) => {
-      // Filtre par pays
-      if (
-        filters.country &&
-        !dest.country.toLowerCase().includes(filters.country.toLowerCase())
-      ) {
-        return false;
-      }
+	// Récupérer les destinations avec filtres avancés
+	async getDestinationsWithFilters(filters: DestinationFilters): Promise<Destination[]> {
+		const allDestinations = await this.getAllDestinations();
 
-      // Filtre par terme de recherche
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        const matchesCountry = dest.country.toLowerCase().includes(searchLower);
-        const matchesText = dest.text.toLowerCase().includes(searchLower);
-        if (!matchesCountry && !matchesText) {
-          return false;
-        }
-      }
+		return allDestinations.filter((dest) => {
+			// Filtre par pays
+			if (filters.country && !dest.country.toLowerCase().includes(filters.country.toLowerCase())) {
+				return false;
+			}
 
-      // Filtre par présence d'image
-      if (filters.hasImage !== undefined) {
-        const hasImage = !!(dest.imagePath || dest.imageUrl);
-        if (filters.hasImage !== hasImage) {
-          return false;
-        }
-      }
+			// Filtre par terme de recherche
+			if (filters.searchTerm) {
+				const searchLower = filters.searchTerm.toLowerCase();
+				const matchesCountry = dest.country.toLowerCase().includes(searchLower);
+				const matchesText = dest.text.toLowerCase().includes(searchLower);
+				if (!matchesCountry && !matchesText) {
+					return false;
+				}
+			}
 
-      // Filtre par plage de dates
-      if (filters.dateRange) {
-        const createdDate = new Date(dest.createdAt);
-        if (
-          createdDate < filters.dateRange.start ||
-          createdDate > filters.dateRange.end
-        ) {
-          return false;
-        }
-      }
+			// Filtre par présence d'image
+			if (filters.hasImage !== undefined) {
+				const hasImage = !!(dest.imagePath || dest.imageUrl);
+				if (filters.hasImage !== hasImage) {
+					return false;
+				}
+			}
 
-      return true;
-    });
-  }
+			// Filtre par plage de dates
+			if (filters.dateRange) {
+				const createdDate = new Date(dest.createdAt);
+				if (createdDate < filters.dateRange.start || createdDate > filters.dateRange.end) {
+					return false;
+				}
+			}
 
-  // Exporter les destinations en CSV
-  async exportDestinationsToCSV(filters?: DestinationFilters): Promise<string> {
-    const destinations = filters
-      ? await this.getDestinationsWithFilters(filters)
-      : await this.getAllDestinations();
+			return true;
+		});
+	}
 
-    const headers = [
-      "ID",
-      "Pays",
-      "Texte",
-      "Chemin image",
-      "URL image",
-      "Date de création",
-      "Date de mise à jour",
-    ];
+	// Exporter les destinations en CSV
+	async exportDestinationsToCSV(filters?: DestinationFilters): Promise<string> {
+		const destinations = filters ? await this.getDestinationsWithFilters(filters) : await this.getAllDestinations();
 
-    const rows = destinations.map((dest) => [
-      dest.id,
-      dest.country,
-      `"${dest.text.replace(/"/g, '""')}"`, // Échapper les guillemets dans le texte
-      dest.imagePath || "",
-      dest.imageUrl || "",
-      new Date(dest.createdAt).toLocaleDateString(),
-      new Date(dest.updatedAt).toLocaleDateString(),
-    ]);
+		const headers = ["ID", "Pays", "Texte", "Chemin image", "URL image", "Date de création", "Date de mise à jour"];
 
-    return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-  }
+		const rows = destinations.map((dest) => [
+			dest.id,
+			dest.country,
+			`"${dest.text.replace(/"/g, '""')}"`, // Échapper les guillemets dans le texte
+			dest.imagePath || "",
+			dest.imageUrl || "",
+			new Date(dest.createdAt).toLocaleDateString(),
+			new Date(dest.updatedAt).toLocaleDateString(),
+		]);
 
-  // Obtenir des statistiques sur les destinations
-  async getDestinationsStatistics(): Promise<{
-    total: number;
-    topCountries: { country: string; count: number }[];
-    withImages: number;
-    withoutImages: number;
-    recentlyAdded: Destination[];
-  }> {
-    const destinations = await this.getAllDestinations();
+		return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+	}
 
-    // Compter par pays
-    const countryCounts: Record<string, number> = {};
-    destinations.forEach((dest) => {
-      countryCounts[dest.country] = (countryCounts[dest.country] || 0) + 1;
-    });
+	// Obtenir des statistiques sur les destinations
+	async getDestinationsStatistics(): Promise<{
+		total: number;
+		topCountries: { country: string; count: number }[];
+		withImages: number;
+		withoutImages: number;
+		recentlyAdded: Destination[];
+	}> {
+		const destinations = await this.getAllDestinations();
 
-    const topCountries = Object.entries(countryCounts)
-      .map(([country, count]) => ({ country, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 pays
+		// Compter par pays
+		const countryCounts: Record<string, number> = {};
+		destinations.forEach((dest) => {
+			countryCounts[dest.country] = (countryCounts[dest.country] || 0) + 1;
+		});
 
-    // Compter avec/sans images
-    const withImages = destinations.filter(
-      (dest) => !!(dest.imagePath || dest.imageUrl),
-    ).length;
-    const withoutImages = destinations.length - withImages;
+		const topCountries = Object.entries(countryCounts)
+			.map(([country, count]) => ({ country, count }))
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 10); // Top 10 pays
 
-    // Récemment ajoutées (7 derniers jours)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentlyAdded = destinations
-      .filter((dest) => new Date(dest.createdAt) >= sevenDaysAgo)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-      .slice(0, 5);
+		// Compter avec/sans images
+		const withImages = destinations.filter((dest) => !!(dest.imagePath || dest.imageUrl)).length;
+		const withoutImages = destinations.length - withImages;
 
-    return {
-      total: destinations.length,
-      topCountries,
-      withImages,
-      withoutImages,
-      recentlyAdded,
-    };
-  }
+		// Récemment ajoutées (7 derniers jours)
+		const sevenDaysAgo = new Date();
+		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+		const recentlyAdded = destinations
+			.filter((dest) => new Date(dest.createdAt) >= sevenDaysAgo)
+			.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+			.slice(0, 5);
 
-  // Valider les données de destination
-  validateDestinationData(
-    data: CreateDestinationData | UpdateDestinationData,
-  ): {
-    isValid: boolean;
-    errors: Record<string, string>;
-  } {
-    const errors: Record<string, string> = {};
+		return {
+			total: destinations.length,
+			topCountries,
+			withImages,
+			withoutImages,
+			recentlyAdded,
+		};
+	}
 
-    // Validation du pays
-    if ("country" in data) {
-      if (!data.country || data.country.trim().length < 2) {
-        errors.country = "Le pays doit contenir au moins 2 caractères";
-      } else if (data.country.length > 100) {
-        errors.country = "Le pays ne peut pas dépasser 100 caractères";
-      }
-    }
+	// Valider les données de destination
+	validateDestinationData(data: CreateDestinationData | UpdateDestinationData): {
+		isValid: boolean;
+		errors: Record<string, string>;
+	} {
+		const errors: Record<string, string> = {};
 
-    // Validation du texte
-    if ("text" in data) {
-      if (!data.text || data.text.trim().length < 10) {
-        errors.text = "Le texte doit contenir au moins 10 caractères";
-      } else if (data.text.length > 2000) {
-        errors.text = "Le texte ne peut pas dépasser 2000 caractères";
-      }
-    }
+		// Validation du pays
+		if ("country" in data) {
+			if (!data.country || data.country.trim().length < 2) {
+				errors.country = "Le pays doit contenir au moins 2 caractères";
+			} else if (data.country.length > 100) {
+				errors.country = "Le pays ne peut pas dépasser 100 caractères";
+			}
+		}
 
-    // Validation de l'image
-    if (data.image) {
-      const allowedTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-      ];
-      if (!allowedTypes.includes(data.image.type)) {
-        errors.image = "Seuls les formats JPEG, PNG et WebP sont autorisés";
-      } else if (data.image.size > 5 * 1024 * 1024) {
-        // 5MB
-        errors.image = "L'image ne peut pas dépasser 5MB";
-      }
-    }
+		// Validation du texte
+		if ("text" in data) {
+			if (!data.text || data.text.trim().length < 10) {
+				errors.text = "Le texte doit contenir au moins 10 caractères";
+			} else if (data.text.length > 2000) {
+				errors.text = "Le texte ne peut pas dépasser 2000 caractères";
+			}
+		}
 
-    return {
-      isValid: Object.keys(errors).length === 0,
-      errors,
-    };
-  }
+		// Validation de l'image
+		if (data.image) {
+			const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+			if (!allowedTypes.includes(data.image.type)) {
+				errors.image = "Seuls les formats JPEG, PNG et WebP sont autorisés";
+			} else if (data.image.size > 5 * 1024 * 1024) {
+				// 5MB
+				errors.image = "L'image ne peut pas dépasser 5MB";
+			}
+		}
+
+		return {
+			isValid: Object.keys(errors).length === 0,
+			errors,
+		};
+	}
 }
 
 export const destinationsService = new DestinationsService();

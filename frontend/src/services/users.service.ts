@@ -79,13 +79,9 @@ function mapUserResponseToAppUser(dto: BackendDTO_UserResponse): AppUser {
  */
 async function parseResponse<T>(response: Response): Promise<T> {
 	const body: BackendDTO_ApiResponse<T> = await response.json();
-	console.log("[users.service] parseResponse:", {
-		status: response.status,
-		ok: response.ok,
-		body: body,
-	});
 
 	if (!response.ok) {
+		console.error("[users.service] Error:", body.message || `HTTP ${response.status}`);
 		throw new Error(body.message || `Erreur HTTP ${response.status}`);
 	}
 	return body.data;
@@ -183,23 +179,15 @@ export async function createUser(params: CreateUserParams): Promise<AppUser> {
 export async function getUsers(params: GetUsersParams = {}): Promise<AppUserList> {
 	const { page = 1, limit = 10 } = params;
 
-	console.log("[users.service] getUsers called:", { page, limit });
-
 	const url = new URL(`${API_URL}/admin/users/all`);
 	url.searchParams.set("page", String(page));
 	url.searchParams.set("limit", String(limit));
 
-	console.log("[users.service] Fetching URL:", url.toString());
-
 	const response = await apiFetch(url, { method: "GET" });
-
-	console.log("[users.service] Response status:", response.status);
 
 	// Pour cette route spécifique, le backend retourne directement la structure
 	// sans enveloppe ApiResponse, donc on parse directement
 	const listDto: BackendDTO_UsersListResponse = await response.json();
-
-	console.log("[users.service] Parsed DTO (direct):", listDto);
 
 	const result = {
 		items: listDto.data.map(mapUserResponseToAppUser),
@@ -208,8 +196,6 @@ export async function getUsers(params: GetUsersParams = {}): Promise<AppUserList
 		limit: listDto.limit,
 		totalPages: Math.ceil(listDto.total / listDto.limit),
 	};
-
-	console.log("[users.service] Final result:", result);
 
 	return result;
 }
@@ -220,23 +206,28 @@ export async function getUsers(params: GetUsersParams = {}): Promise<AppUserList
  * Correspond à la forme retournée par getStatistics() backend.
  */
 export async function getStatistics(): Promise<AppUserStatistics> {
-	const response = await apiFetch(`${API_URL}/admin/users/statistics`, {
-		method: "GET",
-	});
+	try {
+		const response = await apiFetch(`${API_URL}/admin/users/statistics`, {
+			method: "GET",
+		});
 
-	// Le backend retourne la structure directement dans body.data
-	const dto = await parseResponse<BackendDTO_UserStatistics>(response);
+		// Le backend retourne la structure directement dans body.data
+		const dto = await parseResponse<BackendDTO_UserStatistics>(response);
 
-	// Pas de transformation nécessaire : les noms de champs sont identiques
-	return {
-		totalUsers: dto.totalUsers,
-		activeUsers: dto.activeUsers,
-		inactiveUsers: dto.inactiveUsers,
-		adminUsers: dto.adminUsers,
-		userUsers: dto.userUsers,
-		recentlyCreated: dto.recentlyCreated,
-		recentlyActive: dto.recentlyActive,
-	};
+		// Pas de transformation nécessaire : les noms de champs sont identiques
+		return {
+			totalUsers: dto.totalUsers,
+			activeUsers: dto.activeUsers,
+			inactiveUsers: dto.inactiveUsers,
+			adminUsers: dto.adminUsers,
+			userUsers: dto.userUsers,
+			recentlyCreated: dto.recentlyCreated,
+			recentlyActive: dto.recentlyActive,
+		};
+	} catch (error) {
+		toast.error("Erreur lors du chargement des statistiques");
+		throw error;
+	}
 }
 
 /**
@@ -244,12 +235,17 @@ export async function getStatistics(): Promise<AppUserStatistics> {
  * Récupère un utilisateur par son ID.
  */
 export async function getUserById(id: string): Promise<AppUser> {
-	const response = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}`, {
-		method: "GET",
-	});
+	try {
+		const response = await apiFetch(`${API_URL}/admin/user/${encodeURIComponent(id)}`, {
+			method: "GET",
+		});
 
-	const dto = await parseResponse<BackendDTO_UserResponse>(response);
-	return mapUserResponseToAppUser(dto);
+		const dto = await parseResponse<BackendDTO_UserResponse>(response);
+		return mapUserResponseToAppUser(dto);
+	} catch (error) {
+		toast.error("Erreur lors du chargement de l'utilisateur");
+		throw error;
+	}
 }
 
 /**

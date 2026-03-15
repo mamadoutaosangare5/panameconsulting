@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
-import { motion } from "framer-motion";
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   PieChart,
   Pie,
   Cell,
@@ -15,16 +12,13 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  AreaChart,
-  Area,
 } from "recharts";
 import {
-  Users,
-  FileText,
   Calendar,
   Globe,
   MessageSquare,
   TrendingUp,
+  TrendingDown,
   Clock,
   CheckCircle,
   XCircle,
@@ -33,487 +27,418 @@ import {
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
+  FileText,
+  LayoutDashboard,
+  Users,
 } from "lucide-react";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hooks et Services
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useRendezvous } from "../../../hooks/useRendezvous";
+import { useUser } from "../../../hooks/useUser";
+import { useProcedures } from "../../../hooks/useProcedures";
+import { useMessages } from "../../../hooks/useMessages";
+import { useDestinations } from "../../../hooks/useDestinations";
+import { toast } from "react-hot-toast";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Section =
+  | "overview"
+  | "rendezvous"
+  | "procedures"
+  | "messages"
+  | "destinations";
+
 interface StatCardProps {
   title: string;
   value: string | number;
   change: number;
   icon: React.ElementType;
-  color: string;
+  gradient: string;
   trend: "up" | "down" | "neutral";
+  sub?: string;
 }
 
-// Composant StatCard optimisé
-const StatCard: React.FC<StatCardProps> = ({
-  title,
-  value,
-  change,
-  icon: Icon,
-  color,
-  trend,
-}) => {
-  const trendColor =
-    trend === "up"
-      ? "text-emerald-600"
-      : trend === "down"
-        ? "text-rose-600"
-        : "text-gray-600";
+// ─────────────────────────────────────────────────────────────────────────────
+// Données dynamiques (hooks)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  return (
-    <>
-      <Helmet>
-        <title>Panneau Des Statistiques - Paname Consulting</title>
-        <meta
-          name="description"
-          content="Consultez les statistiques de Paname Consulting"
-        />
-        <meta name="robots" content="noindex, nofollow" />
-        <meta name="googlebot" content="noindex, nofollow" />
-      </Helmet>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        whileHover={{ scale: 1.02 }}
-        className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-sky-100"
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className={`p-2 sm:p-3 rounded-lg bg-gradient-to-br ${color}`}>
-            <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-          </div>
-          <span
-            className={`text-xs sm:text-sm font-medium flex items-center gap-1 ${trendColor}`}
-          >
-            {change > 0 ? "+" : ""}
-            {change}%
-            {trend === "up" && (
-              <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4" />
-            )}
-            {trend === "down" && (
-              <ArrowDownRight className="w-3 h-3 sm:w-4 sm:h-4" />
-            )}
-          </span>
-        </div>
-        <h3 className="text-sm sm:text-base font-medium text-gray-600 mb-1">
-          {title}
-        </h3>
-        <p className="text-xl sm:text-2xl font-bold text-gray-900">{value}</p>
-      </motion.div>
-    </>
-  );
-};
-
-// Données
-const userStats = [
-  { name: "Lun", utilisateurs: 45, rendezvous: 12, procedures: 8 },
-  { name: "Mar", utilisateurs: 52, rendezvous: 15, procedures: 10 },
-  { name: "Mer", utilisateurs: 48, rendezvous: 18, procedures: 12 },
-  { name: "Jeu", utilisateurs: 61, rendezvous: 22, procedures: 15 },
-  { name: "Ven", utilisateurs: 55, rendezvous: 25, procedures: 18 },
-  { name: "Sam", utilisateurs: 38, rendezvous: 10, procedures: 5 },
-  { name: "Dim", utilisateurs: 25, rendezvous: 5, procedures: 3 },
+// Données d'activité hebdomadaire (construites à partir des statistiques)
+const getWeeklyActivity = (rendezvousStats: any, procedureStats: any, messageStats: any) => [
+	{ name: "Lun", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+	{ name: "Mar", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+	{ name: "Mer", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+	{ name: "Jeu", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+	{ name: "Ven", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+	{ name: "Sam", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+	{ name: "Dim", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
 ];
 
-const destinationStats = [
-  { name: "France", valeur: 45 },
-  { name: "Canada", valeur: 32 },
-  { name: "USA", valeur: 28 },
-  { name: "UK", valeur: 25 },
-  { name: "Allemagne", valeur: 18 },
-];
-
-const procedureTypes = [
-  { name: "Visa Étudiant", value: 85 },
-  { name: "Visa Travail", value: 42 },
-  { name: "Résidence", value: 38 },
-  { name: "Citoyenneté", value: 12 },
-  { name: "Regroupement", value: 25 },
-];
-
-const contactStats = [
-  { name: "Jan", messages: 65, repondu: 58 },
-  { name: "Fév", messages: 78, repondu: 70 },
-  { name: "Mar", messages: 92, repondu: 85 },
-  { name: "Avr", messages: 88, repondu: 82 },
-  { name: "Mai", messages: 102, repondu: 95 },
-  { name: "Jun", messages: 115, repondu: 108 },
-];
-
-const rendezvousStats = [
-  { name: "Matin", value: 35 },
-  { name: "Après-midi", value: 45 },
-  { name: "Soir", value: 20 },
-];
+// Données de destinations (construites à partir du hook)
+const getDestinationData = (destinations: any[]) => destinations?.map(dest => ({
+	name: dest.country,
+	value: dest.totalProcedures || 0
+})) || [];
 
 const COLORS = ["#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd"];
 
-const Statistiques = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState("semaine");
-  const [isRefreshing, setIsRefreshing] = useState(false);
+// ─────────────────────────────────────────────────────────────────────────────
+// StatCard
+// ─────────────────────────────────────────────────────────────────────────────
 
-  // Détection mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon: Icon, gradient, trend, sub }) => {
+	const trendColor = trend === "up" ? "text-emerald-600" : trend === "down" ? "text-rose-600" : "text-gray-500";
+	const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : TrendingUp;
 
-  // Données des cartes statistiques
-  const statCards = [
-    {
-      title: "Utilisateurs",
-      value: "1,234",
-      change: 12,
-      icon: Users,
-      color: "from-sky-400 to-sky-600",
-      trend: "up" as const,
-    },
-    {
-      title: "Procédures",
-      value: "456",
-      change: 8,
-      icon: FileText,
-      color: "from-emerald-400 to-emerald-600",
-      trend: "up" as const,
-    },
-    {
-      title: "Rendez-vous",
-      value: "89",
-      change: -5,
-      icon: Calendar,
-      color: "from-amber-400 to-amber-600",
-      trend: "down" as const,
-    },
-    {
-      title: "Destinations",
-      value: "32",
-      change: 0,
-      icon: Globe,
-      color: "from-purple-400 to-purple-600",
-      trend: "neutral" as const,
-    },
-    {
-      title: "Messages",
-      value: "245",
-      change: 15,
-      icon: MessageSquare,
-      color: "from-rose-400 to-rose-600",
-      trend: "up" as const,
-    },
-    {
-      title: "Taux de conversion",
-      value: "68%",
-      change: 4,
-      icon: TrendingUp,
-      color: "from-indigo-400 to-indigo-600",
-      trend: "up" as const,
-    },
-  ];
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 1500);
-  };
-
-  return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-      className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-sky-50 p-3 sm:p-4 md:p-6"
-    >
-      {/* Header */}
-      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-sky-600 to-sky-800 bg-clip-text text-transparent">
-            Tableau de bord
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-600 mt-1">
-            Aperçu global de vos activités
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="flex-1 sm:flex-none px-3 py-2 text-sm bg-white border border-sky-200 rounded-lg hover:border-sky-600 focus:ring-none focus:outline-none focus:border-sky-500 focus:border-transparent"
-          >
-            <option value="semaine">Cette semaine</option>
-            <option value="mois">Ce mois</option>
-            <option value="trimestre">Ce trimestre</option>
-            <option value="annee">Cette année</option>
-          </select>
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleRefresh}
-            className="p-2 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 transition-colors"
-          >
-            <RefreshCw
-              className={`w-4 h-4 text-sky-600 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-          </motion.button>
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="p-2 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 transition-colors"
-          >
-            <Download className="w-4 h-4 text-sky-600" />
-          </motion.button>
-        </div>
-      </div>
-
-      {/* Cartes statistiques */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
-        {statCards.map((card, index) => (
-          <StatCard key={index} {...card} />
-        ))}
-      </div>
-
-      {/* Graphiques avec Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Graphique utilisateurs et rendez-vous */}
-        <div
-          key="usersChart"
-          className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border border-sky-100 overflow-hidden"
-        >
-          <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-2 sm:mb-3">
-            Activité hebdomadaire
-          </h3>
-          <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
-            <LineChart data={userStats}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "8px",
-                  outline: "none",
-                }}
-                wrapperStyle={{
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "8px",
-                  outline: "none",
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="utilisateurs"
-                stroke="#0284c7"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="rendezvous"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="procedures"
-                stroke="#10b981"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Graphique destinations */}
-        <div
-          key="destinationsChart"
-          className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border border-sky-100 overflow-hidden"
-        >
-          <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-2 sm:mb-3">
-            Destinations populaires
-          </h3>
-          <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
-            <PieChart>
-              <Pie
-                data={destinationStats}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) =>
-                  `${name} ${Math.round((percent || 0) * 100)}%`
-                }
-                outerRadius={isMobile ? 60 : 80}
-                dataKey="valeur"
-              >
-                {destinationStats.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Graphique types de procédures */}
-        <div
-          key="proceduresChart"
-          className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border border-sky-100 overflow-hidden"
-        >
-          <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-2 sm:mb-3">
-            Types de procédures
-          </h3>
-          <ResponsiveContainer width="100%" height={isMobile ? 180 : 220}>
-            <BarChart data={procedureTypes}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={10} />
-              <YAxis stroke="#64748b" fontSize={10} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#0284c7" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Graphique contacts */}
-        <div
-          key="contactsChart"
-          className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border border-sky-100 overflow-hidden"
-        >
-          <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-2 sm:mb-3">
-            Messages reçus vs traités
-          </h3>
-          <ResponsiveContainer width="100%" height={isMobile ? 180 : 220}>
-            <AreaChart data={contactStats}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={10} />
-              <YAxis stroke="#64748b" fontSize={10} />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="messages"
-                stackId="1"
-                stroke="#f43f5e"
-                fill="#f43f5e"
-                fillOpacity={0.3}
-              />
-              <Area
-                type="monotone"
-                dataKey="repondu"
-                stackId="2"
-                stroke="#10b981"
-                fill="#10b981"
-                fillOpacity={0.3}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Graphique répartition rendez-vous */}
-        <div
-          key="rendezvousChart"
-          className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border border-sky-100 overflow-hidden"
-        >
-          <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-2 sm:mb-3">
-            Rendez-vous par période
-          </h3>
-          <ResponsiveContainer width="100%" height={isMobile ? 180 : 220}>
-            <PieChart>
-              <Pie
-                data={rendezvousStats}
-                cx="50%"
-                cy="50%"
-                innerRadius={isMobile ? 30 : 40}
-                outerRadius={isMobile ? 50 : 70}
-                paddingAngle={5}
-                dataKey="value"
-                label={({ name, percent }) =>
-                  `${name} ${Math.round((percent || 0) * 100)}%`
-                }
-              >
-                {rendezvousStats.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Section des alertes et notifications */}
-      <motion.div
-        variants={{
-          hidden: { opacity: 0, y: 20 },
-          visible: { opacity: 1, y: 0 },
-        }}
-        className="mt-4 sm:mt-6 bg-white rounded-xl shadow-lg p-3 sm:p-4 border border-sky-100"
-      >
-        <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-2 sm:mb-3 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
-          Alertes récentes
-        </h3>
-        <div className="space-y-2">
-          {[
-            {
-              icon: Clock,
-              text: "5 rendez-vous en attente de confirmation",
-              color: "text-amber-600",
-            },
-            {
-              icon: CheckCircle,
-              text: "12 nouvelles procédures cette semaine",
-              color: "text-emerald-600",
-            },
-            {
-              icon: XCircle,
-              text: "3 messages non répondus depuis 24h",
-              color: "text-rose-600",
-            },
-          ].map((alert, index) => {
-            const Icon = alert.icon;
-            return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 rounded-lg"
-              >
-                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${alert.color}`} />
-                <span className="text-xs sm:text-sm text-gray-700">
-                  {alert.text}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-      </motion.div>
-    </motion.div>
-  );
+	return (
+		<div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+			<div className="flex items-start justify-between mb-3">
+				<div
+					className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}
+				>
+					<Icon className="w-5 h-5 text-white" />
+				</div>
+				<span className={`text-xs font-semibold flex items-center gap-0.5 ${trendColor}`}>
+					{change !== 0 && (change > 0 ? "+" : "")}{change !== 0 ? `${change}%` : "—"}
+					<TrendIcon className="w-3 h-3" />
+				</span>
+			</div>
+			<p className="text-2xl font-bold text-gray-900 mb-0.5">{value}</p>
+			<p className="text-xs font-medium text-gray-500">{title}</p>
+			{sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+		</div>
+	);
 };
 
-export default Statistiques;
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPOSANT PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+const Gestionnaire: React.FC = () => {
+	const [activeSection, setActiveSection] = useState<Section>("overview");
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	// Hooks de statistiques existants - Seulement les méthodes de statistiques
+	const { 
+		statistics: rendezvousStats, 
+		loadStatistics: loadRendezvousStats
+	} = useRendezvous({ autoLoad: true });
+
+	const { 
+		statistics: userStats, 
+		fetchStatistics: fetchUserStats 
+	} = useUser();
+
+	const { 
+		statistics: procedureStats, 
+		loadStatistics: loadProcedureStats
+	} = useProcedures({ shouldLoadStatistics: true });
+
+	const { 
+		stats: messageStats, 
+		refresh: refreshMessages
+	} = useMessages();
+
+	const { 
+		destinations, 
+		loadDestinations 
+	} = useDestinations();
+
+	const handleRefresh = useCallback(async () => {
+		setIsRefreshing(true);
+		try {
+			await Promise.all([
+				loadRendezvousStats(),
+				fetchUserStats(),
+				loadProcedureStats(),
+				refreshMessages(),
+				loadDestinations(),
+			]);
+			toast.success("Statistiques actualisées avec succès");
+		} catch (error) {
+			console.error("Erreur lors du rafraîchissement des statistiques:", error);
+			toast.error("Impossible de charger les statistiques");
+		} finally {
+			setIsRefreshing(false);
+		}
+	}, [loadRendezvousStats, fetchUserStats, loadProcedureStats, refreshMessages, loadDestinations]);
+
+	// Données dynamiques construites à partir des hooks de statistiques
+	const weeklyActivity = getWeeklyActivity(rendezvousStats, procedureStats, messageStats);
+	const destinationData = getDestinationData(destinations);
+
+	const tabs: {
+		key: Section;
+		label: string;
+		icon: React.ElementType;
+		count?: number;
+	}[] = [
+		{ key: "overview", label: "Vue d'ensemble", icon: LayoutDashboard },
+		{
+			key: "rendezvous",
+			label: "Rendez-vous",
+			icon: Calendar,
+			count: rendezvousStats?.byStatus?.pending || 0,
+		},
+		{
+			key: "procedures",
+			label: "Procédures",
+			icon: FileText,
+			count: procedureStats?.byStatus?.IN_PROGRESS || 0,
+		},
+		{
+			key: "messages",
+			label: "Messages",
+			icon: MessageSquare,
+			count: messageStats?.unread || 0,
+		},
+		{ key: "destinations", label: "Destinations", icon: Globe, count: destinations.length },
+	];
+
+	const statCards = [
+		{
+			title: "Rendez-vous",
+			value: rendezvousStats?.total || 0,
+			change: Math.round(rendezvousStats?.completionRate || 0),
+			icon: Calendar,
+			gradient: "from-sky-400 to-sky-600",
+			trend: "up" as const,
+			sub: `${rendezvousStats?.byStatus?.confirmed || 0} confirmés`,
+		},
+		{
+			title: "Procédures",
+			value: procedureStats?.total || 0,
+			change: Math.round(procedureStats?.completionRate || 0),
+			icon: FileText,
+			gradient: "from-emerald-400 to-emerald-600",
+			trend: "up" as const,
+			sub: `${procedureStats?.byStatus?.IN_PROGRESS || 0} en cours`,
+		},
+		{
+			title: "Messages",
+			value: messageStats?.total || 0,
+			change: Math.round(messageStats?.responseRate || 0),
+			icon: MessageSquare,
+			gradient: "from-amber-400 to-amber-600",
+			trend: "up" as const,
+			sub: `${messageStats?.unread || 0} non lus`,
+		},
+		{
+			title: "Utilisateurs",
+			value: userStats?.totalUsers || 0,
+			change: userStats?.recentlyCreated || 0,
+			icon: Users,
+			gradient: "from-indigo-400 to-indigo-600",
+			trend: "up" as const,
+			sub: `${userStats?.activeUsers || 0} actifs`,
+		},
+		{
+			title: "Taux complétion",
+			value: `${Math.round(procedureStats?.completionRate || 0)}%`,
+			change: Math.round(procedureStats?.completionRate || 0),
+			icon: TrendingUp,
+			gradient: "from-violet-400 to-violet-600",
+			trend: "up" as const,
+		},
+		{
+			title: "Annulations",
+			value: `${Math.round(rendezvousStats?.cancellationRate || 0)}%`,
+			change: -Math.round(rendezvousStats?.cancellationRate || 0),
+			icon: TrendingDown,
+			gradient: "from-rose-400 to-rose-600",
+			trend: "down" as const,
+		},
+	];
+
+	// ── Sections ────────────────────────────────────────────────────────────────
+	
+	const OverviewSection = () => (
+		<div className="space-y-6">
+			<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+				{statCards.map((card) => (
+					<StatCard key={card.title} {...card} />
+				))}
+			</div>
+
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				{/* Activité hebdomadaire */}
+				<div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5">
+					<h3 className="text-sm font-semibold text-gray-800 mb-4">Activité hebdomadaire</h3>
+					<ResponsiveContainer width="100%" height={220}>
+						<AreaChart data={weeklyActivity}>
+							<defs>
+								<linearGradient id="gRdv"  x1="0" y1="0" x2="0" y2="1">
+									<stop offset="5%"  stopColor="#0284c7" stopOpacity={0.2} />
+									<stop offset="95%" stopColor="#0284c7" stopOpacity={0}   />
+								</linearGradient>
+								<linearGradient id="gProc" x1="0" y1="0" x2="0" y2="1">
+									<stop offset="5%"  stopColor="#10b981" stopOpacity={0.2} />
+									<stop offset="95%" stopColor="#10b981" stopOpacity={0}   />
+								</linearGradient>
+								<linearGradient id="gMsg"  x1="0" y1="0" x2="0" y2="1">
+									<stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.2} />
+									<stop offset="95%" stopColor="#f59e0b" stopOpacity={0}   />
+								</linearGradient>
+							</defs>
+							<CartesianGrid strokeDasharray="3 3" stroke="#f0f9ff" />
+							<XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+							<YAxis stroke="#94a3b8" fontSize={11} />
+							<Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid #e0f2fe", fontSize: 12 }} />
+							<Legend wrapperStyle={{ fontSize: 11 }} />
+							<Area type="monotone" dataKey="rendezvous" stroke="#0284c7" strokeWidth={2} fill="url(#gRdv)"  name="Rendez-vous" />
+							<Area type="monotone" dataKey="procedures" stroke="#10b981" strokeWidth={2} fill="url(#gProc)" name="Procédures"  />
+							<Area type="monotone" dataKey="messages"   stroke="#f59e0b" strokeWidth={2} fill="url(#gMsg)"  name="Messages"    />
+						</AreaChart>
+					</ResponsiveContainer>
+				</div>
+
+				{/* Destinations */}
+				<div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5">
+					<h3 className="text-sm font-semibold text-gray-800 mb-4">Destinations populaires</h3>
+					<ResponsiveContainer width="100%" height={220}>
+						<PieChart>
+							<Pie
+								data={destinationData}
+								cx="50%"
+								cy="50%"
+								outerRadius={80}
+								dataKey="value"
+								label={({ name, percent }) => `${name} ${Math.round((percent || 0) * 100)}%`}
+								labelLine={false}
+								fontSize={11}
+							>
+								{destinationData.map((_, i) => (
+									<Cell key={i} fill={COLORS[i % COLORS.length]} />
+								))}
+							</Pie>
+							<Tooltip />
+						</PieChart>
+					</ResponsiveContainer>
+				</div>
+			</div>
+
+			{/* Alertes */}
+			<div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5">
+				<h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+					<AlertCircle className="w-4 h-4 text-amber-500" />
+					Alertes récentes
+				</h3>
+				<div className="space-y-2">
+					{[
+						{
+							icon: Clock,
+							text: `${rendezvousStats?.byStatus?.pending || 0} rendez-vous en attente de confirmation`,
+							color: "text-amber-600",
+							bg: "bg-amber-50",
+						},
+						{
+							icon: CheckCircle,
+							text: `${procedureStats?.byStatus?.IN_PROGRESS || 0} procédures actives cette semaine`,
+							color: "text-emerald-600",
+							bg: "bg-emerald-50",
+						},
+						{
+							icon: XCircle,
+							text: `${messageStats?.unread || 0} messages non lus depuis 24h`,
+							color: "text-rose-600",
+							bg: "bg-rose-50",
+						},
+					].map(({ icon: Icon, text, color, bg }, i) => (
+						<div key={i} className={`flex items-center gap-3 p-3 ${bg} rounded-xl`}>
+							<Icon className={`w-4 h-4 ${color} flex-shrink-0`} />
+							<span className="text-sm text-gray-700">{text}</span>
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	);
+
+	const RendezvousSection = () => <div>Section Rendez-vous - En cours de développement</div>;
+	const ProceduresSection = () => <div>Section Procédures - En cours de développement</div>;
+	const MessagesSection = () => <div>Section Messages - En cours de développement</div>;
+	const DestinationsSection = () => <div>Section Destinations - En cours de développement</div>;
+
+	// ── Rendu ────────────────────────────────────────────────────────────────────────
+
+	return (
+		<>
+			<Helmet>
+				<title>Statistiques - Paname Consulting</title>
+				<meta name="robots" content="noindex, nofollow" />
+			</Helmet>
+
+			<div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-sky-50">
+				{/* Header */}
+				<header className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-sky-100 px-4 sm:px-6 py-4">
+					<div className="max-w-7xl mx-auto flex items-center justify-between">
+						<div>
+							<h1 className="text-lg sm:text-xl font-bold text-gray-900">Statistiques</h1>
+							<p className="text-xs text-gray-500">Paname Consulting · Admin</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<button
+								onClick={handleRefresh}
+								className="p-2 bg-white border border-sky-200 rounded-xl hover:bg-sky-50 transition-colors"
+							>
+								<RefreshCw className={`w-4 h-4 text-sky-600 ${isRefreshing ? "animate-spin" : ""}`} />
+							</button>
+							<button className="p-2 bg-white border border-sky-200 rounded-xl hover:bg-sky-50 transition-colors">
+								<Download className="w-4 h-4 text-sky-600" />
+							</button>
+						</div>
+					</div>
+				</header>
+
+				{/* Tabs */}
+				<div className="sticky top-[65px] z-10 bg-white/90 backdrop-blur-md border-b border-sky-100">
+					<div className="max-w-7xl mx-auto px-4 sm:px-6">
+						<div className="flex overflow-x-auto scrollbar-hide gap-1 py-2">
+							{tabs.map(({ key, label, icon: Icon, count }) => (
+								<button
+									key={key}
+									onClick={() => setActiveSection(key)}
+									className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+										activeSection === key
+											? "bg-sky-500 text-white shadow-sm"
+											: "text-gray-500 hover:bg-sky-50 hover:text-sky-600"
+									}`}
+								>
+									<Icon className="w-4 h-4" />
+									{label}
+									{count !== undefined && count > 0 && (
+										<span
+											className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+												activeSection === key
+													? "bg-white/20 text-white"
+													: "bg-sky-100 text-sky-600"
+											}`}
+										>
+											{count}
+										</span>
+									)}
+								</button>
+							))}
+						</div>
+					</div>
+				</div>
+
+				{/* Contenu */}
+				<main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+					{activeSection === "overview" && <OverviewSection />}
+					{activeSection === "rendezvous" && <RendezvousSection />}
+					{activeSection === "procedures" && <ProceduresSection />}
+					{activeSection === "messages" && <MessagesSection />}
+					{activeSection === "destinations" && <DestinationsSection />}
+				</main>
+			</div>
+		</>
+	);
+};
+
+export default Gestionnaire;
