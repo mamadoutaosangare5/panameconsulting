@@ -118,7 +118,7 @@ const MonProfile = () => {
         <meta name="robots" content="noindex, nofollow" />
         <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
-      <div className="min-h-screen bg-gray-50 mt-30">
+      <div className="min-h-screen mt-30">
         <div className="container mx-auto px-4 py-6 max-w-6xl">
           {/* Header */}
           <div className="mb-8">

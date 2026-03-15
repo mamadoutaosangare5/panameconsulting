@@ -4,8 +4,6 @@ import type { ReactNode } from "react";
 import { navTabs } from "./UserHeader.config"; // Import from config file
 
 interface UserHeaderProps {
-  title: string;
-  subtitle: string;
   pageTitle: string;
   description: string;
   isLoading?: boolean;
@@ -14,8 +12,6 @@ interface UserHeaderProps {
 }
 
 export const UserHeader = ({
-  title,
-  subtitle,
   isLoading = false,
   onRefresh,
   children,
@@ -41,12 +37,6 @@ export const UserHeader = ({
             >
               <Home className="w-4 h-4 text-sky-600" />
             </button>
-            <div className="flex flex-col">
-              <h1 className="text-base font-bold text-gray-900 leading-tight">
-                {title}
-              </h1>
-              <p className="text-xs text-gray-500">{subtitle}</p>
-            </div>
           </div>
 
           {onRefresh && (

@@ -372,6 +372,11 @@ model Procedure {
   statut      ProcedureStatus @default(IN_PROGRESS)
   raisonRejet String?
 
+  // Annulation
+  cancelledAt      DateTime?
+  cancelledReason  String?
+  cancelledBy      String?
+
   // Soft delete
   isDeleted      Boolean   @default(false)
   deletedAt      DateTime?

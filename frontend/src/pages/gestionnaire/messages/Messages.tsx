@@ -293,7 +293,7 @@ function MessageRow({
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <div
-            className={`w-2 h-2 rounded-full flex-shrink-0 ${statusConfig.dot}`}
+            className={`w-2 h-2 rounded-full shrink-0 ${statusConfig.dot}`}
           />
           <div className="flex-1 min-w-0">
             <div className="font-medium text-slate-800 truncate">
@@ -449,7 +449,7 @@ export default function Messages() {
         <meta name="robots" content="noindex, nofollow" />
         <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
-      <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="min-h-screen font-sans">
         {/* Header */}
         <div className="bg-white border-b border-slate-100 sticky top-0 z-30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -542,7 +542,7 @@ export default function Messages() {
                 </div>
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-sky-500 to-sky-400 rounded-full transition-all duration-700"
+                    className="h-full bg-linear-to-r from-sky-500 to-sky-400 rounded-full transition-all duration-700"
                     style={{ width: `${stats.responseRate}%` }}
                   />
                 </div>
@@ -649,7 +649,7 @@ export default function Messages() {
           {/* Erreur */}
           {error && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <AlertTriangle className="w-4 h-4 shrink-0" />
               {error}
               <button
                 onClick={refresh}

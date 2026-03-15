@@ -44,10 +44,14 @@ export class DatabaseBackupCron {
         throw new Error('Format DATABASE_URL invalide');
       }
 
-      const [, user, , host, port, database] = matches;
+      const [, user, password, host, port, database] = matches;
 
       // Commande pg_dump avec mot de passe masqué dans les logs
-      const command = `PGPASSWORD="***" pg_dump -U ${user} -h ${host} -p ${port} ${database} > ${filepath}`;
+      // Syntaxe Windows pour les variables d'environnement
+      const command =
+        process.platform === 'win32'
+          ? `set PGPASSWORD=${password}&& pg_dump -U ${user} -h ${host} -p ${port} ${database} > ${filepath}`
+          : `PGPASSWORD="${password}" pg_dump -U ${user} -h ${host} -p ${port} ${database} > ${filepath}`;
 
       // Logger sans exposer le mot de passe
       this.logger.log(`Exécution de la sauvegarde`);
@@ -72,6 +76,7 @@ export class DatabaseBackupCron {
         const filepath = path.join(this.backupPath, file);
         const stats = fs.statSync(filepath);
 
+        // Supprimer les fichiers plus vieux que 7 jours
         if (now - stats.mtimeMs > sevenDays) {
           fs.unlinkSync(filepath);
           this.logger.log(`Ancien backup supprimé: ${file}`);

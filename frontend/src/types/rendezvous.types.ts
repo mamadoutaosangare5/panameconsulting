@@ -458,7 +458,7 @@ export const timeSlotToDateTime = (timeSlot: string): string => {
  * Vérifie si un rendez-vous peut être annulé (moins de 2H avant)
  */
 export const canCancelRendezvous = (rdv: Rendezvous): boolean => {
-	return rdv.canCancel && rdv.status === RendezvousStatus.CONFIRMED;
+	return rdv.canCancel && (rdv.status === RendezvousStatus.CONFIRMED || rdv.status === RendezvousStatus.PENDING);
 };
 
 /**

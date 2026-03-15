@@ -193,4 +193,24 @@ export class ProceduresController {
       user,
     );
   }
+
+  @Patch('procedures/:id/cancel')
+  @ApiOperation({ summary: 'Annuler une procédure (utilisateur connecté)' })
+  @ApiResponse({ status: 200, description: 'Procédure annulée' })
+  @ApiResponse({ status: 404, description: 'Procédure non trouvée' })
+  @ApiResponse({
+    status: 400,
+    description: "Impossible d'annuler cette procédure",
+  })
+  async cancel(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserType,
+    @Body('reason') reason?: string,
+  ): Promise<ProcedureResponseDto> {
+    return await this.proceduresService.cancel(
+      id,
+      reason || "Annulation par l'utilisateur",
+      user,
+    );
+  }
 }

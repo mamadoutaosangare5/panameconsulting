@@ -26,7 +26,6 @@ import { SessionModule } from './common/middlewares/session.module';
 // Common
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
-import { AppController } from './app.controller';
 
 // Interceptors & Filters
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -107,7 +106,7 @@ import configuration from './config/configuration';
     UploadModule,
   ],
 
-  controllers: [AppController],
+  controllers: [],
 
   providers: [
     // ==================== GUARDS GLOBAUX (ordre important) ====================

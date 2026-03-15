@@ -33,7 +33,23 @@ class RendezvousService {
 	private readonly baseUrl: string;
 
 	constructor() {
-		this.baseUrl = import.meta.env.VITE_API_URL;
+		this.baseUrl = import.meta.env.VITE_API_URL as string;
+	}
+
+	// ─────────────────────────────────────────────────────────────
+	// Helper functions
+	// ─────────────────────────────────────────────────────────────
+
+	/**
+	 * Calcule les champs effectifs (destination, niveau, filière)
+	 */
+	private calculateEffectiveFields(rdv: any): any {
+		return {
+			...rdv,
+			effectiveDestination: rdv.destinationAutre || rdv.destination || "",
+			effectiveNiveauEtude: rdv.niveauEtudeAutre || rdv.niveauEtude || "",
+			effectiveFiliere: rdv.filiereAutre || rdv.filiere || "",
+		};
 	}
 
 	// ==================== UTILITAIRES PRIVÉS ====================
@@ -265,8 +281,12 @@ class RendezvousService {
 		try {
 			const response = await apiFetch(url);
 			const result = await this.handleResponse<RendezvousResponseDto[]>(response);
-			toast.success(`${result.length} rendez-vous trouvés`);
-			return result;
+
+			// Appliquer les champs effectifs
+			const processedResult = result.map((rdv: any) => this.calculateEffectiveFields(rdv));
+
+			toast.success(`${processedResult.length} rendez-vous trouvés`);
+			return processedResult;
 		} catch (error) {
 			console.error(`[RendezvousService]  Erreur getRendezvousByEmail:`, error);
 			return [];
@@ -594,6 +614,10 @@ class RendezvousService {
 			}
 
 			const result = await response.json();
+
+			// Appliquer les champs effectifs
+			result.data = result.data.map((rdv: any) => this.calculateEffectiveFields(rdv));
+
 			return result;
 		} catch (error) {
 			toast.error("Erreur lors de la recherche des rendez-vous");

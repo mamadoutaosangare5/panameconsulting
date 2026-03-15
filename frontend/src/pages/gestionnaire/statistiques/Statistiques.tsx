@@ -1,35 +1,32 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import {
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+	AreaChart,
+	Area,
+	PieChart,
+	Pie,
+	Cell,
+	XAxis,
+	YAxis,
+	CartesianGrid,
+	Tooltip,
+	Legend,
+	ResponsiveContainer,
 } from "recharts";
 import {
-  Calendar,
-  Globe,
-  MessageSquare,
-  TrendingUp,
-  TrendingDown,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Download,
-  RefreshCw,
-  ArrowUpRight,
-  ArrowDownRight,
-  FileText,
-  LayoutDashboard,
-  Users,
+	Calendar,
+	MessageSquare,
+	TrendingUp,
+	TrendingDown,
+	Clock,
+	CheckCircle,
+	XCircle,
+	AlertCircle,
+	RefreshCw,
+	ArrowUpRight,
+	ArrowDownRight,
+	FileText,
+	Users,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,53 +39,23 @@ import { useProcedures } from "../../../hooks/useProcedures";
 import { useMessages } from "../../../hooks/useMessages";
 import { useDestinations } from "../../../hooks/useDestinations";
 import { toast } from "react-hot-toast";
+import { useAuth } from "../../../hooks/useAuth";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Section =
-  | "overview"
-  | "rendezvous"
-  | "procedures"
-  | "messages"
-  | "destinations";
-
 interface StatCardProps {
-  title: string;
-  value: string | number;
-  change: number;
-  icon: React.ElementType;
-  gradient: string;
-  trend: "up" | "down" | "neutral";
-  sub?: string;
+	title: string;
+	value: string | number;
+	change: number;
+	icon: React.ElementType;
+	gradient: string;
+	trend: "up" | "down" | "neutral";
+	sub?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Données dynamiques (hooks)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Données d'activité hebdomadaire (construites à partir des statistiques)
-const getWeeklyActivity = (rendezvousStats: any, procedureStats: any, messageStats: any) => [
-	{ name: "Lun", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-	{ name: "Mar", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-	{ name: "Mer", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-	{ name: "Jeu", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-	{ name: "Ven", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-	{ name: "Sam", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-	{ name: "Dim", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
-];
-
-// Données de destinations (construites à partir du hook)
-const getDestinationData = (destinations: any[]) => destinations?.map(dest => ({
-	name: dest.country,
-	value: dest.totalProcedures || 0
-})) || [];
-
-const COLORS = ["#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd"];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// StatCard
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon: Icon, gradient, trend, sub }) => {
@@ -99,12 +66,13 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon: Icon, g
 		<div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5 hover:shadow-md transition-shadow">
 			<div className="flex items-start justify-between mb-3">
 				<div
-					className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}
+					className={`w-10 h-10 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center shadow-sm`}
 				>
 					<Icon className="w-5 h-5 text-white" />
 				</div>
 				<span className={`text-xs font-semibold flex items-center gap-0.5 ${trendColor}`}>
-					{change !== 0 && (change > 0 ? "+" : "")}{change !== 0 ? `${change}%` : "—"}
+					{change !== 0 && (change > 0 ? "+" : "")}
+					{change !== 0 ? `${change}%` : "—"}
 					<TrendIcon className="w-3 h-3" />
 				</span>
 			</div>
@@ -120,87 +88,77 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon: Icon, g
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Gestionnaire: React.FC = () => {
-	const [activeSection, setActiveSection] = useState<Section>("overview");
+	const { isAdmin } = useAuth();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	// Hooks de statistiques existants - Seulement les méthodes de statistiques
-	const { 
-		statistics: rendezvousStats, 
-		loadStatistics: loadRendezvousStats
-	} = useRendezvous({ autoLoad: true });
+	// Hooks de statistiques - Configuration optimisée pour éviter les boucles
+	const { statistics: rendezvousStats, loadStatistics: loadRendezvousStats } = useRendezvous({ 
+		autoLoad: false, // Désactiver autoLoad pour contrôler manuellement
+		refreshInterval: 0 // Désactiver rafraîchissement automatique
+	});
 
-	const { 
-		statistics: userStats, 
-		fetchStatistics: fetchUserStats 
-	} = useUser();
+	const { statistics: userStats, fetchStatistics: fetchUserStats } = useUser();
 
-	const { 
-		statistics: procedureStats, 
-		loadStatistics: loadProcedureStats
-	} = useProcedures({ shouldLoadStatistics: true });
+	const { statistics: procedureStats, loadStatistics: loadProcedureStats } = useProcedures({
+		shouldLoadStatistics: false, // Désactiver chargement automatique
+		refreshInterval: 0 // Désactiver rafraîchissement automatique
+	});
 
-	const { 
-		stats: messageStats, 
-		refresh: refreshMessages
-	} = useMessages();
+	const { stats: messageStats, refresh: refreshMessages } = useMessages();
 
-	const { 
-		destinations, 
-		loadDestinations 
-	} = useDestinations();
+	const { destinations, loadDestinations } = useDestinations();
 
-	const handleRefresh = useCallback(async () => {
-		setIsRefreshing(true);
-		try {
-			await Promise.all([
+	// Charger toutes les statistiques une seule fois au montage
+	useEffect(() => {
+		if (isAdmin) {
+			console.log("[Statistiques] Initial load of all statistics");
+			Promise.all([
 				loadRendezvousStats(),
 				fetchUserStats(),
 				loadProcedureStats(),
 				refreshMessages(),
 				loadDestinations(),
-			]);
-			toast.success("Statistiques actualisées avec succès");
-		} catch (error) {
-			console.error("Erreur lors du rafraîchissement des statistiques:", error);
-			toast.error("Impossible de charger les statistiques");
-		} finally {
-			setIsRefreshing(false);
+			]).catch(error => {
+				console.error("[Statistiques] Error during initial load:", error);
+				toast.error("Impossible de charger les statistiques initiales");
+			});
 		}
-	}, [loadRendezvousStats, fetchUserStats, loadProcedureStats, refreshMessages, loadDestinations]);
+	}, [isAdmin]); // Seulement dépend de isAdmin
 
-	// Données dynamiques construites à partir des hooks de statistiques
-	const weeklyActivity = getWeeklyActivity(rendezvousStats, procedureStats, messageStats);
-	const destinationData = getDestinationData(destinations);
+	// Données dynamiques avec useMemo pour éviter les recalculs
+	const weeklyActivity = useMemo(() => {
+		if (!rendezvousStats || !procedureStats || !messageStats) return [];
+		
+		return [
+			{ name: "Lun", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+			{ name: "Mar", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+			{ name: "Mer", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+			{ name: "Jeu", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+			{ name: "Ven", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+			{ name: "Sam", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+			{ name: "Dim", rendezvous: rendezvousStats?.upcoming?.today || 0, procedures: procedureStats?.newProcedures?.today || 0, messages: messageStats?.today || 0 },
+		];
+	}, [rendezvousStats, procedureStats, messageStats]);
 
-	const tabs: {
-		key: Section;
-		label: string;
-		icon: React.ElementType;
-		count?: number;
-	}[] = [
-		{ key: "overview", label: "Vue d'ensemble", icon: LayoutDashboard },
-		{
-			key: "rendezvous",
-			label: "Rendez-vous",
-			icon: Calendar,
-			count: rendezvousStats?.byStatus?.pending || 0,
-		},
-		{
-			key: "procedures",
-			label: "Procédures",
-			icon: FileText,
-			count: procedureStats?.byStatus?.IN_PROGRESS || 0,
-		},
-		{
-			key: "messages",
-			label: "Messages",
-			icon: MessageSquare,
-			count: messageStats?.unread || 0,
-		},
-		{ key: "destinations", label: "Destinations", icon: Globe, count: destinations.length },
-	];
+	const destinationData = useMemo(() => {
+		// Utiliser les données de topDestinations des statistiques de procédures si disponibles
+		if (procedureStats?.topDestinations) {
+			return procedureStats.topDestinations.map((dest) => ({
+				name: dest.destination,
+				value: dest.count,
+			}));
+		}
+		
+		// Sinon, utiliser les destinations de base avec une valeur par défaut
+		return destinations?.map((dest) => ({
+			name: dest.country,
+			value: 0, // Pas de statistique de procédures disponible
+		})) || [];
+	}, [destinations, procedureStats]);
 
-	const statCards = [
+	const COLORS = ["#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd"];
+
+	const statCards = useMemo(() => [
 		{
 			title: "Rendez-vous",
 			value: rendezvousStats?.total || 0,
@@ -253,10 +211,29 @@ const Gestionnaire: React.FC = () => {
 			gradient: "from-rose-400 to-rose-600",
 			trend: "down" as const,
 		},
-	];
+	], [rendezvousStats, procedureStats, messageStats, userStats]);
 
-	// ── Sections ────────────────────────────────────────────────────────────────
-	
+	const handleRefresh = useCallback(async () => {
+		setIsRefreshing(true);
+		try {
+			await Promise.all([
+				loadRendezvousStats(),
+				fetchUserStats(),
+				loadProcedureStats(),
+				refreshMessages(),
+				loadDestinations(),
+			]);
+			toast.success("Statistiques actualisées avec succès");
+		} catch (error) {
+			console.error("Erreur lors du rafraîchissement des statistiques:", error);
+			toast.error("Impossible de charger les statistiques");
+		} finally {
+			setIsRefreshing(false);
+		}
+	}, [loadRendezvousStats, fetchUserStats, loadProcedureStats, refreshMessages, loadDestinations]);
+
+	// ── Vue d'ensemble ────────────────────────────────────────────────────────────
+
 	const OverviewSection = () => (
 		<div className="space-y-6">
 			<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -272,27 +249,50 @@ const Gestionnaire: React.FC = () => {
 					<ResponsiveContainer width="100%" height={220}>
 						<AreaChart data={weeklyActivity}>
 							<defs>
-								<linearGradient id="gRdv"  x1="0" y1="0" x2="0" y2="1">
-									<stop offset="5%"  stopColor="#0284c7" stopOpacity={0.2} />
-									<stop offset="95%" stopColor="#0284c7" stopOpacity={0}   />
+								<linearGradient id="gRdv" x1="0" y1="0" x2="0" y2="1">
+									<stop offset="5%" stopColor="#0284c7" stopOpacity={0.2} />
+									<stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
 								</linearGradient>
 								<linearGradient id="gProc" x1="0" y1="0" x2="0" y2="1">
-									<stop offset="5%"  stopColor="#10b981" stopOpacity={0.2} />
-									<stop offset="95%" stopColor="#10b981" stopOpacity={0}   />
+									<stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+									<stop offset="95%" stopColor="#10b981" stopOpacity={0} />
 								</linearGradient>
-								<linearGradient id="gMsg"  x1="0" y1="0" x2="0" y2="1">
-									<stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.2} />
-									<stop offset="95%" stopColor="#f59e0b" stopOpacity={0}   />
+								<linearGradient id="gMsg" x1="0" y1="0" x2="0" y2="1">
+									<stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+									<stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
 								</linearGradient>
 							</defs>
 							<CartesianGrid strokeDasharray="3 3" stroke="#f0f9ff" />
 							<XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
 							<YAxis stroke="#94a3b8" fontSize={11} />
-							<Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid #e0f2fe", fontSize: 12 }} />
+							<Tooltip
+								contentStyle={{ borderRadius: "12px", border: "1px solid #e0f2fe", fontSize: 12 }}
+							/>
 							<Legend wrapperStyle={{ fontSize: 11 }} />
-							<Area type="monotone" dataKey="rendezvous" stroke="#0284c7" strokeWidth={2} fill="url(#gRdv)"  name="Rendez-vous" />
-							<Area type="monotone" dataKey="procedures" stroke="#10b981" strokeWidth={2} fill="url(#gProc)" name="Procédures"  />
-							<Area type="monotone" dataKey="messages"   stroke="#f59e0b" strokeWidth={2} fill="url(#gMsg)"  name="Messages"    />
+							<Area
+								type="monotone"
+								dataKey="rendezvous"
+								stroke="#0284c7"
+								strokeWidth={2}
+								fill="url(#gRdv)"
+								name="Rendez-vous"
+							/>
+							<Area
+								type="monotone"
+								dataKey="procedures"
+								stroke="#10b981"
+								strokeWidth={2}
+								fill="url(#gProc)"
+								name="Procédures"
+							/>
+							<Area
+								type="monotone"
+								dataKey="messages"
+								stroke="#f59e0b"
+								strokeWidth={2}
+								fill="url(#gMsg)"
+								name="Messages"
+							/>
 						</AreaChart>
 					</ResponsiveContainer>
 				</div>
@@ -350,7 +350,7 @@ const Gestionnaire: React.FC = () => {
 						},
 					].map(({ icon: Icon, text, color, bg }, i) => (
 						<div key={i} className={`flex items-center gap-3 p-3 ${bg} rounded-xl`}>
-							<Icon className={`w-4 h-4 ${color} flex-shrink-0`} />
+							<Icon className={`w-4 h-4 ${color} shrink-0`} />
 							<span className="text-sm text-gray-700">{text}</span>
 						</div>
 					))}
@@ -359,21 +359,18 @@ const Gestionnaire: React.FC = () => {
 		</div>
 	);
 
-	const RendezvousSection = () => <div>Section Rendez-vous - En cours de développement</div>;
-	const ProceduresSection = () => <div>Section Procédures - En cours de développement</div>;
-	const MessagesSection = () => <div>Section Messages - En cours de développement</div>;
-	const DestinationsSection = () => <div>Section Destinations - En cours de développement</div>;
-
 	// ── Rendu ────────────────────────────────────────────────────────────────────────
 
 	return (
 		<>
 			<Helmet>
 				<title>Statistiques - Paname Consulting</title>
+				<meta name="description" content="Tableau de bord statistiques Paname Consulting" />
 				<meta name="robots" content="noindex, nofollow" />
+				<meta name="googlebot" content="noindex, nofollow" />
 			</Helmet>
 
-			<div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-sky-50">
+			<div className="min-h-screen">
 				{/* Header */}
 				<header className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-sky-100 px-4 sm:px-6 py-4">
 					<div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -388,53 +385,13 @@ const Gestionnaire: React.FC = () => {
 							>
 								<RefreshCw className={`w-4 h-4 text-sky-600 ${isRefreshing ? "animate-spin" : ""}`} />
 							</button>
-							<button className="p-2 bg-white border border-sky-200 rounded-xl hover:bg-sky-50 transition-colors">
-								<Download className="w-4 h-4 text-sky-600" />
-							</button>
 						</div>
 					</div>
 				</header>
 
-				{/* Tabs */}
-				<div className="sticky top-[65px] z-10 bg-white/90 backdrop-blur-md border-b border-sky-100">
-					<div className="max-w-7xl mx-auto px-4 sm:px-6">
-						<div className="flex overflow-x-auto scrollbar-hide gap-1 py-2">
-							{tabs.map(({ key, label, icon: Icon, count }) => (
-								<button
-									key={key}
-									onClick={() => setActiveSection(key)}
-									className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-										activeSection === key
-											? "bg-sky-500 text-white shadow-sm"
-											: "text-gray-500 hover:bg-sky-50 hover:text-sky-600"
-									}`}
-								>
-									<Icon className="w-4 h-4" />
-									{label}
-									{count !== undefined && count > 0 && (
-										<span
-											className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
-												activeSection === key
-													? "bg-white/20 text-white"
-													: "bg-sky-100 text-sky-600"
-											}`}
-										>
-											{count}
-										</span>
-									)}
-								</button>
-							))}
-						</div>
-					</div>
-				</div>
-
 				{/* Contenu */}
 				<main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-					{activeSection === "overview" && <OverviewSection />}
-					{activeSection === "rendezvous" && <RendezvousSection />}
-					{activeSection === "procedures" && <ProceduresSection />}
-					{activeSection === "messages" && <MessagesSection />}
-					{activeSection === "destinations" && <DestinationsSection />}
+					<OverviewSection />
 				</main>
 			</div>
 		</>

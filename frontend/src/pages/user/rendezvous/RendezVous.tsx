@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { useState, useEffect, useCallback, type FormEvent, type ChangeEvent } from "react";
 import { Helmet } from "react-helmet-async";
-import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import AOS from "aos";
 import "aos/dist/aos.css";
@@ -279,26 +278,17 @@ const RendezVous = () => {
 		} else {
 			if (currentStep === 1) {
 				if (!formData.firstName?.trim() || !formData.lastName?.trim()) {
-					toast.error("Prénom et nom sont obligatoires");
 				} else if (!formData.email?.trim()) {
-					toast.error("Email est obligatoire");
 				} else if (!formData.telephone?.trim() || !validatePhone(formData.telephone)) {
-					toast.error("Numéro de téléphone invalide");
 				}
 			} else if (currentStep === 2) {
 				// Messages d'erreur pour l'étape 2
 				if (!formData.destination) {
-					toast.error("La destination est obligatoire");
 				} else if (formData.destination === "Autre" && !formData.destinationAutre?.trim()) {
-					toast.error('La destination "Autre" nécessite une précision');
 				} else if (!formData.niveauEtude) {
-					toast.error("Le niveau d'étude est obligatoire");
 				} else if (formData.niveauEtude === "Autre" && !formData.niveauEtudeAutre?.trim()) {
-					toast.error('Le niveau "Autre" nécessite une précision');
 				} else if (!formData.filiere) {
-					toast.error("La filière est obligatoire");
 				} else if (formData.filiere === "Autre" && !formData.filiereAutre?.trim()) {
-					toast.error('La filière "Autre" nécessite une précision');
 				}
 			}
 		}
@@ -334,93 +324,79 @@ const RendezVous = () => {
 
 		// VALIDATION FINALE COMPLÈTE
 		if (!formData.firstName?.trim()) {
-			toast.error("Le prénom est obligatoire");
 			return;
 		}
 
 		if (!formData.lastName?.trim()) {
-			toast.error("Le nom est obligatoire");
+			return;
 			return;
 		}
 
 		if (!formData.email?.trim()) {
-			toast.error("L'email est obligatoire");
 			return;
 		}
 
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(formData.email.trim())) {
-			toast.error("Format d'email invalide");
 			return;
 		}
 
 		if (!formData.telephone?.trim()) {
-			toast.error("Le téléphone est obligatoire");
+
 			return;
 		}
 
 		if (!validatePhone(formData.telephone)) {
-			toast.error("Numéro de téléphone invalide");
 			return;
 		}
 
 		// ✅ Validation destination
 		if (!formData.destination?.trim()) {
-			toast.error("La destination est obligatoire");
 			return;
 		}
 
 		if (formData.destination === "Autre") {
 			if (!formData.destinationAutre?.trim()) {
-				toast.error('La destination "Autre" nécessite une précision');
 				return;
 			}
 		}
 
 		// ✅ Validation niveau d'étude
 		if (!formData.niveauEtude?.trim()) {
-			toast.error("Le niveau d'étude est obligatoire");
 			return;
 		}
 
 		if (formData.niveauEtude === "Autre") {
 			if (!formData.niveauEtudeAutre?.trim()) {
-				toast.error('Le niveau "Autre" nécessite une précision');
 				return;
 			}
 		}
 
 		// ✅ Validation filière
 		if (!formData.filiere?.trim()) {
-			toast.error("La filière est obligatoire");
 			return;
 		}
 
 		if (formData.filiere === "Autre") {
 			if (!formData.filiereAutre?.trim()) {
-				toast.error('La filière "Autre" nécessite une précision');
 				return;
 			}
 		}
 
 		if (!formData.date?.trim()) {
-			toast.error("La date est obligatoire");
 			return;
 		}
 
 		if (!formData.time?.trim()) {
-			toast.error("L'heure est obligatoire");
 			return;
 		}
 
 		if (isDatePassed(formData.date)) {
-			toast.error("Vous ne pouvez pas réserver une date passée");
 			return;
 		}
 
 		if (formData.date === new Date().toISOString().split("T")[0] && formData.time) {
 			if (isTimePassed(formData.time, formData.date)) {
-				toast.error("Vous ne pouvez pas réserver un créneau passé");
 				return;
 			}
 		}
@@ -428,7 +404,6 @@ const RendezVous = () => {
 		// Vérification rapide de disponibilité avant soumission
 		const availabilityCheck = await checkAvailability(formData.date, formData.time as TimeSlot);
 		if (availabilityCheck && !availabilityCheck.available) {
-			toast.error("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
 			fetchAvailableSlots(formData.date);
 			setFormData((prev) => ({ ...prev, time: "" }));
 			return;
@@ -470,7 +445,6 @@ const RendezVous = () => {
 
 			if (result) {
 				setSuccess(true);
-				toast.success("Rendez-vous créé et confirmé avec succès !");
 				setTimeout(() => {
 					navigate("/user/mes-rendezvous");
 				}, 2000);
@@ -916,7 +890,7 @@ const RendezVous = () => {
 				<meta name="robots" content="noindex, nofollow" />
 			</Helmet>
 
-			<div className="min-h-screen bg-linear-to-b from-sky-50 to-white py-6">
+			<div className="min-h-screen py-6">
 				<div className="mx-auto max-w-2xl px-3 sm:px-4">
 					<div className="mb-6 flex items-center gap-2">
 						<button

@@ -603,6 +603,8 @@ export const useRendezvous = (options: UseRendezvousOptions = {}): UseRendezvous
 			try {
 				const data = await rendezvousService.getRendezvousByEmail(email);
 				console.log(`[useRendezvous] ✅ ${data.length} rendez-vous pour ${email}`);
+				// Mettre à jour l'état local
+				setRendezvous(data);
 				return data;
 			} catch (err) {
 				console.error(`[useRendezvous] Erreur chargement rendez-vous pour ${email}:`, err);

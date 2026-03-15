@@ -121,7 +121,7 @@ const ResetPassword: React.FC = () => {
         <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-screen bg-linear-to-br from-sky-50 to-indigo-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-linear-to-r from-sky-500 to-sky-600 p-6 text-white text-center">
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">

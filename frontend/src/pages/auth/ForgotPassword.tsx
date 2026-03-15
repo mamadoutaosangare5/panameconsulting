@@ -57,7 +57,7 @@ const ForgotPassword: React.FC = () => {
         <meta name="robots" content="noindex, nofollow" />
         <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-sky-50 to-indigo-50 p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="bg-linear-to-r from-sky-500 to-sky-600 p-6 text-center">

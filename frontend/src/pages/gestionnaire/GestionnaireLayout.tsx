@@ -3,6 +3,7 @@ import { Outlet, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "../../hooks/useAuth";
 import AdminSidebar from "../../components/shared/admin/AdminSidebar";
+import Loader from "../../components/shared/admin/Loader";
 
 const GestionnaireLayout = () => {
 	const { isAuthenticated, isLoading, user } = useAuth();
@@ -15,9 +16,7 @@ const GestionnaireLayout = () => {
 	// Si en cours de chargement, afficher un spinner
 	if (isLoading) {
 		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
-			</div>
+			<Loader/>
 		);
 	}
 

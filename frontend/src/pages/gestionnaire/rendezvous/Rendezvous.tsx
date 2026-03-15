@@ -107,13 +107,15 @@ const STATUS_CFG: Record<
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const getInitials = (name?: string | null) =>
-	(name ?? "??")
+const getInitials = (firstName?: string | null, lastName?: string | null) => {
+	const fullName = [firstName, lastName].filter(Boolean).join(" ");
+	return (fullName || "??")
 		.split(" ")
 		.map((n) => n[0])
 		.join("")
 		.toUpperCase()
 		.slice(0, 2);
+};
 
 const StatusBadge = ({ status }: { status: RendezvousStatus }) => {
 	const cfg = STATUS_CFG[status] ?? STATUS_CFG[RendezvousStatus.PENDING];
@@ -141,10 +143,12 @@ const ModalHeader = ({ title, onClose }: { title: string; onClose: () => void })
 const PanelRow = ({ rdv, onView }: { rdv: Rendezvous; onView: () => void }) => (
 	<div className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
 		<div className="w-9 h-9 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-			{getInitials(rdv.fullName)}
+			{getInitials(rdv.firstName, rdv.lastName)}
 		</div>
 		<div className="flex-1 min-w-0">
-			<p className="font-semibold text-sm text-gray-900 truncate">{rdv.fullName}</p>
+			<p className="font-semibold text-sm text-gray-900 truncate">
+				{rdv.firstName} {rdv.lastName}
+			</p>
 			<p className="text-xs text-gray-500 truncate">{rdv.effectiveDestination}</p>
 		</div>
 		<div className="flex items-center gap-3 shrink-0">
@@ -173,6 +177,7 @@ const RendezvousAdmin = () => {
 	// ── Tout depuis le hook — aucun service appelé directement ────────────────
 	const {
 		rendezvous,
+		selectedRendezvous,
 		statistics,
 		pagination,
 		loading,
@@ -294,8 +299,9 @@ const RendezvousAdmin = () => {
 	const openModal = useCallback(
 		async (type: ModalType, rdv: Rendezvous) => {
 			// GET /rendezvous/:id
-			const fresh = await loadRendezvousById(rdv.id);
-			const data = fresh ?? rdv;
+			await loadRendezvousById(rdv.id);
+			// Utiliser selectedRendezvous qui a été mis à jour par loadRendezvousById
+			const data = selectedRendezvous ?? rdv;
 			setModal({ type, rdv: data });
 			if (type === "update") {
 				setEditForm({
@@ -305,15 +311,18 @@ const RendezvousAdmin = () => {
 					destination: data.destination,
 					niveauEtude: data.niveauEtude,
 					filiere: data.filiere,
+					niveauEtudeAutre: data.niveauEtudeAutre || '',
+					filiereAutre: data.filiereAutre || '',
+					destinationAutre: data.destinationAutre || '',
 					date: data.date,
 					time: data.time,
 				});
+			} else if (type === "complete") {
+				setCompleteOpinion(AdminOpinion.FAVORABLE);
+				setCompleteComment("");
 			}
-			setCancelReason("");
-			setCompleteOpinion(AdminOpinion.FAVORABLE);
-			setCompleteComment("");
 		},
-		[loadRendezvousById],
+		[loadRendezvousById, selectedRendezvous],
 	);
 
 	const closeModal = () => setModal({ type: null, rdv: null });
@@ -895,8 +904,8 @@ const RendezvousAdmin = () => {
 										<div className="p-4 sm:p-5">
 											<div className="flex items-start gap-3">
 												{/* Avatar */}
-												<div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
-													{getInitials(rdv.fullName)}
+												<div className="w-10 h-10 bg-linear-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
+													{getInitials(rdv.firstName, rdv.lastName)}
 												</div>
 
 												<div className="flex-1 min-w-0">
@@ -904,7 +913,7 @@ const RendezvousAdmin = () => {
 													<div className="flex flex-wrap items-start justify-between gap-2 mb-2">
 														<div>
 															<p className="font-semibold text-gray-900">
-																{rdv.fullName}
+																{rdv.firstName} {rdv.lastName}
 															</p>
 															<div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
 																<span className="flex items-center gap-1">
@@ -1111,12 +1120,12 @@ const RendezvousAdmin = () => {
 									) : (
 										<>
 											<div className="flex items-center gap-4">
-												<div className="w-14 h-14 bg-gradient-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-													{getInitials(modal.rdv.fullName)}
+												<div className="w-14 h-14 bg-linear-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+													{getInitials(modal.rdv.firstName, modal.rdv.lastName)}
 												</div>
 												<div>
 													<p className="font-bold text-gray-900 text-lg">
-														{modal.rdv.fullName}
+														{modal.rdv.firstName} {modal.rdv.lastName}
 													</p>
 													<div className="mt-1.5 flex flex-wrap gap-2">
 														<StatusBadge status={modal.rdv.status} />

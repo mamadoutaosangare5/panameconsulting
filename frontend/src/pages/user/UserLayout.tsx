@@ -39,8 +39,6 @@ const UserLayout: React.FC<UserLayoutProps> = ({ children }) => {
 
       <div className="min-h-screen flex flex-col bg-gray-50">
         <UserHeader
-          title={currentPage.title}
-          subtitle={currentPage.subtitle}
           pageTitle={currentPage.pageTitle}
           description={currentPage.description}
         >

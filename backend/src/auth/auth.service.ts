@@ -501,7 +501,7 @@ export class AuthService {
     },
     token: string,
   ): string {
-    const resetLink = `${this.configService.get<string>('FRONTEND_URL')}/reset-password?token=${token}`;
+    const resetLink = `${this.configService.get<string>('FRONTEND_URL')}/reinitialiser-mot-de-passe?token=${token}`;
 
     return `
       <div style="margin:25px 0;line-height:1.8;">

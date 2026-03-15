@@ -1,10 +1,12 @@
+import type { Attachment } from 'nodemailer/lib/mailer';
+
 export interface EmailJobData {
   to: string | string[];
   from?: string;
   fromName?: string;
   subject: string;
   html: string;
-  attachments?: any[];
+  attachments?: Attachment[];
   cc?: string | string[];
   bcc?: string | string[];
   replyTo?: string;

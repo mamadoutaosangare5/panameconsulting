@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { toast } from "react-hot-toast";
 import { Helmet } from "react-helmet-async";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -316,7 +315,23 @@ const MesRendezvous: React.FC = () => {
 
 	// Filtrage + pagination côté client (le backend renvoie un tableau brut non paginé)
 	useEffect(() => {
+		console.log("[MesRendezvous] Debug - allRendezvous:", allRendezvous);
+		console.log("[MesRendezvous] Debug - selectedStatus:", selectedStatus);
+		console.log("[MesRendezvous] Debug - allRendezvous length:", allRendezvous.length);
+
+		// Log détaillé de chaque rendez-vous
+		allRendezvous.forEach((rdv, index) => {
+			console.log(`[MesRendezvous] RDV ${index}:`, {
+				id: rdv.id,
+				status: rdv.status,
+				statusType: typeof rdv.status,
+				email: rdv.email,
+			});
+		});
+
 		const filtered = selectedStatus ? allRendezvous.filter((rdv) => rdv.status === selectedStatus) : allRendezvous;
+		console.log("[MesRendezvous] Debug - filtered:", filtered);
+		console.log("[MesRendezvous] Debug - filtered length:", filtered.length);
 
 		const total = filtered.length;
 		const totalPages = Math.max(1, Math.ceil(total / pagination.limit));
@@ -352,11 +367,9 @@ const MesRendezvous: React.FC = () => {
 			await cancelRendezvous(selectedRdvForCancel.id, cancelData);
 
 			// Le hook met à jour automatiquement l'état
-			toast.success("Rendez-vous annulé avec succès");
 			closeCancelModal();
 		} catch (err) {
 			console.error("[MesRendezvous] Erreur annulation:", err);
-			// Le hook gère déjà les erreurs avec des toasts
 		} finally {
 			setCancelling(false);
 		}
@@ -418,7 +431,7 @@ const MesRendezvous: React.FC = () => {
 			</Helmet>
 
 			<div
-				className="min-h-screen bg-linear-to-b from-sky-50 to-white"
+				className="min-h-screen"
 				style={{ paddingTop: `${headerHeight}px` }}
 			>
 				<div className="max-w-4xl mx-auto px-4 py-8">

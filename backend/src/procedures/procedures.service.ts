@@ -491,6 +491,21 @@ export class ProceduresService {
 
     await this.proceduresRepository.softDelete(id, reason);
 
+    // Cascade: annuler toutes les étapes en cours ou en attente
+    await this.prisma.step.updateMany({
+      where: {
+        procedureId: id,
+        statut: {
+          in: [StepStatus.PENDING, StepStatus.IN_PROGRESS],
+        },
+      },
+      data: {
+        statut: StepStatus.CANCELLED,
+        dateMaj: new Date(),
+        dateCompletion: new Date(),
+      },
+    });
+
     // Notifier l'utilisateur
     await this.queueService.addEmailJob({
       to: procedure.email,
@@ -498,8 +513,94 @@ export class ProceduresService {
       html: this.generateProcedureDeletedContent(procedure, reason),
       priority: 'high',
     });
+  }
 
-    this.logger.log(`Procédure ${id} supprimée (soft delete): ${reason}`);
+  async cancel(
+    id: string,
+    reason: string,
+    currentUser: CurrentUser,
+  ): Promise<ProcedureResponseDto> {
+    const procedure = await this.proceduresRepository.findById(id);
+
+    if (!procedure) {
+      throw new NotFoundException(`Procédure avec l'ID ${id} non trouvée`);
+    }
+
+    // Vérifier que l'utilisateur peut annuler sa propre procédure
+    if (
+      currentUser.role !== UserRole.ADMIN &&
+      procedure.userId !== currentUser.id
+    ) {
+      throw new ForbiddenException(
+        'Vous ne pouvez annuler que vos propres procédures',
+      );
+    }
+
+    // Vérifier que la procédure peut être annulée
+    if (procedure.statut !== ProcedureStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        'Seules les procédures en cours peuvent être annulées',
+      );
+    }
+
+    // Mettre à jour la procédure
+    const updateData: Prisma.ProcedureUpdateInput = {
+      statut: ProcedureStatus.CANCELLED,
+    };
+
+    // Ajouter les champs d'annulation (temporairement jusqu'à ce que les types soient régénérés)
+    const extendedUpdateData = {
+      ...updateData,
+      cancelledAt: new Date(),
+      cancelledReason: reason,
+      cancelledBy: currentUser.id,
+    };
+
+    await this.proceduresRepository.update(
+      id,
+      extendedUpdateData as Prisma.ProcedureUpdateInput,
+    );
+
+    // Cascade: annuler toutes les étapes en cours ou en attente
+    await this.prisma.step.updateMany({
+      where: {
+        procedureId: id,
+        statut: {
+          in: [StepStatus.PENDING, StepStatus.IN_PROGRESS],
+        },
+      },
+      data: {
+        statut: StepStatus.CANCELLED,
+        dateMaj: new Date(),
+        dateCompletion: new Date(),
+      },
+    });
+
+    this.logger.log(
+      `Procédure ${id} annulée par l'utilisateur ${currentUser.id}`,
+    );
+    // Recharger la procédure complète avec ses relations pour le DTO
+    const procedureWithRelations = await this.proceduresRepository.findById(id);
+
+    if (!procedureWithRelations) {
+      throw new NotFoundException(
+        `Procédure avec l'ID ${id} non trouvée après mise à jour`,
+      );
+    }
+
+    // Notifier l'administrateur
+    await this.queueService.addEmailJob({
+      to: process.env.EMAIL_USER,
+      subject: 'Annulation de procédure - Paname Consulting',
+      html: this.generateProcedureCancelledContent(
+        this.toResponseDto(procedureWithRelations),
+        reason,
+        currentUser,
+      ),
+      priority: 'normal',
+    });
+
+    return this.toResponseDto(procedureWithRelations);
   }
 
   async getStatistics(currentUser: CurrentUser): Promise<any> {
@@ -904,6 +1005,28 @@ export class ProceduresService {
         <div style="text-align:center;margin-top:30px;">
           <a href="https://panameconsulting.com/contact" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px;">Nous contacter</a>
         </div>
+      </div>`;
+  }
+
+  private generateProcedureCancelledContent(
+    procedure: ProcedureResponseDto,
+    reason: string,
+    currentUser: CurrentUser,
+  ): string {
+    return `
+      <div style="margin:25px 0;line-height:1.8;">
+        <p>Une procédure a été annulée par l'utilisateur.</p>
+        <div style="background:#fef3c7;padding:25px;border-radius:8px;border-left:4px solid #f59e0b;margin:25px 0;">
+          <h3 style="margin-top:0;color:#d97706;">Procédure annulée</h3>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">ID Procédure :</span> ${procedure.id}</div>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Étudiant :</span> ${procedure.prenom} ${procedure.nom}</div>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Destination :</span> ${procedure.destination}</div>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Email :</span> ${procedure.email}</div>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Raison :</span> ${reason}</div>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Annulé par :</span> ${currentUser.email}</div>
+          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Date d'annulation :</span> ${new Date().toLocaleDateString('fr-FR')}</div>
+        </div>
+        <p>Veuillez contacter l'utilisateur si nécessaire pour plus d'informations.</p>
       </div>`;
   }
 }

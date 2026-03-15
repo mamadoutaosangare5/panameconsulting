@@ -99,7 +99,7 @@ const Avatar = ({ user }: { user: AppUser }) => {
 	const color = colors[user.email.charCodeAt(0) % colors.length];
 	return (
 		<div
-			className={`w-8 h-8 rounded-full bg-gradient-to-br ${color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm`}
+			className={`w-8 h-8 rounded-full bg-linear-to-br ${color} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}
 		>
 			{initials}
 		</div>
@@ -786,7 +786,7 @@ const Utilisateurs = () => {
 												<p className="font-medium text-slate-800 text-sm truncate">
 													{user.firstName} {user.lastName}
 												</p>
-												<div className="flex gap-1 flex-shrink-0">
+												<div className="flex gap-1 shrink-0">
 													<button
 														onClick={() => handleToggleStatus(user)}
 														disabled={user.role === "ADMIN" && user.isActive}

@@ -77,41 +77,13 @@ export class UsersController {
   async getProfile(
     @CurrentUser() user: { id: string; role: UserRole },
   ): Promise<UserResponseDto> {
-    console.log(
-      '[CONTROLLER] GET_PROFILE - Recherche utilisateur pour ID:',
-      user.id?.substring(0, 8) + '...',
-    );
-
     const foundUser = await this.usersService.findById(user.id);
 
-    console.log('[CONTROLLER] GET_PROFILE - Utilisateur trouvé:', !!foundUser);
-    if (foundUser) {
-      console.log(
-        '[CONTROLLER] GET_PROFILE - foundUser.telephone:',
-        foundUser.telephone,
-      );
-      console.log(
-        '[CONTROLLER] GET_PROFILE - foundUser keys:',
-        Object.keys(foundUser),
-      );
-    }
-
     if (!foundUser) {
-      console.log('[CONTROLLER] GET_PROFILE - Utilisateur non trouvé');
       throw new NotFoundException('Utilisateur non trouvé');
     }
 
     const responseDto = this.usersService.toResponseDto(foundUser);
-
-    console.log('[CONTROLLER] GET_PROFILE - DTO créé:', !!responseDto);
-    console.log(
-      '[CONTROLLER] GET_PROFILE - DTO.telephone:',
-      responseDto.telephone,
-    );
-    console.log(
-      '[CONTROLLER] GET_PROFILE - DTO keys:',
-      Object.keys(responseDto),
-    );
 
     return responseDto;
   }

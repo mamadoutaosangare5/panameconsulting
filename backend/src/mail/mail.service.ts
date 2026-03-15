@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import type { Attachment } from 'nodemailer/lib/mailer';
 import { RendezvousEntity } from '../rendezvous/entities/rendezvous.entity';
 import { ProcedureEntity } from '../procedures/entities/procedure.entity';
 import { ProcedureStatus, StepStatus } from '@prisma/client';
@@ -47,7 +48,7 @@ export class MailService {
     replyTo?: string;
     cc?: string | string[];
     bcc?: string | string[];
-    attachments?: any[];
+    attachments?: Attachment[];
   }): Promise<{ success: boolean; error?: string }> {
     if (!this.transporter) {
       return { success: false, error: 'Service GMAIL non configuré' };
@@ -73,7 +74,7 @@ export class MailService {
             ? options.bcc
             : [options.bcc]
           : undefined,
-        attachments: options.attachments,
+        attachments: options.attachments || [],
       });
 
       this.logger.log('Email envoyé avec succès');

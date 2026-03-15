@@ -180,7 +180,7 @@ const Destinations = () => {
 			</Helmet>
 			<div className="min-h-screen">
 				{/* Header */}
-				<div className="bg-white shadow-sm border-b border-gray-200">
+				<div className="bg-white shadow-sm border-b">
 					<div className="px-4 sm:px-6 lg:px-8 py-6">
 						<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 							<div>
@@ -308,7 +308,7 @@ const Destinations = () => {
 								className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
 							>
 								{/* Header */}
-								<div className="relative h-32 sm:h-40 bg-gradient-to-br from-sky-400 to-indigo-600">
+								<div className="relative h-32 sm:h-40 bg-linear-to-br from-sky-400 to-indigo-600">
 									{destination.imageUrl ? (
 										<img
 											src={destination.imageUrl}

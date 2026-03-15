@@ -282,6 +282,25 @@ export const ProceduresService = {
 	},
 
 	/**
+	 * PATCH /procedures/:id/cancel — User
+	 * Annuler une procédure (utilisateur connecté)
+	 */
+	async cancel(id: string, reason?: string): Promise<void> {
+		try {
+			const res = await apiFetch(`${BASE_URL}/procedures/${id}/cancel`, {
+				method: "PATCH",
+				headers: JSON_HEADERS,
+				body: JSON.stringify({ reason }),
+			});
+			await handleResponse<void>(res);
+			toast.success("Procédure annulée avec succès");
+		} catch (error) {
+			toast.error("Erreur lors de l'annulation de la procédure");
+			throw error;
+		}
+	},
+
+	/**
 	 * Validation client — miroir des contraintes create-procedure.dto.ts
 	 */
 	validate(data: Partial<CreateProcedureDto>): Record<string, string> {

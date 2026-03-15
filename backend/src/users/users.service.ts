@@ -30,12 +30,6 @@ export class UsersService {
 
   // Add this method to UsersService
   public toResponseDto(user: User): UserResponseDto {
-    console.log('[SERVICE] toResponseDto - User reçu:', !!user);
-    if (user) {
-      console.log('[SERVICE] toResponseDto - user.telephone:', user.telephone);
-      console.log('[SERVICE] toResponseDto - user keys:', Object.keys(user));
-    }
-
     const responseDto = {
       id: user.id,
       email: user.email,
@@ -58,16 +52,6 @@ export class UsersService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
-
-    console.log('[SERVICE] toResponseDto - DTO créé:', !!responseDto);
-    console.log(
-      '[SERVICE] toResponseDto - DTO.telephone:',
-      responseDto.telephone,
-    );
-    console.log(
-      '[SERVICE] toResponseDto - DTO keys:',
-      Object.keys(responseDto),
-    );
 
     return responseDto;
   }
@@ -210,20 +194,11 @@ export class UsersService {
       updateUserDto.email &&
       updateUserDto.email !== existingUser.email
     ) {
-      try {
-        await this.prisma.rendezvous.updateMany({
-          where: { userId: id },
-          data: { email: updateUserDto.email },
-        });
-        console.log(
-          `Email synchronisé pour les rendez-vous de l'utilisateur ${id}`,
-        );
-      } catch (error) {
-        console.error(
-          `Erreur lors de la synchronisation des rendez-vous pour l'utilisateur ${id}:`,
-          error,
-        );
-      }
+      // Mettre à jour l'email dans les rendez-vous associés
+      await this.prisma.rendezvous.updateMany({
+        where: { userId: id },
+        data: { email: updateUserDto.email },
+      });
     }
 
     // Envoyer un email de notification de mise à jour
