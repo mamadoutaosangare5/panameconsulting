@@ -659,7 +659,7 @@ export default function MaProcedures() {
             </h1>
             {user?.firstName && (
               <p className="text-sky-100 text-sm mt-1">
-                Bonjour, {user.firstName} 👋
+                Bonjour, {user.firstName}
               </p>
             )}
           </div>

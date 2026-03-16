@@ -134,7 +134,6 @@ const Gestionnaire: React.FC = () => {
   useEffect(() => {
     if (isAdmin) {
       console.log("[Statistiques] Initial load of all statistics");
-      console.log("[Statistiques] isAdmin:", isAdmin);
       Promise.all([
         loadRendezvousStats(),
         fetchUserStats(),
@@ -142,8 +141,8 @@ const Gestionnaire: React.FC = () => {
         refreshMessages(),
         loadDestinations(),
       ])
-        .then((results) => {
-          console.log("[Statistiques] ✅ All statistics loaded:", results);
+        .then(() => {
+          console.log("[Statistiques] ✅ All statistics loaded");
         })
         .catch((error) => {
           console.error("[Statistiques] Error during initial load:", error);
@@ -161,9 +160,6 @@ const Gestionnaire: React.FC = () => {
 
   // Données dynamiques avec useMemo pour éviter les recalculs
   const weeklyActivity = useMemo(() => {
-    console.log("[Statistiques] Rendezvous stats:", rendezvousStats);
-    console.log("[Statistiques] Procedure stats:", procedureStats);
-    console.log("[Statistiques] Message stats:", messageStats);
 
     if (!rendezvousStats || !procedureStats || !messageStats) return [];
 

@@ -1,6 +1,6 @@
 const AboutSection = () => {
   return (
-    <section className="relative py-16 md:py-24 bg-white overflow-hidden font-['Inter',_sans-serif]">
+    <section className="relative py-16 md:py-24 bg-white overflow-hidden font-['Inter',sans-serif]">
       {/* Décorations de fond épurées : seulement quelques accents légers */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/5 rounded-full blur-2xl -translate-y-1/2" />
 
@@ -94,7 +94,7 @@ const AboutSection = () => {
             </div>
 
             {/* Conteneur d'image : Taille doublée */}
-            <div className="relative z-10 mx-auto rounded-2xl w-48 h-48 sm:w-56 h-56 md:w-64 md:h-64 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] flex items-center justify-center overflow-hidden shadow-2xl border-4 border-white">
+            <div className="relative z-10 mx-auto rounded-2xl w-48 sm:w-56 h-56 md:w-64 md:h-64 lg:w-96 lg:h-96 xl:w-md xl:h-112 flex items-center justify-center overflow-hidden shadow-2xl border-4 border-white">
               <img
                 src="/images/CEOPANAME.webp"
                 alt="Photo de Sangare Damini"
@@ -104,7 +104,7 @@ const AboutSection = () => {
             </div>
 
             {/* Décoration minimaliste (un simple cadre fin) */}
-            <div className="absolute -bottom-3 -right-3 w-full h-full border border-slate-200 rounded-2xl -z-0" />
+            <div className="absolute -bottom-3 -right-3 w-full h-full border border-slate-200 rounded-2xl z-0" />
 
             {/* Badge CEO discret */}
             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-xl shadow-lg border border-slate-100 text-center min-w-[160px] z-20">

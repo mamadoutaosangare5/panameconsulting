@@ -208,10 +208,10 @@ export default function AdminSidebar({
             animate="expanded"
             exit="collapsed"
             variants={sidebarVariants}
-            className="fixed left-0 top-0 h-screen bg-gradient-to-b from-sky-100 via-sky-50 to-blue-50 border-r border-sky-200 flex flex-col z-50 shadow-2xl shadow-sky-900/20 overflow-hidden"
+            className="fixed left-0 top-0 h-screen bg-linear-to-b from-sky-100 via-sky-50 to-blue-50 border-r border-sky-200 flex flex-col z-50 shadow-2xl shadow-sky-900/20 overflow-hidden"
           >
             {/* Header avec logo et titre */}
-            <div className="relative px-4 py-5 border-b border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50">
+            <div className="relative px-4 py-5 border-b border-sky-200 bg-linear-to-r from-sky-50 to-blue-50">
               {/* Informations utilisateur - aligné à gauche */}
               {user && (
                 <motion.div
@@ -223,7 +223,7 @@ export default function AdminSidebar({
                   <div className="relative">
                     <Link
                       to="/"
-                      className="w-10 h-10 bg-gradient-to-br from-sky-400 to-sky-600 rounded-lg flex items-center justify-center shadow-md shadow-sky-500/30"
+                      className="w-10 h-10 bg-linear-to-br from-sky-400 to-sky-600 rounded-lg flex items-center justify-center shadow-md shadow-sky-500/30"
                     >
                       {user.role === "ADMIN" ? (
                         <Settings className="w-5 h-5 text-white" />
@@ -257,7 +257,7 @@ export default function AdminSidebar({
                 whileHover={{ scale: 1.1, x: -2 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onToggle}
-                className="absolute right-5 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-full shadow-lg hover:shadow-xl hover:from-sky-600 hover:to-blue-700 transition-all duration-200 border-2 border-white group z-10"
+                className="absolute right-5 top-1/2 -translate-y-1/2 p-2 bg-linear-to-br from-sky-500 to-blue-600 text-white rounded-full shadow-lg hover:shadow-xl hover:from-sky-600 hover:to-blue-700 transition-all duration-200 border-2 border-white group z-10"
                 aria-label="Rétracter le menu"
               >
                 <ChevronLeft
@@ -471,7 +471,7 @@ export default function AdminSidebar({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onToggle}
-            className="fixed left-3 top-3 z-50 p-2.5 bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white rounded-xl shadow-lg shadow-sky-500/30 transition-all group"
+            className="fixed left-3 top-3 z-50 p-2.5 bg-linear-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white rounded-xl shadow-lg shadow-sky-500/30 transition-all group"
             aria-label="Développer le menu"
           >
             <ChevronRight className="w-4 h-4" />

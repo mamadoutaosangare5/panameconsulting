@@ -360,11 +360,10 @@ export class ProcedureEntity {
 
   // Méthodes d'instance pour Procedure
   get canBeModified(): boolean {
-    const finalStatuses = [
+    const finalStatuses: ProcedureStatus[] = [
       ProcedureStatus.COMPLETED,
       ProcedureStatus.CANCELLED,
       ProcedureStatus.REJECTED,
-      ProcedureStatus.IN_PROGRESS,
     ];
     return !finalStatuses.includes(this.statut);
   }

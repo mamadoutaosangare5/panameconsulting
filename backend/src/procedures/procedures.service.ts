@@ -727,12 +727,12 @@ export class ProceduresService {
         return activeStep || null;
       },
       canBeModified: () => {
-        return ![
+        const finalStatuses: ProcedureStatus[] = [
           ProcedureStatus.COMPLETED,
           ProcedureStatus.CANCELLED,
           ProcedureStatus.REJECTED,
-          ProcedureStatus.IN_PROGRESS,
-        ].includes(procedure.statut);
+        ];
+        return !finalStatuses.includes(procedure.statut);
       },
       getDaysSinceCreation: () => {
         const diff = Date.now() - new Date(procedure.createdAt).getTime();

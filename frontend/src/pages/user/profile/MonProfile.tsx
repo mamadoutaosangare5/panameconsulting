@@ -36,8 +36,6 @@ const MonProfile = () => {
   // Mettre à jour le profil quand l'utilisateur change
   useEffect(() => {
     if (user) {
-      console.log("DEBUG - Données utilisateur reçues:", user);
-      console.log("DEBUG - Téléphone dans user:", user.telephone);
 
       const newEditedProfile = {
         firstName: user.firstName || "",
@@ -46,7 +44,6 @@ const MonProfile = () => {
         telephone: user.telephone || "",
       };
 
-      console.log("DEBUG - Nouveau editedProfile:", newEditedProfile.lastName);
       setEditedProfile(newEditedProfile);
     }
   }, [user]); // ← Déclenché quand user change (après updateUser)
@@ -277,10 +274,6 @@ const MonProfile = () => {
                         type="tel"
                         value={editedProfile.telephone}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          console.log(
-                            "DEBUG - Changement téléphone:",
-                            e.target.value,
-                          );
                           setEditedProfile({
                             ...editedProfile,
                             telephone: e.target.value,

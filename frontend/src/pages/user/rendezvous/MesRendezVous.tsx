@@ -351,7 +351,6 @@ const MesRendezvous: React.FC = () => {
 
   // Filtrage + pagination côté client (le backend renvoie un tableau brut non paginé)
   useEffect(() => {
-    console.log("[MesRendezvous] Debug - allRendezvous:", allRendezvous);
     console.log("[MesRendezvous] Debug - selectedStatus:", selectedStatus);
     console.log(
       "[MesRendezvous] Debug - allRendezvous length:",
@@ -361,17 +360,14 @@ const MesRendezvous: React.FC = () => {
     // Log détaillé de chaque rendez-vous
     allRendezvous.forEach((rdv, index) => {
       console.log(`[MesRendezvous] RDV ${index}:`, {
-        id: rdv.id,
         status: rdv.status,
         statusType: typeof rdv.status,
-        email: rdv.email,
       });
     });
 
     const filtered = selectedStatus
       ? allRendezvous.filter((rdv) => rdv.status === selectedStatus)
       : allRendezvous;
-    console.log("[MesRendezvous] Debug - filtered:", filtered);
     console.log("[MesRendezvous] Debug - filtered length:", filtered.length);
 
     const total = filtered.length;

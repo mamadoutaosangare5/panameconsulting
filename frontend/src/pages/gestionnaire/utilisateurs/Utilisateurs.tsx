@@ -405,15 +405,13 @@ const Utilisateurs = () => {
     totalItems: userList?.items?.length ?? 0,
     filteredCount: filtered.length,
     items: filtered.map((u) => ({
-      id: u.id,
       name: `${u.firstName} ${u.lastName}`,
-      email: u.email,
     })),
   });
 
   // ── Handlers création ──────────────────────────────────────
   const handleCreate = async () => {
-    console.log("[Utilisateurs] Creating user with params:", createForm);
+    console.log("[Utilisateurs] Creating user with params:", createForm.firstName);
     const params: CreateUserParams = {
       firstName: createForm.firstName,
       lastName: createForm.lastName,
@@ -422,7 +420,7 @@ const Utilisateurs = () => {
       telephone: createForm.telephone,
     };
     const result = await createNewUser(params);
-    console.log("[Utilisateurs] Create result:", result);
+    console.log("[Utilisateurs] Create result:", result?.firstName);
     if (result) {
       setShowCreate(false);
       setCreateForm(EMPTY_CREATE);
@@ -431,7 +429,7 @@ const Utilisateurs = () => {
 
   // ── Handlers édition ──────────────────────────────────────
   const openEdit = (user: AppUser) => {
-    console.log("[Utilisateurs] Opening edit for user:", user);
+    console.log("[Utilisateurs] Opening edit for user:", user.isActive);
     setEditTarget(user);
     setEditForm({
       firstName: user.firstName,

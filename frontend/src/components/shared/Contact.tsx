@@ -271,13 +271,13 @@ const Contact: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-3">
             {/* Section informations */}
-            <div className="lg:col-span-1 bg-gradient-to-br from-blue-600 to-blue-800 text-white p-8 lg:p-10">
+            <div className="lg:col-span-1 bg-linear-to-br from-blue-600 to-blue-800 text-white p-8 lg:p-10">
               <h2 className="text-2xl font-bold mb-8">Informations</h2>
 
               <div className="space-y-6">
                 {contactInfo.map((info, index) => (
                   <div key={index} className="flex space-x-4">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <div className="w-10 h-10 bg-blue-500/30 rounded-lg flex items-center justify-center">
                         {info.icon}
                       </div>
@@ -326,9 +326,9 @@ const Contact: React.FC = () => {
                   }`}
                 >
                   {submitStatus.type === "success" ? (
-                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                   )}
                   <p
                     className={
