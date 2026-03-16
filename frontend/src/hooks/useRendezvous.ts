@@ -699,6 +699,8 @@ export const useRendezvous = (
           `[useRendezvous] Erreur chargement rendez-vous pour ${email}:`,
           err,
         );
+        // Afficher seulement l'erreur, pas le succès
+        toast.error("Erreur lors du chargement de vos rendez-vous");
         return [];
       }
     },

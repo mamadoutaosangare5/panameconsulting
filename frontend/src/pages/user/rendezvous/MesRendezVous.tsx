@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../../hooks/useAuth";
 import { useRendezvous } from "../../../hooks/useRendezvous";
+import { toast } from "react-hot-toast";
 import {
   formatTimeSlot,
   getRemainingCancellationTime,
@@ -330,12 +331,16 @@ const MesRendezvous: React.FC = () => {
     try {
       // Utiliser la méthode du hook
       await getRendezvousByEmail(user.email);
+      // Afficher un toast de succès uniquement lors du chargement manuel
+      if (allRendezvous.length === 0) {
+        toast.success("Vos rendez-vous ont été chargés");
+      }
       // Le hook gère déjà l'état, pas besoin de setAllRendezvous
     } catch (err) {
       console.error("[MesRendezvous] Erreur chargement:", err);
       // Le hook gère déjà les erreurs avec des toasts
     }
-  }, [user?.email, getRendezvousByEmail]);
+  }, [user?.email, getRendezvousByEmail, allRendezvous.length]);
 
   // Chargement initial - charge dès que l'utilisateur est connecté
   useEffect(() => {
