@@ -20,8 +20,11 @@ export class LoggingMiddleware implements NestMiddleware {
     req.startTime = Date.now();
     const { method, originalUrl } = req;
 
+    // Masquer les données sensibles dans l'URL pour les logs
+    const sanitizedUrl = this.sanitizeUrl(originalUrl);
+
     // Log de la requête entrante - format simplifié
-    this.logger.log(`${method} ${originalUrl}`);
+    this.logger.log(`${method} ${sanitizedUrl}`);
 
     // Intercepter la réponse pour logger le résultat
     const originalSend = res.send;
@@ -35,9 +38,9 @@ export class LoggingMiddleware implements NestMiddleware {
       const duration = endTime - (req.startTime || endTime);
       const statusCode = res.statusCode;
 
-      // Log de la réponse sortante - format simplifié
+      // Log de la réponse sortante - format simplifié avec URL masquée
       this.logger.log(
-        `${method} ${originalUrl} -> ${statusCode} (${duration}ms)`,
+        `${method} ${sanitizedUrl} -> ${statusCode} (${duration}ms)`,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -51,9 +54,9 @@ export class LoggingMiddleware implements NestMiddleware {
       const duration = endTime - (req.startTime || endTime);
       const statusCode = res.statusCode;
 
-      // Log de la réponse sortante - format simplifié
+      // Log de la réponse sortante - format simplifié avec URL masquée
       this.logger.log(
-        `${method} ${originalUrl} -> ${statusCode} (${duration}ms)`,
+        `${method} ${sanitizedUrl} -> ${statusCode} (${duration}ms)`,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -61,6 +64,32 @@ export class LoggingMiddleware implements NestMiddleware {
     };
 
     next();
+  }
+
+  private sanitizeUrl(url: string): string {
+    // Masquer les emails dans les URLs
+    // Pattern: /api/procedures/email@domain.com -> /api/procedures/[EMAIL]
+    let sanitized = url.replace(
+      /\/api\/procedures\/[^/\s@]+@[^\\/\s@]+\.[^/\s@]+/g,
+      '/api/procedures/[EMAIL]',
+    );
+
+    // Masquer les IDs dans les URLs
+    // Pattern: /api/rendezvous/by-email/abc123 -> /api/rendezvous/by-email/[EMAIL]
+    sanitized = sanitized.replace(/\/by-email\/[^/\s]+/g, '/by-email/[EMAIL]');
+
+    // Masquer les IDs UUID ou autres identifiants
+    // Pattern: /api/procedures/550e8400-e29b-41d4-a716-446655440000 -> /api/procedures/[ID]
+    sanitized = sanitized.replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      '/[ID]',
+    );
+
+    // Masquer les IDs numériques dans les paramètres
+    // Pattern: /api/rendezvous/12345 -> /api/rendezvous/[ID]
+    sanitized = sanitized.replace(/\/\d+(?=\/|$)/g, '/[ID]');
+
+    return sanitized;
   }
 
   private sanitizeBody(

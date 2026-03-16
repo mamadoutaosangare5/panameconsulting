@@ -33,7 +33,7 @@ const Maprocedure = lazy(() => import("./pages/user/procedures/Maprocedure"));
 const MesRendezVous = lazy(
   () => import("./pages/user/rendezvous/MesRendezVous"),
 );
-const RendezVous = lazy(() => import("./pages/user/rendezvous/RendezVous"));
+const UserRendezVous = lazy(() => import("./pages/user/rendezvous/RendezVous"));
 
 // Pages gestionnaire
 const Statistiques = lazy(
@@ -45,7 +45,7 @@ const Utilisateurs = lazy(
 const Destinations = lazy(
   () => import("./pages/gestionnaire/destinations/Destinations"),
 );
-const Rendezvous = lazy(
+const AdminRendezvous = lazy(
   () => import("./pages/gestionnaire/rendezvous/Rendezvous"),
 );
 const Messages = lazy(() => import("./pages/gestionnaire/messages/Messages"));
@@ -117,7 +117,7 @@ function App() {
             />
 
             {/* Rendez-vous public */}
-            <Route path="/rendez-vous" element={<RendezVous />} />
+            <Route path="/rendez-vous" element={<UserRendezVous />} />
 
             {/* User */}
             <Route
@@ -139,7 +139,7 @@ function App() {
               <Route path="statistiques" element={<Statistiques />} />
               <Route path="utilisateurs" element={<Utilisateurs />} />
               <Route path="destinations" element={<Destinations />} />
-              <Route path="rendezvous" element={<Rendezvous />} />
+              <Route path="rendezvous" element={<AdminRendezvous />} />
               <Route path="procedures" element={<Procedures />} />
               <Route path="messages" element={<Messages />} />
               <Route path="profil" element={<Profil />} />

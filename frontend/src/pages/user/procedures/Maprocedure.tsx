@@ -34,7 +34,7 @@ const Maprocedure = () => {
     findByEmail,
     loadById,
     cancelProcedure,
-  } = useProcedures();
+  } = useProcedures({ shouldLoadStatistics: false }); // Désactiver les stats pour les utilisateurs
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("tous");
@@ -80,12 +80,16 @@ const Maprocedure = () => {
   const handleCancelProcedure = async () => {
     if (!procedureToCancel) return;
 
-    const success = await cancelProcedure(
-      procedureToCancel.id,
-      cancelReason || "Annulation par l'utilisateur",
-    );
-    if (success) {
-      handleCloseCancelModal();
+    try {
+      const result = await cancelProcedure(
+        procedureToCancel.id,
+        cancelReason || "Annulation par l'utilisateur",
+      );
+      if (result) {
+        handleCloseCancelModal();
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'annulation:", error);
     }
   };
 

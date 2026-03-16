@@ -1,6 +1,27 @@
 // services/procedures.service.ts
 // Calqué strictement sur procedures.controller.ts (NestJS)
-// Chaque méthode = un endpoint exact du controller
+// Chaque méthode correspond à un endpoint exact du controller.
+//
+// ROUTES BACKEND (controller) :
+//  POST   /admin/procedures/create                       → create()
+//  GET    /admin/procedures/all                          → findAll()
+//  GET    /admin/procedures/statistics                   → getStatistics()
+//  PATCH  /admin/procedures/:id/steps/:stepName          → updateStep()
+//  POST   /admin/procedures/:id/steps/:stepName          → addStep()
+//  DELETE /admin/procedures/:id/delete                   → remove()   — 204 No Content
+//  GET    /procedures/:email                             → findByEmail()
+//  GET    /procedures/:rendezVousId                      → findByRendezvousId()
+//  GET    /procedures/:id/details                        → findById()
+//  PATCH  /procedures/:id/update                         → update()
+//  PATCH  /procedures/:id/cancel                         → cancel()   — retourne ProcedureResponseDto
+//
+// ⚠️  ATTENTION — ambiguïté de routes GET /procedures/:param :
+//      Le controller déclare trois routes avec le même pattern `procedures/:x`,
+//      mais elles sont discriminées par le suffixe `/details`.
+//      Côté frontend on distingue :
+//        - findByEmail      → /procedures/:email           (tableau)
+//        - findByRendezvousId → /procedures/:rendezVousId  (objet unique ou 404)
+//        - findById         → /procedures/:id/details      (objet unique)
 
 import { toast } from "react-hot-toast";
 import type {
@@ -21,18 +42,22 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-// ─── Gestion des erreurs ──────────────────────────────────────────────────────
+// ─── Gestion des réponses ─────────────────────────────────────────────────────
+//
+// Le backend NestJS retourne les réponses de deux façons :
+//   1. Directement : { id, prenom, ... }  ou  [{ ... }, ...]  ou  { data: [...], total, ... }
+//   2. Wrappé      : { data: <T>, message?, statusCode? }
+//
+// Règle appliquée :
+//   - 204 → undefined  (soft delete)
+//   - La réponse paginée (PaginatedProcedureResponseDto) possède une clé `data`
+//     qui EST le tableau de procédures — elle ne doit PAS être dépaquetée.
+//     On la détecte grâce aux clés `total` + `page` + `limit`.
+//   - Sinon, si la réponse possède une clé `data` sans les clés de pagination,
+//     on suppose un wrapper NestJS et on extrait `.data`.
 
 async function handleResponse<T>(res: Response): Promise<T> {
-  // 204 No Content — DELETE retourne void
   if (res.status === 204) return undefined as unknown as T;
-
-  // Type for wrapped responses from NestJS ApiResponse
-  type WrappedResponse<TData> = {
-    data: TData;
-    message?: string;
-    statusCode?: number;
-  };
 
   let body: unknown;
   try {
@@ -45,26 +70,40 @@ async function handleResponse<T>(res: Response): Promise<T> {
     const apiError = body as ApiError;
     const err = new Error(
       apiError.message || `Erreur ${res.status}`,
-    ) as Error & {
-      apiError: ApiError;
-      status: number;
-    };
+    ) as Error & { apiError: ApiError; status: number };
     err.apiError = apiError;
     err.status = res.status;
     throw err;
   }
 
-  // Le backend NestJS wrappe dans { data: T } via ApiResponse
-  // Certaines routes retournent directement le tableau (findByUserEmail)
-  // Vérifier si la réponse a une propriété 'data' (wrapped response)
-  if (body && typeof body === "object" && "data" in body) {
-    return (body as WrappedResponse<T>).data;
+  // Détecter la réponse paginée : elle a `data` + `total` + `page` + `limit`
+  // → ne pas dépaqueter, la retourner telle quelle
+  if (
+    body &&
+    typeof body === "object" &&
+    "data" in body &&
+    "total" in body &&
+    "page" in body &&
+    "limit" in body
+  ) {
+    return body as T;
   }
+
+  // Wrapper NestJS simple { data: T, message?, statusCode? }
+  if (
+    body &&
+    typeof body === "object" &&
+    "data" in body &&
+    !("id" in body) &&
+    !Array.isArray(body)
+  ) {
+    return (body as { data: T }).data;
+  }
+
   return body as T;
 }
 
-// ─── Fetch authentifié (délégué à apiFetch de l'AuthContext) ─────────────────
-// On importe apiFetch pour conserver la gestion du refresh token existante
+// ─── Fetch authentifié ────────────────────────────────────────────────────────
 import { apiFetch } from "../context/AuthContext";
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -73,8 +112,9 @@ export const ProceduresService = {
   // ── Routes Admin ─────────────────────────────────────────────────────────
 
   /**
-   * POST /admin/procedures/create — Admin
-   * Créer une procédure depuis un rendez-vous éligible
+   * POST /admin/procedures/create — ADMIN
+   * Créer une procédure depuis un rendez-vous éligible.
+   * Retourne : ProcedureResponseDto (201)
    */
   async create(data: CreateProcedureDto): Promise<ProcedureResponseDto> {
     try {
@@ -83,7 +123,7 @@ export const ProceduresService = {
         headers: JSON_HEADERS,
         body: JSON.stringify(data),
       });
-      const result = handleResponse<ProcedureResponseDto>(res);
+      const result = await handleResponse<ProcedureResponseDto>(res);
       toast.success("Procédure créée avec succès");
       return result;
     } catch (error) {
@@ -93,56 +133,46 @@ export const ProceduresService = {
   },
 
   /**
-   * GET /admin/procedures/all — Admin
-   * Liste paginée avec filtres, tri, recherche, plage de dates
+   * GET /admin/procedures/all — ADMIN
+   * Liste paginée avec filtres, tri, recherche, plage de dates.
+   * Retourne : PaginatedProcedureResponseDto (200) — objet direct, PAS de wrapper.
    */
   async findAll(
     query: ProcedureQueryDto = {},
   ): Promise<PaginatedProcedureResponseDto> {
     const params = new URLSearchParams();
-
-    const entries: [string, unknown][] = Object.entries(query);
-    for (const [key, value] of entries) {
+    for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null) {
         params.set(key, String(value));
       }
     }
-
     const url = `${BASE_URL}/admin/procedures/all${params.toString() ? `?${params}` : ""}`;
     const res = await apiFetch(url, { method: "GET" });
     return handleResponse<PaginatedProcedureResponseDto>(res);
   },
 
   /**
-   * GET /admin/procedures/statistics — Admin
+   * GET /admin/procedures/statistics — ADMIN
+   * Statistiques globales des procédures.
+   * Retourne : ProcedureStatisticsDto (200)
    */
   async getStatistics(): Promise<ProcedureStatisticsDto> {
     try {
-      console.log("[ProceduresService] Récupération des statistiques...");
       const res = await apiFetch(`${BASE_URL}/admin/procedures/statistics`, {
         method: "GET",
       });
       const result = await handleResponse<ProcedureStatisticsDto>(res);
-      console.log("[ProceduresService] Statistiques reçues .");
-      console.log(
-        "[ProceduresService] Statistiques extraites:",
-        Object.keys(result).length,
-      );
-      toast.success("Statistiques chargées avec succès");
       return result;
     } catch (error) {
-      console.error(
-        "[ProceduresService] Erreur lors de la récupération des statistiques:",
-        error,
-      );
       toast.error("Erreur lors du chargement des statistiques");
       throw error;
     }
   },
 
   /**
-   * PATCH /admin/procedures/:id/steps/:stepName — Admin
-   * Mettre à jour une étape existante
+   * PATCH /admin/procedures/:id/steps/:stepName — ADMIN
+   * Mettre à jour une étape existante.
+   * Retourne : ProcedureResponseDto (200)
    */
   async updateStep(
     id: string,
@@ -158,7 +188,7 @@ export const ProceduresService = {
           body: JSON.stringify(data),
         },
       );
-      const result = handleResponse<ProcedureResponseDto>(res);
+      const result = await handleResponse<ProcedureResponseDto>(res);
       toast.success(`Étape ${stepName} mise à jour avec succès`);
       return result;
     } catch (error) {
@@ -168,16 +198,21 @@ export const ProceduresService = {
   },
 
   /**
-   * POST /admin/procedures/:id/steps/:stepName — Admin
-   * Ajouter une nouvelle étape (409 si déjà existante)
+   * POST /admin/procedures/:id/steps/:stepName — ADMIN
+   * Ajouter une nouvelle étape.
+   * Erreur 409 si l'étape existe déjà.
+   * Retourne : ProcedureResponseDto (200)
    */
-  async addStep(id: string, stepName: StepName): Promise<ProcedureResponseDto> {
+  async addStep(
+    id: string,
+    stepName: StepName,
+  ): Promise<ProcedureResponseDto> {
     try {
       const res = await apiFetch(
         `${BASE_URL}/admin/procedures/${id}/steps/${stepName}`,
         { method: "POST" },
       );
-      const result = handleResponse<ProcedureResponseDto>(res);
+      const result = await handleResponse<ProcedureResponseDto>(res);
       toast.success(`Étape ${stepName} ajoutée avec succès`);
       return result;
     } catch (error) {
@@ -187,9 +222,9 @@ export const ProceduresService = {
   },
 
   /**
-   * DELETE /admin/procedures/:id/delete — Admin
-   * Soft delete, body: { reason?: string }
-   * Backend retourne 204 No Content
+   * DELETE /admin/procedures/:id/delete — ADMIN
+   * Soft delete avec raison optionnelle.
+   * Retourne : 204 No Content
    */
   async remove(id: string, reason = "Suppression manuelle"): Promise<void> {
     try {
@@ -210,39 +245,51 @@ export const ProceduresService = {
 
   /**
    * GET /procedures/:email
-   * Trouver toutes les procédures d'un utilisateur par email
-   * Le backend retourne directement un tableau (pas de wrapper ApiResponse)
+   * Récupère toutes les procédures d'un utilisateur par email.
+   * Retourne : ProcedureResponseDto[] directement (pas de wrapper ni pagination).
+   *
+   * ⚠️  Ce endpoint partage le pattern `/procedures/:param` avec findByRendezvousId.
+   *     La distinction est faite par la nature du paramètre (email vs UUID) côté backend.
    */
   async findByEmail(email: string): Promise<ProcedureResponseDto[]> {
     const res = await apiFetch(
       `${BASE_URL}/procedures/${encodeURIComponent(email)}`,
       { method: "GET" },
     );
-    // Cette route retourne directement un tableau
     if (res.status === 204) return [];
+
     let body: unknown;
     try {
       body = await res.json();
     } catch {
       return [];
     }
+
     if (!res.ok) {
       const err = new Error(
         (body as { message?: string })?.message ?? `Erreur ${res.status}`,
-      ) as Error & {
-        apiError: unknown;
-      };
+      ) as Error & { apiError: unknown };
       err.apiError = body;
       throw err;
     }
-    return Array.isArray(body)
-      ? body
-      : (((body as { data?: unknown })?.data as ProcedureResponseDto[]) ?? []);
+
+    // Le backend retourne directement le tableau ou éventuellement { data: [...] }
+    if (Array.isArray(body)) return body as ProcedureResponseDto[];
+    if (
+      body &&
+      typeof body === "object" &&
+      "data" in body &&
+      Array.isArray((body as { data: unknown }).data)
+    ) {
+      return (body as { data: ProcedureResponseDto[] }).data;
+    }
+    return [];
   },
 
   /**
    * GET /procedures/:rendezVousId
-   * Trouver une procédure par ID de rendez-vous
+   * Trouve une procédure via l'ID du rendez-vous associé.
+   * Retourne : ProcedureResponseDto (200) ou null (404)
    */
   async findByRendezvousId(
     rendezVousId: string,
@@ -256,7 +303,8 @@ export const ProceduresService = {
 
   /**
    * GET /procedures/:id/details
-   * Détails complets d'une procédure (toutes les virtuels calculés)
+   * Détails complets d'une procédure (avec tous les virtuels calculés).
+   * Retourne : ProcedureResponseDto (200)
    */
   async findById(id: string): Promise<ProcedureResponseDto> {
     const res = await apiFetch(`${BASE_URL}/procedures/${id}/details`, {
@@ -267,7 +315,8 @@ export const ProceduresService = {
 
   /**
    * PATCH /procedures/:id/update
-   * Mettre à jour une procédure (admin ou propriétaire selon le guard)
+   * Mettre à jour une procédure (admin ou propriétaire selon le guard).
+   * Retourne : ProcedureResponseDto (200)
    */
   async update(
     id: string,
@@ -281,11 +330,36 @@ export const ProceduresService = {
     return handleResponse<ProcedureResponseDto>(res);
   },
 
+  /**
+   * PATCH /procedures/:id/cancel
+   * Annuler une procédure (utilisateur connecté ou admin).
+   * body: { reason?: string }
+   * Retourne : ProcedureResponseDto (200)  ← ⚠️ PAS void, contrairement à l'ancienne version
+   */
+  async cancel(
+    id: string,
+    reason = "Annulation par l'utilisateur",
+  ): Promise<ProcedureResponseDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}/procedures/${id}/cancel`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ reason }),
+      });
+      const result = await handleResponse<ProcedureResponseDto>(res);
+      toast.success("Procédure annulée avec succès");
+      return result;
+    } catch (error) {
+      toast.error("Erreur lors de l'annulation de la procédure");
+      throw error;
+    }
+  },
+
   // ── Helpers frontend (pas de nouvelles routes) ────────────────────────────
 
   /**
-   * Convertit un objet ProcedureFilters en ProcedureQueryDto
-   * et appelle findAll — pas de nouvelle route
+   * Convertit un ProcedureFilters en ProcedureQueryDto et appelle findAll.
+   * Pas de route supplémentaire.
    */
   async findWithFilters(
     filters: ProcedureFilters,
@@ -306,8 +380,8 @@ export const ProceduresService = {
   },
 
   /**
-   * Récupère les procédures en retard (isOverdue = true)
-   * Basé sur le virtual calculé côté backend — pas de nouvelle route
+   * Récupère les procédures en retard (isOverdue = true).
+   * Virtual calculé côté backend — pas de route dédiée.
    */
   async findOverdue(): Promise<ProcedureResponseDto[]> {
     const result = await this.findAll({
@@ -319,28 +393,9 @@ export const ProceduresService = {
     return result.data.filter((p) => p.isOverdue);
   },
 
-  /**
-   * PATCH /procedures/:id/cancel — User
-   * Annuler une procédure (utilisateur connecté)
-   */
-  async cancel(id: string, reason?: string): Promise<void> {
-    try {
-      const res = await apiFetch(`${BASE_URL}/procedures/${id}/cancel`, {
-        method: "PATCH",
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ reason }),
-      });
-      await handleResponse<void>(res);
-      toast.success("Procédure annulée avec succès");
-    } catch (error) {
-      toast.error("Erreur lors de l'annulation de la procédure");
-      throw error;
-    }
-  },
+  // ── Validation client ─────────────────────────────────────────────────────
+  // Miroir des contraintes de create-procedure.dto.ts (class-validator)
 
-  /**
-   * Validation client — miroir des contraintes create-procedure.dto.ts
-   */
   validate(data: Partial<CreateProcedureDto>): Record<string, string> {
     const errors: Record<string, string> = {};
     const UUID_RE =
@@ -383,7 +438,10 @@ export const ProceduresService = {
       (!data.destination || data.destination.trim().length < 2)
     )
       errors.destination = "Destination requise (min 2 caractères)";
-    if ("filiere" in data && (!data.filiere || data.filiere.trim().length < 2))
+    if (
+      "filiere" in data &&
+      (!data.filiere || data.filiere.trim().length < 2)
+    )
       errors.filiere = "Filière requise (min 2 caractères)";
     if ("niveauEtude" in data && !data.niveauEtude?.trim())
       errors.niveauEtude = "Niveau d'étude requis";

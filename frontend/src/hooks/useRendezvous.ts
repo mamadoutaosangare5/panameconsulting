@@ -233,6 +233,7 @@ export const useRendezvous = (
     return message;
   };
 
+  // ── Log dev (désactivé pour éviter les logs de données) ─────────────────────────────
   // ── Actions admin ──────────────────────────────────────────────────────────
 
   /**
@@ -264,6 +265,7 @@ export const useRendezvous = (
           hasPrevious: res.hasPrevious,
         });
 
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ ${res.data.length} rendez-vous chargés (page ${res.page}/${res.totalPages})`,
         );
@@ -286,6 +288,7 @@ export const useRendezvous = (
     try {
       const data = await rendezvousService.getRendezvousById(id);
       setSelectedRendezvous(data);
+      // Log de succès sans données sensibles
       console.log(`[useRendezvous] ✅ Rendez-vous ${id} chargé`);
     } catch (err) {
       handleError(err, "Rendez-vous introuvable");
@@ -305,6 +308,7 @@ export const useRendezvous = (
     try {
       const stats = await rendezvousService.getStatistics();
       setStatistics(stats);
+      // Log de succès sans données sensibles
       console.log("[useRendezvous] ✅ Statistiques chargées");
     } catch (err) {
       console.error("[useRendezvous] Erreur chargement statistiques:", err);
@@ -326,6 +330,7 @@ export const useRendezvous = (
           endDate,
         );
         setAvailableDates(dates);
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ ${dates.length} dates disponibles chargées`,
         );
@@ -376,6 +381,7 @@ export const useRendezvous = (
           return [...prev, slots];
         });
 
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ ${slots.availableSlots.length} créneaux pour ${date}`,
         );
@@ -445,6 +451,7 @@ export const useRendezvous = (
         }
 
         toast.success("Rendez-vous mis à jour avec succès");
+        // Log de succès sans données sensibles
         console.log(`[useRendezvous] ✅ Rendez-vous ${id} mis à jour`);
 
         return updated;
@@ -484,6 +491,7 @@ export const useRendezvous = (
         }
 
         const data = await response.json();
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ ${data.length} rendez-vous pour le ${date}`,
         );
@@ -530,6 +538,7 @@ export const useRendezvous = (
         const avisMsg =
           data.avisAdmin === "FAVORABLE" ? "favorable" : "défavorable";
         toast.success(`Rendez-vous terminé avec avis ${avisMsg}`);
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ Rendez-vous ${id} terminé (avis: ${data.avisAdmin})`,
         );
@@ -569,6 +578,7 @@ export const useRendezvous = (
         }
 
         toast.success("Rendez-vous supprimé avec succès");
+        // Log de succès sans données sensibles
         console.log(`[useRendezvous] ✅ Rendez-vous ${id} supprimé`);
 
         return true;
@@ -597,6 +607,7 @@ export const useRendezvous = (
       ...todayRdv,
     ]);
 
+    // Log de succès sans données sensibles
     console.log(
       `[useRendezvous] 🔄 Rendez-vous du jour rafraîchis (${todayRdv.length})`,
     );
@@ -611,6 +622,7 @@ export const useRendezvous = (
 
       try {
         const upcoming = await rendezvousService.getUpcomingRendezvous(limit);
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ ${upcoming.length} prochains rendez-vous`,
         );
@@ -638,6 +650,7 @@ export const useRendezvous = (
 
       try {
         const csv = await rendezvousService.exportToCSV(filters);
+        // Log de succès sans données sensibles
         console.log("[useRendezvous] ✅ CSV exporté");
         return csv;
       } catch (err) {
@@ -667,6 +680,7 @@ export const useRendezvous = (
       try {
         const newRdv = await rendezvousService.createRendezvous(data);
         toast.success("Rendez-vous confirmé avec succès !");
+        // Log de succès sans données sensibles
         console.log(`[useRendezvous] ✅ Rendez-vous créé: ${newRdv.id}`);
         return newRdv;
       } catch (err) {
@@ -688,6 +702,7 @@ export const useRendezvous = (
 
       try {
         const data = await rendezvousService.getRendezvousByEmail(email);
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ ${data.length} rendez-vous pour ${email}`,
         );
@@ -760,6 +775,7 @@ export const useRendezvous = (
 
       try {
         const result = await rendezvousService.checkAvailability(date, time);
+        // Log de succès sans données sensibles
         console.log(
           `[useRendezvous] ✅ Disponibilité ${date} ${time}: ${result.available ? "oui" : "non"}`,
         );

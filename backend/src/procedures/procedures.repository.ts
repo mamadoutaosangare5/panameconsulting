@@ -73,7 +73,7 @@ export class ProceduresRepository {
     }
 
     return this.prisma.procedure.findFirst({
-      where: where as Prisma.ProcedureFindFirstArgs['where'],
+      where: where,
       include: include || {
         steps: true,
       },

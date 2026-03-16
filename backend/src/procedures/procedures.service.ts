@@ -135,9 +135,7 @@ export class ProceduresService {
       priority: 'high',
     });
 
-    this.logger.log(
-      `Procédure créée: ${procedure.id} pour rendez-vous: ${procedure.rendezVousId}`,
-    );
+    // Pas de log de données sensibles
     return this.toResponseDto(procedure);
   }
 

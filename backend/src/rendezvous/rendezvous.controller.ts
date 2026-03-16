@@ -499,9 +499,10 @@ export class RendezvousController {
         };
       });
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: ${rendezvous.length} rendez-vous trouvés`,
-      );
+      // Pas de log ici - le middleware HTTP gère déjà le logging
+      // this.logger.log(
+      //   `[RendezvousController] ${step} -> 200: ${rendezvous.length} rendez-vous trouvés`,
+      // );
       return rendezvous;
     } catch (error) {
       this.logger.error(
@@ -565,9 +566,10 @@ export class RendezvousController {
         },
       });
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: ${rendezvous.length} rendez-vous trouvés`,
-      );
+      // Pas de log ici - le middleware HTTP gère déjà le logging
+      // this.logger.log(
+      //   `[RendezvousController] ${step} -> 200: ${rendezvous.length} rendez-vous trouvés`,
+      // );
       return rendezvous;
     } catch (error) {
       this.logger.error(
