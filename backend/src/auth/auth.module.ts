@@ -27,7 +27,7 @@ import { JwtModuleOptions } from '@nestjs/jwt';
         configService: ConfigService,
       ): Promise<JwtModuleOptions> => {
         const secret =
-          configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET!;
+          configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
         const expiresIn =
           configService.get<string>('JWT_ACCESS_EXPIRES_IN') || '15m';
 

@@ -227,7 +227,7 @@ export class PaginationInterceptor implements NestInterceptor {
         // Si c'est un tableau, ajouter les métadonnées de pagination
         if (Array.isArray(data)) {
           const total = data.length;
-          const { page, limit } = request.pagination!;
+          const { page, limit } = request.pagination;
 
           return {
             data: data.slice((page - 1) * limit, page * limit),

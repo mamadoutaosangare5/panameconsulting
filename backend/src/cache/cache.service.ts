@@ -1,37 +1,56 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
+import { createRedisInstance } from '../config/redis.config';
 
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
+  private readonly defaultTTL = 1800; // 1 heure
   private redis: Redis;
-  private defaultTTL = 1800; // 1 heure
 
   constructor(private configService: ConfigService) {
-    const redisHost = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const redisPort = parseInt(
-      this.configService.get<number>('REDIS_PORT', 6379).toString(),
-    );
-    const redisPassword = this.configService.get<string>('REDIS_PASSWORD');
-
     this.logger.log('Configuration Redis initialisée');
 
-    this.redis = new Redis({
-      host: redisHost,
-      port: redisPort,
-      password: redisPassword,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
-    });
+    // Utilisation de la configuration centralisée
+    this.redis = createRedisInstance();
+  }
 
-    this.redis.on('connect', () => {
-      this.logger.log('Redis connecté avec succès');
-    });
+  // =================================
+  // CYCLE DE VIE DU MODULE
+  // =================================
 
-    this.redis.on('error', () => {
-      this.logger.error('Erreur Redis');
-    });
+  /**
+   * Appelé lorsque le module est initialisé
+   * Établit la connexion Redis
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.redis.connect();
+      this.logger.log('Connexion Redis établie avec succès');
+    } catch (error) {
+      this.logger.error('Erreur lors de la connexion Redis:', error);
+    }
+  }
+
+  /**
+   * Appelé lorsque le module est détruit
+   * Ferme proprement la connexion Redis
+   */
+  async onModuleDestroy(): Promise<void> {
+    try {
+      if (this.redis.status === 'ready') {
+        await this.redis.quit();
+        this.logger.log('Connexion Redis fermée avec succès');
+      }
+    } catch (error) {
+      this.logger.error('Erreur lors de la fermeture Redis:', error);
+    }
   }
 
   async set(key: string, value: any, ttl?: number): Promise<void> {

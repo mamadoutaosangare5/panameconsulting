@@ -1,3 +1,5 @@
+import { getRedisConfig } from './redis.config';
+
 export default () => ({
   // Configuration de base
   port: process.env.PORT || 10000,
@@ -14,16 +16,8 @@ export default () => ({
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
 
-  // Configuration Redis (optionnelle pour le moment)
-  redis: {
-    host: process.env.REDIS_HOST,
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB || '0', 10),
-    // Désactiver Redis temporairement si non disponible
-    enabled: process.env.REDIS_ENABLED !== 'false',
-    url: process.env.REDIS_URL,
-  },
+  // Configuration Redis centralisée avec support dual-stack
+  redis: getRedisConfig(),
 
   // Email (optionnel)
   email: {

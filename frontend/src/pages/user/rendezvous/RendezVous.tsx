@@ -130,6 +130,7 @@ const RendezVous = () => {
   const [showOtherFiliere, setShowOtherFiliere] = useState(false);
 
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     AOS.init({
@@ -219,6 +220,11 @@ const RendezVous = () => {
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Effacer l'erreur lorsque l'utilisateur modifie un champ
+    if (error) {
+      setError(null);
+    }
   };
 
   // Validation téléphone
@@ -307,29 +313,47 @@ const RendezVous = () => {
     } else {
       if (currentStep === 1) {
         if (!formData.firstName?.trim() || !formData.lastName?.trim()) {
+          setError("Veuillez remplir votre nom et prénom");
+          return;
         } else if (!formData.email?.trim()) {
+          setError("Veuillez remplir votre adresse email");
+          return;
         } else if (
           !formData.telephone?.trim() ||
           !validatePhone(formData.telephone)
         ) {
+          setError("Veuillez remplir un numéro de téléphone valide");
+          return;
         }
       } else if (currentStep === 2) {
         // Messages d'erreur pour l'étape 2
         if (!formData.destination) {
+          setError("Veuillez sélectionner une destination");
+          return;
         } else if (
           formData.destination === "Autre" &&
           !formData.destinationAutre?.trim()
         ) {
+          setError("Veuillez spécifier votre destination");
+          return;
         } else if (!formData.niveauEtude) {
+          setError("Veuillez sélectionner votre niveau d'étude");
+          return;
         } else if (
           formData.niveauEtude === "Autre" &&
           !formData.niveauEtudeAutre?.trim()
         ) {
+          setError("Veuillez spécifier votre niveau d'étude");
+          return;
         } else if (!formData.filiere) {
+          setError("Veuillez sélectionner une filière");
+          return;
         } else if (
           formData.filiere === "Autre" &&
           !formData.filiereAutre?.trim()
         ) {
+          setError("Veuillez spécifier votre filière");
+          return;
         }
       }
     }
@@ -996,13 +1020,31 @@ const RendezVous = () => {
         <div className="mx-auto max-w-2xl px-3 sm:px-4">
           <div className="mb-6 flex items-center gap-2">
             <button
-              onClick={() => navigate("/user/mes-rendezvous")}
-              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-sky-700 shadow-sm transition-all duration-150 hover:bg-sky-50 hover:text-sky-800"
+              onClick={() => navigate(-1)}
+              className="rounded-lg bg-white p-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-sky-600"
             >
-              <Calendar className="h-4 w-4" />
-              Mes rendez-vous
+              <ChevronLeft className="h-4 w-4" />
             </button>
+            <h1 className="text-xl font-bold text-gray-900">
+              Prendre un rendez-vous
+            </h1>
           </div>
+
+          {/* Affichage du message d'erreur */}
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded-full bg-red-500" />
+                <p className="text-sm font-medium text-red-800">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-auto text-red-500 hover:text-red-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
 
           {success ? (
             <div

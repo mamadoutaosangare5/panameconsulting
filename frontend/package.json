@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "vercel": "vercel --prod",
-    "lint": "eslint .",
-    "format": "prettier --write .",
+    "lint": "eslint ./src",
+    "format": "prettier --write ./src",
     "preview": "vite preview"
   },
   "dependencies": {

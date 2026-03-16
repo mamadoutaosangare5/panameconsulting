@@ -6,9 +6,7 @@ export interface EnvironmentVariables {
   NODE_ENV: string;
   PORT: number;
   DATABASE_URL: string;
-  REDIS_HOST: string;
-  REDIS_PORT: number;
-  REDIS_PASSWORD?: string;
+  REDIS_URL: string;
   CLOUDINARY_CLOUD_NAME: string;
   CLOUDINARY_API_KEY: string;
   CLOUDINARY_API_SECRET: string;

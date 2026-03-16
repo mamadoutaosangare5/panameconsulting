@@ -1,9 +1,9 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD, APP_PIPE, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { RedisConfig } from './config/redis.config';
 
 // Modules
 import { AuthModule } from './auth/auth.module';
@@ -35,6 +35,7 @@ import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter'
 
 // Configuration
 import configuration from './config/configuration';
+import { APP_GUARD, APP_PIPE, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -66,23 +67,26 @@ import configuration from './config/configuration';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        redis: {
-          host: config.get('REDIS_HOST', 'localhost'),
-          port: config.get('REDIS_PORT', 6379),
-          password: config.get('REDIS_PASSWORD'),
-          db: config.get('REDIS_DB', 0),
-        },
-        defaultJobOptions: {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 5000,
+      useFactory: (config: ConfigService) => {
+        const redisConfig = config.get<RedisConfig>('redis');
+        if (!redisConfig.enabled) {
+          throw new Error(
+            'Redis est désactivé. Impossible de configurer BullMQ.',
+          );
+        }
+        return {
+          redis: redisConfig.url,
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 5000,
+            },
+            removeOnComplete: 100,
+            removeOnFail: 500,
           },
-          removeOnComplete: 100,
-          removeOnFail: 500,
-        },
-      }),
+        };
+      },
     }),
 
     // ==================== MODULES MÉTIER ====================
