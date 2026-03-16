@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, Lock, CheckCircle, XCircle } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { Helmet } from "react-helmet-async";
@@ -127,7 +127,9 @@ const ResetPassword: React.FC = () => {
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold">Nouveau mot de passe</h1>
+            <Link to="/" className="text-2xl font-bold text-white">
+              Nouveau mot de passe
+            </Link>
             <p className="text-sky-100 mt-2">
               Choisissez un mot de passe sécurisé
             </p>

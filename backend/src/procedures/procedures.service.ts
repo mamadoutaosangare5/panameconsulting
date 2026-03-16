@@ -612,6 +612,7 @@ export class ProceduresService {
 
     const [
       totalProcedures,
+      pending,
       inProgress,
       completed,
       rejected,
@@ -621,6 +622,10 @@ export class ProceduresService {
       proceduresThisMonth,
     ] = await Promise.all([
       this.proceduresRepository.count({ isDeleted: false }),
+      this.proceduresRepository.count({
+        statut: ProcedureStatus.IN_PROGRESS,
+        isDeleted: false,
+      }),
       this.proceduresRepository.count({
         statut: ProcedureStatus.IN_PROGRESS,
         isDeleted: false,
@@ -655,21 +660,24 @@ export class ProceduresService {
     return {
       total: totalProcedures,
       byStatus: {
-        inProgress,
-        completed,
-        rejected,
-        cancelled,
+        PENDING: pending,
+        IN_PROGRESS: inProgress,
+        COMPLETED: completed,
+        REJECTED: rejected,
+        CANCELLED: cancelled,
       },
       completionRate:
         totalProcedures > 0 ? (completed / totalProcedures) * 100 : 0,
       rejectionRate:
         totalProcedures > 0 ? (rejected / totalProcedures) * 100 : 0,
+      averageCompletionTime: 0, // TODO: calculer le temps moyen
       newProcedures: {
         today: proceduresToday,
         thisWeek: proceduresThisWeek,
         thisMonth: proceduresThisMonth,
       },
       topDestinations,
+      topFilieres: [], // TODO: implémenter les statistiques par filière
     };
   }
 

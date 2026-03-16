@@ -67,9 +67,9 @@ const ForgotPassword: React.FC = () => {
                     <FiMail className="text-white text-xl" />
                   </div>
                 </div>
-                <h1 className="text-2xl font-bold text-white">
+                <Link to="/" className="text-2xl font-bold text-white">
                   Mot de passe oublié
-                </h1>
+                </Link>
               </div>
             </div>
 

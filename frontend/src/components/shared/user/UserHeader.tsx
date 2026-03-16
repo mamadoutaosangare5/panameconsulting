@@ -20,8 +20,11 @@ export const UserHeader = ({
   const location = useLocation();
 
   const activeTabId =
-    navTabs.find((tab) => location.pathname === tab.to || location.pathname.startsWith(tab.to + "/"))?.id ||
-    "rendezvous";
+    navTabs.find(
+      (tab) =>
+        location.pathname === tab.to ||
+        location.pathname.startsWith(tab.to + "/"),
+    )?.id || "rendezvous";
 
   return (
     <header className="bg-white shadow-lg border-b border-gray-100 fixed top-0 left-0 right-0 z-50">

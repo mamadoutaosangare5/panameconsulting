@@ -164,9 +164,9 @@ const Register: React.FC = () => {
                     <FiUser className="text-white text-xl" />
                   </div>
                 </div>
-                <h1 className="text-2xl font-bold text-white">
+                <Link to="/" className="text-2xl font-bold text-white">
                   Créer un compte
-                </h1>
+                </Link>
               </div>
             </div>
 
