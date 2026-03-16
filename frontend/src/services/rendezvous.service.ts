@@ -307,8 +307,6 @@ class RendezvousService {
       const processedResult = result.map((rdv: RendezvousResponseDto) =>
         this.calculateEffectiveFields(rdv),
       );
-
-      toast.success(`${processedResult.length} rendez-vous trouvés`);
       return processedResult;
     } catch (error) {
       console.error(`[RendezvousService]  Erreur getRendezvousByEmail:`, error);
