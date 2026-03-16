@@ -53,17 +53,17 @@ export type StatusColor =
 // ─── DTO Création (create-procedure.dto.ts) ───────────────────────────────────
 
 export interface CreateProcedureDto {
-  rendezVousId: string;        // UUID v4, requis
-  prenom: string;              // min 2, max 50, lettres/espaces/tirets/apostrophes
-  nom: string;                 // min 2, max 50, lettres/espaces/tirets/apostrophes
-  email: string;               // format email valide, requis
-  telephone: string;           // format international +XXXXXXXXXXX, requis
-  destination: string;         // requis
-  destinationAutre?: string;   // si destination = "Autre"
-  filiere: string;             // requis
-  filiereAutre?: string;       // si filiere = "Autre"
-  niveauEtude: string;         // requis
-  niveauEtudeAutre?: string;   // si niveauEtude = "Autre"
+  rendezVousId: string; // UUID v4, requis
+  prenom: string; // min 2, max 50, lettres/espaces/tirets/apostrophes
+  nom: string; // min 2, max 50, lettres/espaces/tirets/apostrophes
+  email: string; // format email valide, requis
+  telephone: string; // format international +XXXXXXXXXXX, requis
+  destination: string; // requis
+  destinationAutre?: string; // si destination = "Autre"
+  filiere: string; // requis
+  filiereAutre?: string; // si filiere = "Autre"
+  niveauEtude: string; // requis
+  niveauEtudeAutre?: string; // si niveauEtude = "Autre"
 }
 
 // ─── DTO Mise à jour (update-procedure.dto.ts) ────────────────────────────────
@@ -72,7 +72,7 @@ export interface CreateProcedureDto {
 export interface UpdateProcedureDto extends Partial<CreateProcedureDto> {
   raisonRejet?: string;
   isDeleted?: boolean;
-  deletedAt?: string;       // ISO date string
+  deletedAt?: string; // ISO date string
   deletionReason?: string;
 }
 
@@ -81,30 +81,30 @@ export interface UpdateProcedureDto extends Partial<CreateProcedureDto> {
 export interface UpdateStepDto {
   statut?: StepStatus;
   raisonRefus?: string;
-  dateCompletion?: string;  // ISO date string
+  dateCompletion?: string; // ISO date string
 }
 
 // ─── DTO Query (procedure-query.dto.ts) ───────────────────────────────────────
 
 export interface ProcedureQueryDto {
-  page?: number;             // default 1, min 1
-  limit?: number;            // default 10, min 1
+  page?: number; // default 1, min 1
+  limit?: number; // default 10, min 1
   status?: ProcedureStatus;
   email?: string;
   destination?: string;
   filiere?: string;
-  includeDeleted?: boolean;  // default false
-  startDate?: string;        // YYYY-MM-DD
-  endDate?: string;          // YYYY-MM-DD
+  includeDeleted?: boolean; // default false
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
   search?: string;
-  sortBy?: string;           // default 'createdAt'
-  sortOrder?: SortOrder;     // default 'desc'
+  sortBy?: string; // default 'createdAt'
+  sortOrder?: SortOrder; // default 'desc'
 }
 
 export interface ProcedureStatsQueryDto {
-  startDate?: string;        // YYYY-MM-DD
-  endDate?: string;          // YYYY-MM-DD
-  groupBy?: GroupBy;         // default 'month'
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  groupBy?: GroupBy; // default 'month'
 }
 
 // ─── DTO Réponse étape (StepResponseDto — procedure-response.dto.ts) ─────────
@@ -119,9 +119,9 @@ export interface StepResponseDto {
   dateCompletion?: Date;
   // Virtuels calculés par le service backend
   canBeModified: boolean;
-  duration?: number;       // en jours, si complétée
-  isOverdue: boolean;      // >7 jours en IN_PROGRESS sans complétion
-  statusLabel: string;     // ex : "En cours", "Terminée"
+  duration?: number; // en jours, si complétée
+  isOverdue: boolean; // >7 jours en IN_PROGRESS sans complétion
+  statusLabel: string; // ex : "En cours", "Terminée"
   statusColor: StatusColor;
 }
 
@@ -132,12 +132,12 @@ export interface ProcedureResponseDto {
   rendezVousId?: string;
   prenom: string;
   nom: string;
-  fullName: string;                    // calculé : "Jean Dupont"
+  fullName: string; // calculé : "Jean Dupont"
   email: string;
   telephone: string;
   destination: string;
   destinationAutre?: string;
-  effectiveDestination: string;        // destination || destinationAutre
+  effectiveDestination: string; // destination || destinationAutre
   filiere: string;
   filiereAutre?: string;
   effectiveFiliere: string;
@@ -156,7 +156,7 @@ export interface ProcedureResponseDto {
   userId?: string | null;
   steps: StepResponseDto[];
   // Virtuels calculés par le service backend
-  progress: number;                    // 0–100
+  progress: number; // 0–100
   completedSteps: number;
   totalSteps: number;
   activeStep?: StepName;
@@ -168,7 +168,7 @@ export interface ProcedureResponseDto {
   canBeModified: boolean;
   daysSinceCreation: number;
   estimatedCompletionDate?: Date;
-  isOverdue: boolean;                  // >14 jours
+  isOverdue: boolean; // >14 jours
 }
 
 // ─── DTO Réponse paginée (PaginatedProcedureResponseDto) ─────────────────────
@@ -189,9 +189,9 @@ export interface PaginatedProcedureResponseDto {
 export interface ProcedureStatisticsDto {
   total: number;
   byStatus: Record<ProcedureStatus, number>;
-  completionRate: number;              // %
-  rejectionRate: number;              // %
-  averageCompletionTime: number;      // jours
+  completionRate: number; // %
+  rejectionRate: number; // %
+  averageCompletionTime: number; // jours
   newProcedures: {
     today: number;
     thisWeek: number;
@@ -357,9 +357,9 @@ export interface ProcedureAuditFilterEntity {
   userId?: string;
   startDate?: string;
   endDate?: string;
-  limit?: number;    // default 100
-  offset?: number;   // default 0
-  sortBy?: string;   // default 'createdAt'
+  limit?: number; // default 100
+  offset?: number; // default 0
+  sortBy?: string; // default 'createdAt'
   sortOrder?: SortOrder; // default 'desc'
 }
 

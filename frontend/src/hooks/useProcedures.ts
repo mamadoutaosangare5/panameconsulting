@@ -171,20 +171,17 @@ export function useProcedures(
     [],
   );
 
-  const syncPagination = useCallback(
-    (res: PaginatedProcedureResponseDto) => {
-      if (!res) return;
-      setPagination({
-        total: res.total ?? 0,
-        page: res.page ?? 1,
-        limit: res.limit ?? 10,
-        totalPages: res.totalPages ?? 0,
-        hasNext: res.hasNext ?? false,
-        hasPrevious: res.hasPrevious ?? false,
-      });
-    },
-    [],
-  );
+  const syncPagination = useCallback((res: PaginatedProcedureResponseDto) => {
+    if (!res) return;
+    setPagination({
+      total: res.total ?? 0,
+      page: res.page ?? 1,
+      limit: res.limit ?? 10,
+      totalPages: res.totalPages ?? 0,
+      hasNext: res.hasNext ?? false,
+      hasPrevious: res.hasPrevious ?? false,
+    });
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // loadProcedures — GET /admin/procedures/all
@@ -428,9 +425,7 @@ export function useProcedures(
           setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
         }
         setError(
-          err instanceof Error
-            ? err.message
-            : "Erreur lors de la suppression",
+          err instanceof Error ? err.message : "Erreur lors de la suppression",
         );
         return false;
       } finally {
@@ -455,17 +450,13 @@ export function useProcedures(
         const updated = await ProceduresService.cancel(id, reason);
 
         // Mise à jour optimiste à partir de la réponse réelle du backend
-        setProcedures((prev) =>
-          prev.map((p) => (p.id === id ? updated : p)),
-        );
+        setProcedures((prev) => prev.map((p) => (p.id === id ? updated : p)));
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
 
         return updated;
       } catch (err: unknown) {
         setError(
-          err instanceof Error
-            ? err.message
-            : "Erreur lors de l'annulation",
+          err instanceof Error ? err.message : "Erreur lors de l'annulation",
         );
         return null;
       } finally {
@@ -529,9 +520,7 @@ export function useProcedures(
       setProcedures(res.data);
       syncPagination(res);
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Erreur lors du filtrage",
-      );
+      setError(err instanceof Error ? err.message : "Erreur lors du filtrage");
     }
   }, [filters, syncPagination]);
 
@@ -546,8 +535,7 @@ export function useProcedures(
   );
 
   const setLimit = useCallback(
-    (limit: number) =>
-      setQueryState((prev) => ({ ...prev, limit, page: 1 })),
+    (limit: number) => setQueryState((prev) => ({ ...prev, limit, page: 1 })),
     [],
   );
 

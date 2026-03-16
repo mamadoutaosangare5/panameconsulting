@@ -203,10 +203,7 @@ export const ProceduresService = {
    * Erreur 409 si l'étape existe déjà.
    * Retourne : ProcedureResponseDto (200)
    */
-  async addStep(
-    id: string,
-    stepName: StepName,
-  ): Promise<ProcedureResponseDto> {
+  async addStep(id: string, stepName: StepName): Promise<ProcedureResponseDto> {
     try {
       const res = await apiFetch(
         `${BASE_URL}/admin/procedures/${id}/steps/${stepName}`,
@@ -438,10 +435,7 @@ export const ProceduresService = {
       (!data.destination || data.destination.trim().length < 2)
     )
       errors.destination = "Destination requise (min 2 caractères)";
-    if (
-      "filiere" in data &&
-      (!data.filiere || data.filiere.trim().length < 2)
-    )
+    if ("filiere" in data && (!data.filiere || data.filiere.trim().length < 2))
       errors.filiere = "Filière requise (min 2 caractères)";
     if ("niveauEtude" in data && !data.niveauEtude?.trim())
       errors.niveauEtude = "Niveau d'étude requis";
