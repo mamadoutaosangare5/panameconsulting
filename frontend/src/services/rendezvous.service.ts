@@ -307,9 +307,12 @@ class RendezvousService {
       const processedResult = result.map((rdv: RendezvousResponseDto) =>
         this.calculateEffectiveFields(rdv),
       );
+
+      toast.success(`${processedResult.length} rendez-vous trouvés`);
       return processedResult;
     } catch (error) {
       console.error(`[RendezvousService]  Erreur getRendezvousByEmail:`, error);
+      toast.error("Erreur lors de la récupération des rendez-vous");
       return [];
     }
   }
@@ -329,6 +332,7 @@ class RendezvousService {
       return result;
     } catch (error) {
       console.error(`[RendezvousService] Erreur getRendezvousById:`, error);
+      toast.error("Erreur lors de la récupération du rendez-vous");
       throw error;
     }
   }
@@ -356,6 +360,7 @@ class RendezvousService {
       return result;
     } catch (error) {
       console.error(`[RendezvousService]  Erreur cancelRendezvous:`, error);
+      toast.error("Erreur lors de l'annulation du rendez-vous");
       throw error;
     }
   }
@@ -390,6 +395,7 @@ class RendezvousService {
       return result;
     } catch (error) {
       console.error(`[RendezvousService] Erreur updateRendezvous:`, error);
+      toast.error("Erreur lors de la mise à jour du rendez-vous");
       throw error;
     }
   }
@@ -416,6 +422,7 @@ class RendezvousService {
       return result;
     } catch (error) {
       console.error(`[RendezvousService] Erreur completeRendezvous:`, error);
+      toast.error("Erreur lors de la marquage du rendez-vous comme terminé");
       throw error;
     }
   }
@@ -433,6 +440,7 @@ class RendezvousService {
       toast.success(`Rendez-vous supprimé`);
     } catch (error) {
       console.error(`[RendezvousService]  Erreur deleteRendezvous:`, error);
+      toast.error("Erreur lors de la suppression du rendez-vous");
       throw error;
     }
   }
