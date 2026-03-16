@@ -162,7 +162,6 @@ export function useUser(): UseUserReturn {
   // ─────────────────────────────────────────────────────────
   const fetchUsers = useCallback(
     async (params: GetUsersParams = {}): Promise<void> => {
-      console.log("[useUser] fetchUsers called with params:", params);
       startLoading("list");
       try {
         const list = await getUsers(params);

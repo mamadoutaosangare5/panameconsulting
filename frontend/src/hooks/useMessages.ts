@@ -116,25 +116,13 @@ export function useMessages(): UseMessagesReturn {
         endDate: filtersRef.current.endDate,
       };
 
-      console.log("[useMessages] fetchMessages called with query:", query);
 
       const [listResult, statsResult] = await Promise.all([
         MessagesService.findAll(query),
         MessagesService.getStatistics(),
       ]);
 
-      console.log(
-        "[useMessages] fetchMessages success - listResult:",
-        listResult,
-      );
-      console.log(
-        "[useMessages] fetchMessages success - listResult.data:",
-        listResult.data,
-      );
-      console.log(
-        "[useMessages] fetchMessages success - listResult.data length:",
-        listResult.data?.length,
-      );
+     
       console.log(
         "[useMessages] fetchMessages success - statsResult:",
         statsResult,
@@ -225,27 +213,19 @@ export function useMessages(): UseMessagesReturn {
 
   const respond = useCallback(
     async (id: string, response: string) => {
-      console.log(
-        "[useMessages] respond called with id:",
-        id,
-        "response length:",
-        response.length,
-      );
       try {
-        const result = await MessagesService.respond(id, {
+        await MessagesService.respond(id, {
           response,
           markAsRead: true,
         });
-        console.log("[useMessages] respond success:", result);
         toast.success("Réponse envoyée avec succès");
         setSelectedMessage(null);
         await refresh();
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Erreur lors de l'envoi";
-        console.log("[useMessages] respond error:", err);
+          err instanceof Error ? err.message : "Erreur lors de l'envoi de la réponse";
         toast.error(message);
-        throw err;
+        console.error("[useMessages] respond error:", err);
       }
     },
     [refresh],
