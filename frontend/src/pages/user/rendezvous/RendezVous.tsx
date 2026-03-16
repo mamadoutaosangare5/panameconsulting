@@ -1,8 +1,8 @@
-/* eslint-disable react-hooks/rules-of-hooks */
 import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type FormEvent,
   type ChangeEvent,
 } from "react";
@@ -54,59 +54,16 @@ interface FormData {
 }
 
 const RendezVous = () => {
+  // ✅ TOUS les hooks doivent être appelés au début, dans le même ordre
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
 
-  // Vérification d'authentification
-  const [isAuthChecked, setIsAuthChecked] = useState(false);
-
-  useEffect(() => {
-    if (!isAuthChecked && isAuthenticated) {
-      setIsAuthChecked(true);
-    }
-  }, [isAuthenticated, isAuthChecked, navigate]);
-
-  if (!isAuthenticated && !isAuthChecked) {
-    // Redirection automatique vers la page de connexion
-    useEffect(() => {
-      navigate("/connexion");
-    }, [navigate]);
-
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center p-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
-            <div className="mb-4">
-              <Calendar className="mx-auto h-12 w-12 text-sky-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Connexion requise
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Vous devez être connecté pour prendre un rendez-vous.
-            </p>
-            <p className="text-sm text-gray-500">
-              Redirection vers la page de connexion...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Utilisation du hook useRendezvous avec les bonnes méthodes
-  const {
-    createRendezvous,
-    checkAvailability,
-    getAvailableSlotsList,
-    getAvailableDates,
-    loading,
-  } = useRendezvous({
-    autoLoad: false,
-  });
-
+  // ✅ Utiliser useMemo pour isAuthChecked aussi
+  const isAuthChecked = useMemo(() => isAuthenticated, [isAuthenticated]);
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
+  
+  // ✅ Garder un état séparé pour les modifications du formulaire
+  const [formData, setFormData] = useState<FormData>(() => ({
     firstName: "",
     lastName: "",
     email: "",
@@ -119,19 +76,49 @@ const RendezVous = () => {
     filiereAutre: "",
     date: "",
     time: "",
-  });
+  }));
+  
+  // ✅ Utiliser useMemo pour calculer les données initiales basées sur user
+  const initialFormData = useMemo<FormData>(() => ({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
+    telephone: user?.telephone || "",
+    destination: "",
+    destinationAutre: "",
+    niveauEtude: "",
+    niveauEtudeAutre: "",
+    filiere: "",
+    filiereAutre: "",
+    date: "",
+    time: "",
+  }), [user?.firstName, user?.lastName, user?.email, user?.telephone]);
+  
+  // ✅ Réinitialiser le formulaire quand les données utilisateur changent
+  useEffect(() => {
+    setFormData(initialFormData);
+  }, [initialFormData]);
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-
-  // États pour les champs "Autre"
   const [showOtherDestination, setShowOtherDestination] = useState(false);
   const [showOtherNiveau, setShowOtherNiveau] = useState(false);
   const [showOtherFiliere, setShowOtherFiliere] = useState(false);
-
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Hook useRendezvous
+  const {
+    createRendezvous,
+    checkAvailability,
+    getAvailableSlotsList,
+    getAvailableDates,
+    loading,
+  } = useRendezvous({
+    autoLoad: false,
+  });
+
+  // ✅ TOUS les useEffect doivent être appelés après les états
   useEffect(() => {
     AOS.init({
       duration: 300,
@@ -140,35 +127,33 @@ const RendezVous = () => {
     });
   }, []);
 
-  // Charger les dates disponibles via le hook
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && isAuthChecked) {
+      navigate("/connexion");
+    }
+  }, [isLoading, isAuthenticated, isAuthChecked, navigate]);
+
+  // ✅ Calculs et callbacks
   const fetchAvailableDates = useCallback(async (): Promise<void> => {
     try {
       const dates: AvailableDate[] = await getAvailableDates();
-      // Transformer AvailableDate[] en string[] pour le select
       const dateStrings = dates
         .filter((d) => d.hasSlots)
-        .map((d) => d.date)
-        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
+        .map((d) => d.date);
       setAvailableDates(dateStrings);
-    } catch (error) {
-      console.error("Erreur dates:", error);
-      // Le hook gère déjà les erreurs avec des toasts
+    } catch (err) {
+      console.error("Erreur lors du chargement des dates:", err);
     }
   }, [getAvailableDates]);
 
-  // Charger les créneaux disponibles via le hook
   const fetchAvailableSlots = useCallback(
     async (date: string): Promise<void> => {
-      if (!date) return;
-
-      setAvailableSlots([]);
       try {
-        const slots = await getAvailableSlotsList(date);
+        const slots: TimeSlot[] = await getAvailableSlotsList(date);
+        // ✅ TimeSlot[] est déjà un tableau de strings, pas besoin de .time
         setAvailableSlots(slots);
-      } catch {
-        setAvailableSlots([]);
-        // Le hook gère déjà les erreurs avec des toasts
+      } catch (err) {
+        console.error("Erreur lors du chargement des créneaux:", err);
       }
     },
     [getAvailableSlotsList],
