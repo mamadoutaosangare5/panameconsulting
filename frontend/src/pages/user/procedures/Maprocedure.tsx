@@ -646,7 +646,7 @@ export default function MaProcedures() {
         <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-screen bg-slate-50 pb-20">
+      <div className="min-h-screen bg-slate-50 pb-20 mt-35">
         {/* ── Page hero ── */}
         <div className="bg-linear-to-br from-sky-500 via-sky-600 to-blue-700 px-5 pt-8 pb-6">
           {/* greeting */}
