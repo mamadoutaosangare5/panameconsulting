@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   FileText,
   Calendar,
@@ -9,9 +9,12 @@ import {
   X,
   Filter,
   Search,
-  ChevronDown,
-  Eye,
-  Trash2,
+  ChevronRight,
+  MapPin,
+  GraduationCap,
+  RefreshCw,
+  AlertTriangle,
+  Ban,
 } from "lucide-react";
 import { useAuth } from "../../../hooks/useAuth";
 import { useProcedures } from "../../../hooks/useProcedures";
@@ -21,573 +24,817 @@ import type {
   ProcedureResponseDto,
   ProcedureStatus,
   StepResponseDto,
+  StepName,
 } from "../../../types/procedures.types";
 import Loader from "../../../components/shared/user/Loader";
 
-const Maprocedure = () => {
-  const { user, isAuthenticated } = useAuth();
-  const {
-    procedures,
-    loading,
-    selectedProcedure,
-    selectProcedure,
-    findByEmail,
-    loadById,
-    cancelProcedure,
-  } = useProcedures({ shouldLoadStatistics: false }); // Désactiver les stats pour les utilisateurs
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("tous");
-  const [showFilters, setShowFilters] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [procedureToCancel, setProcedureToCancel] =
-    useState<ProcedureResponseDto | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
+const STATUS_CONFIG: Record<
+  ProcedureStatus,
+  { label: string; color: string; bg: string; icon: React.ReactNode; dot: string }
+> = {
+  PENDING: {
+    label: "En attente",
+    color: "text-slate-500",
+    bg: "bg-slate-100",
+    dot: "bg-slate-400",
+    icon: <Clock className="w-3.5 h-3.5" />,
+  },
+  IN_PROGRESS: {
+    label: "En cours",
+    color: "text-sky-600",
+    bg: "bg-sky-50",
+    dot: "bg-sky-500",
+    icon: <RefreshCw className="w-3.5 h-3.5" />,
+  },
+  COMPLETED: {
+    label: "Terminée",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    dot: "bg-emerald-500",
+    icon: <CheckCircle className="w-3.5 h-3.5" />,
+  },
+  REJECTED: {
+    label: "Rejetée",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    dot: "bg-red-500",
+    icon: <XCircle className="w-3.5 h-3.5" />,
+  },
+  CANCELLED: {
+    label: "Annulée",
+    color: "text-orange-500",
+    bg: "bg-orange-50",
+    dot: "bg-orange-400",
+    icon: <Ban className="w-3.5 h-3.5" />,
+  },
+};
 
-  // Charger les procedures au montage et quand l'utilisateur change
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      findByEmail(user.email);
-    }
-  }, [isAuthenticated, user, findByEmail]);
+const STEP_LABELS: Record<StepName, string> = {
+  DEMANDE_ADMISSION: "Demande d'admission",
+  PREPARATION_DOSSIERS: "Préparation dossiers",
+  SOUMISSION_DOSSIERS: "Soumission dossiers",
+  ATTENTE_DECISION: "Attente décision",
+  DEMANDE_VISA: "Demande de visa",
+  PREPARATIF_VOYAGE: "Préparatifs voyage",
+  ARRIVEE_PAYS: "Arrivée au pays",
+  INSCRIPTION_ETABLISSEMENT: "Inscription établissement",
+};
 
-  // Gérer la sélection d'une procédure
-  const handleProcedureClick = async (procedure: ProcedureResponseDto) => {
-    await loadById(procedure.id);
-    setShowModal(true);
-  };
+function formatDate(d: Date | string | undefined): string {
+  if (!d) return "—";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(d));
+}
 
-  // Fermer le modal
-  const handleCloseModal = () => {
-    setShowModal(false);
-    selectProcedure(null);
-  };
+// ─── StatusBadge ─────────────────────────────────────────────────────────────
 
-  // Gérer l'annulation
-  const openCancelModal = (procedure: ProcedureResponseDto) => {
-    setProcedureToCancel(procedure);
-    setCancelReason("");
-    setShowCancelModal(true);
-  };
+function StatusBadge({ status }: { status: ProcedureStatus }) {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color} ${cfg.bg}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
 
-  const handleCloseCancelModal = () => {
-    setShowCancelModal(false);
-    setProcedureToCancel(null);
-    setCancelReason("");
-  };
+// ─── ProgressBar ─────────────────────────────────────────────────────────────
 
-  const handleCancelProcedure = async () => {
-    if (!procedureToCancel) return;
-
-    try {
-      const result = await cancelProcedure(
-        procedureToCancel.id,
-        cancelReason || "Annulation par l'utilisateur",
-      );
-      if (result) {
-        handleCloseCancelModal();
-      }
-    } catch (error) {
-      console.error("Erreur lors de l'annulation:", error);
-    }
-  };
-
-  // Filtrer les procédures (logique combinée entre le hook et le composant)
-  const filteredProcedures = useMemo(() => {
-    let filtered = procedures || []; // Protection contre undefined
-
-    // Filtrer par terme de recherche
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (procedure) =>
-          procedure.effectiveDestination
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          procedure.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          procedure.nom.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-    }
-
-    // Filtrer par statut
-    if (statusFilter !== "tous") {
-      filtered = filtered.filter(
-        (procedure) => procedure.statut === statusFilter,
-      );
-    }
-
-    return filtered;
-  }, [procedures, searchTerm, statusFilter]);
-
-  const getStatusColor = (status: ProcedureStatus) => {
-    switch (status) {
-      case "IN_PROGRESS":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "COMPLETED":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "REJECTED":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "CANCELLED":
-        return "bg-gray-100 text-gray-800 border-gray-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: ProcedureStatus) => {
-    switch (status) {
-      case "IN_PROGRESS":
-        return <Clock className="w-4 h-4" />;
-      case "COMPLETED":
-        return <CheckCircle className="w-4 h-4" />;
-      case "REJECTED":
-        return <XCircle className="w-4 h-4" />;
-      case "CANCELLED":
-        return <AlertCircle className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
-
-  const getStatusLabel = (status: ProcedureStatus) => {
-    switch (status) {
-      case "IN_PROGRESS":
-        return "En cours";
-      case "COMPLETED":
-        return "Terminée";
-      case "REJECTED":
-        return "Rejetée";
-      case "CANCELLED":
-        return "Annulée";
-      default:
-        return status;
-    }
-  };
-
-  const formatDate = (dateString: string | Date) => {
-    const date =
-      typeof dateString === "string" ? new Date(dateString) : dateString;
-    return date.toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
+function ProgressBar({
+  progress,
+  status,
+}: {
+  progress: number;
+  status: ProcedureStatus;
+}) {
+  const color =
+    status === "COMPLETED"
+      ? "bg-emerald-500"
+      : status === "REJECTED" || status === "CANCELLED"
+        ? "bg-red-400"
+        : "bg-gradient-to-r from-sky-400 to-blue-500";
 
   return (
-    <>
-      <Helmet>
-        <title>{pageConfigs["/mes-procedures"].pageTitle}</title>
-        <meta
-          name="description"
-          content={pageConfigs["/mes-procedures"].description}
-        />
-        <meta name="robots" content="noindex, nofollow" />
-        <meta name="googlebot" content="noindex, nofollow" />
-      </Helmet>
+    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all duration-700 ${color}`}
+        style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+      />
+    </div>
+  );
+}
 
-      <div className="min-h-screen mt-25">
-        <div className="container mx-auto px-4 py-6 max-w-7xl">
-          {/* Filters */}
-          <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Recherchercher par destination..."
-                  value={searchTerm}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setSearchTerm(e.target.value)
-                  }
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
-              </div>
+// ─── StepTimeline ─────────────────────────────────────────────────────────────
 
-              {/* Status Filter */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <Filter className="w-4 h-4" />
-                  <span>Statut</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
+function StepTimeline({ steps }: { steps: StepResponseDto[] }) {
+  const sorted = [...steps].sort((a, b) => {
+    const order: Record<string, number> = {
+      DEMANDE_ADMISSION: 0,
+      PREPARATION_DOSSIERS: 1,
+      SOUMISSION_DOSSIERS: 2,
+      ATTENTE_DECISION: 3,
+      DEMANDE_VISA: 4,
+      PREPARATIF_VOYAGE: 5,
+      ARRIVEE_PAYS: 6,
+      INSCRIPTION_ETABLISSEMENT: 7,
+    };
+    return (order[a.nom] ?? 99) - (order[b.nom] ?? 99);
+  });
 
-                {showFilters && (
-                  <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[200px]">
-                    <div className="p-2">
-                      <button
-                        onClick={() => {
-                          setStatusFilter("tous");
-                          setShowFilters(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${
-                          statusFilter === "tous"
-                            ? "bg-sky-100 text-sky-700"
-                            : ""
-                        }`}
-                      >
-                        Tous
-                      </button>
-                      <button
-                        onClick={() => {
-                          setStatusFilter("IN_PROGRESS");
-                          setShowFilters(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${
-                          statusFilter === "IN_PROGRESS"
-                            ? "bg-sky-100 text-sky-700"
-                            : ""
-                        }`}
-                      >
-                        En cours
-                      </button>
-                      <button
-                        onClick={() => {
-                          setStatusFilter("COMPLETED");
-                          setShowFilters(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${
-                          statusFilter === "COMPLETED"
-                            ? "bg-sky-100 text-sky-700"
-                            : ""
-                        }`}
-                      >
-                        Terminées
-                      </button>
-                      <button
-                        onClick={() => {
-                          setStatusFilter("REJECTED");
-                          setShowFilters(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${
-                          statusFilter === "REJECTED"
-                            ? "bg-sky-100 text-sky-700"
-                            : ""
-                        }`}
-                      >
-                        Rejetées
-                      </button>
-                      <button
-                        onClick={() => {
-                          setStatusFilter("CANCELLED");
-                          setShowFilters(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${
-                          statusFilter === "CANCELLED"
-                            ? "bg-sky-100 text-sky-700"
-                            : ""
-                        }`}
-                      >
-                        Annulées
-                      </button>
-                    </div>
-                  </div>
+  return (
+    <div className="space-y-2 mt-3">
+      {sorted.map((step, i) => {
+        const isDone = step.statut === "COMPLETED";
+        const isActive = step.statut === "IN_PROGRESS";
+        const isRejected =
+          step.statut === "REJECTED" || step.statut === "CANCELLED";
+
+        return (
+          <div key={step.id} className="flex items-start gap-3">
+            {/* connector */}
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-bold
+                  ${isDone ? "bg-emerald-500" : isActive ? "bg-sky-500 ring-4 ring-sky-100" : isRejected ? "bg-red-400" : "bg-slate-200"}`}
+              >
+                {isDone ? (
+                  <CheckCircle className="w-3.5 h-3.5" />
+                ) : isRejected ? (
+                  <X className="w-3 h-3" />
+                ) : (
+                  <span className={isActive ? "text-white" : "text-slate-400"}>
+                    {i + 1}
+                  </span>
                 )}
               </div>
+              {i < sorted.length - 1 && (
+                <div
+                  className={`w-px flex-1 min-h-[10px] mt-1 ${isDone ? "bg-emerald-300" : "bg-slate-200"}`}
+                />
+              )}
+            </div>
+
+            {/* content */}
+            <div className="pb-2 flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span
+                  className={`text-xs font-medium truncate ${isActive ? "text-sky-700" : isDone ? "text-slate-700" : isRejected ? "text-red-500" : "text-slate-400"}`}
+                >
+                  {STEP_LABELS[step.nom] ?? step.nom}
+                </span>
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0
+                  ${isDone ? "bg-emerald-100 text-emerald-700" : isActive ? "bg-sky-100 text-sky-700" : isRejected ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-400"}`}
+                >
+                  {step.statusLabel ?? step.statut}
+                </span>
+              </div>
+              {step.raisonRefus && (
+                <p className="text-[11px] text-red-500 mt-0.5 truncate">
+                  {step.raisonRefus}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── ProcedureDetailModal ─────────────────────────────────────────────────────
+
+function ProcedureDetailModal({
+  procedure,
+  onClose,
+  onCancel,
+  cancelling,
+}: {
+  procedure: ProcedureResponseDto;
+  onClose: () => void;
+  onCancel: (id: string) => Promise<void>;
+  cancelling: boolean;
+}) {
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      {/* backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* panel */}
+      <div className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col">
+        {/* header */}
+        <div className="relative bg-linear-to-br from-sky-500 to-blue-600 px-5 pt-6 pb-5 text-white shrink-0">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="pr-10">
+            <p className="text-sky-100 text-xs font-medium uppercase tracking-widest mb-1">
+              Procédure
+            </p>
+            <h2 className="text-xl font-bold leading-tight">
+              {procedure.fullName}
+            </h2>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-xs bg-white/20 px-2.5 py-1 rounded-full">
+                <MapPin className="w-3 h-3" />
+                {procedure.effectiveDestination}
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs bg-white/20 px-2.5 py-1 rounded-full">
+                <GraduationCap className="w-3 h-3" />
+                {procedure.effectiveFiliere}
+              </span>
             </div>
           </div>
 
-          {/* Procedures List */}
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader loading={true} size="md" />
+          {/* progress */}
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-sky-100 mb-1.5">
+              <span>
+                {procedure.completedSteps}/{procedure.totalSteps} étapes
+              </span>
+              <span className="font-semibold">{procedure.progress}%</span>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredProcedures.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Aucune procédure trouvée
-                  </h3>
-                  <p className="text-gray-600">
-                    {searchTerm || statusFilter !== "tous"
-                      ? `Aucune procédure ne correspond à vos critères de recherche.`
-                      : `Vous n'avez pas encore de procédure.`}
-                  </p>
-                </div>
-              ) : (
-                filteredProcedures.map((procedure) => (
-                  <div
-                    key={procedure.id}
-                    className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleProcedureClick(procedure)}
-                  >
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            Procédure pour {procedure.effectiveDestination}
-                          </h3>
-                          <span
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(procedure.statut)}`}
-                          >
-                            {getStatusIcon(procedure.statut)}
-                            <span className="ml-1">
-                              {getStatusLabel(procedure.statut)}
-                            </span>
-                          </span>
-                        </div>
+            <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-700"
+                style={{ width: `${procedure.progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            <span>
-                              Demande: {formatDate(procedure.createdAt)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            <span>Progression: {procedure.progress}%</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            <span>
-                              Étapes: {procedure.completedSteps}/
-                              {procedure.totalSteps}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
-                            <span>{procedure.statusLabel}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button className="p-2 text-gray-600 hover:text-sky-600 transition-colors">
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        {procedure.statut === "IN_PROGRESS" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openCancelModal(procedure);
-                            }}
-                            className="p-2 text-red-600 hover:text-red-700 transition-colors"
-                            title="Annuler la procédure"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                        <span>Progression</span>
-                        <span>
-                          {procedure.completedSteps}/{procedure.totalSteps}{" "}
-                          étapes
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-sky-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${procedure.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
+        {/* body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+          {/* meta */}
+          <div className="grid grid-cols-2 gap-3">
+            <InfoCard
+              label="Statut"
+              value={<StatusBadge status={procedure.statut} />}
+            />
+            <InfoCard
+              label="Niveau"
+              value={procedure.effectiveNiveauEtude}
+            />
+            <InfoCard
+              label="Créée le"
+              value={formatDate(procedure.createdAt)}
+            />
+            <InfoCard
+              label="Modifiée le"
+              value={formatDate(
+                procedure.dateDerniereModification ?? procedure.updatedAt,
               )}
+            />
+            {procedure.dateCompletion && (
+              <InfoCard
+                label="Complétée le"
+                value={formatDate(procedure.dateCompletion)}
+              />
+            )}
+            {procedure.raisonRejet && (
+              <div className="col-span-2 bg-red-50 border border-red-100 rounded-xl p-3">
+                <p className="text-xs text-red-500 font-medium mb-0.5">
+                  Motif de rejet
+                </p>
+                <p className="text-sm text-red-700">{procedure.raisonRejet}</p>
+              </div>
+            )}
+          </div>
+
+          {/* steps */}
+          {procedure.steps.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
+                Suivi des étapes
+              </h3>
+              <StepTimeline steps={procedure.steps} />
+            </div>
+          )}
+
+          {/* overdue warning */}
+          {procedure.isOverdue && procedure.statut === "IN_PROGRESS" && (
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">
+                Cette procédure est en retard ({procedure.daysSinceCreation}{" "}
+                jours depuis la création).
+              </p>
             </div>
           )}
         </div>
 
-        {/* Modal */}
-        {showModal && selectedProcedure && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Procédure pour {selectedProcedure.effectiveDestination}
-                  </h2>
+        {/* footer actions */}
+        {procedure.canBeModified && (
+          <div className="shrink-0 px-5 py-4 border-t border-slate-100 bg-slate-50">
+            {!confirmCancel ? (
+              <button
+                onClick={() => setConfirmCancel(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition-colors"
+              >
+                <Ban className="w-4 h-4" />
+                Annuler cette procédure
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-600 text-center font-medium">
+                  Confirmer l'annulation ?
+                </p>
+                <div className="flex gap-2">
                   <button
-                    onClick={handleCloseModal}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    onClick={() => setConfirmCancel(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors"
                   >
-                    <X className="w-6 h-6" />
+                    Non
+                  </button>
+                  <button
+                    disabled={cancelling}
+                    onClick={() => onCancel(procedure.id)}
+                    className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+                  >
+                    {cancelling ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : null}
+                    Confirmer
                   </button>
                 </div>
               </div>
-
-              <div className="p-6">
-                {/* Status and Dates */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(selectedProcedure.statut)}`}
-                    >
-                      {getStatusIcon(selectedProcedure.statut)}
-                      <span className="ml-1">
-                        {getStatusLabel(selectedProcedure.statut)}
-                      </span>
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Date de demande:</span>
-                      <p className="font-medium">
-                        {formatDate(selectedProcedure.createdAt)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Niveau d'étude:</span>
-                      <p className="font-medium">
-                        {selectedProcedure.effectiveNiveauEtude}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Filière:</span>
-                      <p className="font-medium">
-                        {selectedProcedure.effectiveFiliere}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Progression:</span>
-                      <p className="font-medium">
-                        {selectedProcedure.progress}%
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Steps */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Étapes de la procédure
-                  </h3>
-                  <div className="space-y-3">
-                    {selectedProcedure.steps.map(
-                      (step: StepResponseDto, index: number) => (
-                        <div
-                          key={step.id}
-                          className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg"
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              step.statut === "COMPLETED"
-                                ? "bg-green-500 text-white"
-                                : step.statut === "IN_PROGRESS"
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-gray-300 text-gray-600"
-                            }`}
-                          >
-                            {step.statut === "COMPLETED"
-                              ? "✓"
-                              : step.statut === "IN_PROGRESS"
-                                ? "⟳"
-                                : "○"}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">
-                              {step.nom}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Statut:{" "}
-                              {step.statut.replace("_", " ").toLowerCase()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Créée le: {formatDate(step.dateCreation)}
-                            </p>
-                            {step.dateMaj && (
-                              <p className="text-sm text-gray-600">
-                                Dernière mise à jour: {formatDate(step.dateMaj)}
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            Étape {index + 1}
-                          </span>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cancel Modal */}
-        {showCancelModal && procedureToCancel && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Annuler la procédure
-                  </h2>
-                  <button
-                    onClick={handleCloseCancelModal}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="mb-4">
-                  <p className="text-gray-700 mb-2">
-                    Êtes-vous sûr de vouloir annuler cette procédure ?
-                  </p>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="font-medium text-gray-900">
-                      Procédure pour {procedureToCancel.effectiveDestination}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Statut: {getStatusLabel(procedureToCancel.statut)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <label
-                    htmlFor="cancelReason"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Raison de l'annulation (optionnelle)
-                  </label>
-                  <textarea
-                    id="cancelReason"
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="Indiquez la raison de votre annulation..."
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCloseCancelModal}
-                    className="flex-1 px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Retour
-                  </button>
-                  <button
-                    onClick={handleCancelProcedure}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    Annuler la procédure
-                  </button>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="bg-slate-50 rounded-xl px-3 py-2.5">
+      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">
+        {label}
+      </p>
+      <div className="text-sm text-slate-700 font-medium">{value}</div>
+    </div>
+  );
+}
+
+// ─── ProcedureCard ────────────────────────────────────────────────────────────
+
+function ProcedureCard({
+  procedure,
+  onView,
+}: {
+  procedure: ProcedureResponseDto;
+  onView: (p: ProcedureResponseDto) => void;
+}) {
+
+  return (
+    <div
+      className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-sky-200 transition-all duration-200 overflow-hidden cursor-pointer active:scale-[0.99]"
+      onClick={() => onView(procedure)}
+    >
+      {/* top accent line */}
+      <div
+        className={`h-1 w-full ${
+          procedure.statut === "COMPLETED"
+            ? "bg-emerald-400"
+            : procedure.statut === "IN_PROGRESS"
+              ? "bg-linear-to-r from-sky-400 to-blue-500"
+              : procedure.statut === "REJECTED"
+                ? "bg-red-400"
+                : procedure.statut === "CANCELLED"
+                  ? "bg-orange-400"
+                  : "bg-slate-300"
+        }`}
+      />
+
+      <div className="px-4 pt-3 pb-4">
+        {/* header row */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-slate-800 text-sm leading-tight truncate">
+              {procedure.effectiveDestination}
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              {procedure.effectiveFiliere} · {procedure.effectiveNiveauEtude}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <StatusBadge status={procedure.statut} />
+            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-sky-400 transition-colors" />
+          </div>
+        </div>
+
+        {/* progress */}
+        <div className="mb-3">
+          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+            <span>
+              {procedure.completedSteps}/{procedure.totalSteps} étapes
+            </span>
+            <span className="font-semibold text-sky-600">
+              {procedure.progress}%
+            </span>
+          </div>
+          <ProgressBar
+            progress={procedure.progress}
+            status={procedure.statut}
+          />
+        </div>
+
+        {/* footer */}
+        <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            <span>{formatDate(procedure.createdAt)}</span>
+          </div>
+          {procedure.isOverdue && procedure.statut === "IN_PROGRESS" && (
+            <span className="flex items-center gap-1 text-amber-500 font-medium">
+              <AlertTriangle className="w-3 h-3" />
+              En retard
+            </span>
+          )}
+          {procedure.activeStep && (
+            <span className="text-sky-500 font-medium truncate max-w-[120px]">
+              {STEP_LABELS[procedure.activeStep] ?? procedure.activeStep}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+function EmptyState({ hasFilters }: { hasFilters: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+      <div className="w-16 h-16 bg-sky-50 rounded-2xl flex items-center justify-center mb-4">
+        <FileText className="w-8 h-8 text-sky-300" />
+      </div>
+      <h3 className="font-semibold text-slate-700 mb-1">
+        {hasFilters ? "Aucun résultat" : "Aucune procédure"}
+      </h3>
+      <p className="text-sm text-slate-400 max-w-xs">
+        {hasFilters
+          ? "Essayez de modifier vos filtres pour trouver vos procédures."
+          : "Vous n'avez pas encore de procédure en cours. Commencez par prendre un rendez-vous."}
+      </p>
+    </div>
+  );
+}
+
+// ─── FilterSheet ──────────────────────────────────────────────────────────────
+
+const STATUS_OPTIONS: { value: ProcedureStatus | "ALL"; label: string }[] = [
+  { value: "ALL", label: "Tous les statuts" },
+  { value: "PENDING", label: "En attente" },
+  { value: "IN_PROGRESS", label: "En cours" },
+  { value: "COMPLETED", label: "Terminée" },
+  { value: "REJECTED", label: "Rejetée" },
+  { value: "CANCELLED", label: "Annulée" },
+];
+
+function FilterSheet({
+  open,
+  selectedStatus,
+  onStatusChange,
+  onClose,
+}: {
+  open: boolean;
+  selectedStatus: ProcedureStatus | "ALL";
+  onStatusChange: (s: ProcedureStatus | "ALL") => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end">
+      <div
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative w-full bg-white rounded-t-3xl shadow-2xl px-5 py-6 pb-10">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-slate-800 text-base">Filtrer par statut</h3>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center"
+          >
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => {
+                onStatusChange(opt.value);
+                onClose();
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors
+                ${selectedStatus === opt.value ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              <span>{opt.label}</span>
+              {selectedStatus === opt.value && (
+                <CheckCircle className="w-4 h-4 text-sky-500" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MaProcedures (main page) ─────────────────────────────────────────────────
+
+export default function MaProcedures() {
+  const { user } = useAuth();
+
+  const {
+    procedures,
+    loading,
+    error,
+    cancelProcedure,
+    findByEmail,
+  } = useProcedures({ autoLoad: false });
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ProcedureStatus | "ALL">(
+    "ALL",
+  );
+  const [selectedProcedure, setSelectedProcedure] =
+    useState<ProcedureResponseDto | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Charger les procédures de l'utilisateur connecté
+  useEffect(() => {
+    if (user?.email) {
+      findByEmail(user.email);
+    }
+  }, [user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Filtrage local
+  const filtered = useMemo(() => {
+    let list = [...procedures];
+    if (statusFilter !== "ALL") {
+      list = list.filter((p) => p.statut === statusFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.effectiveDestination.toLowerCase().includes(q) ||
+          p.effectiveFiliere.toLowerCase().includes(q) ||
+          p.effectiveNiveauEtude.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [procedures, statusFilter, search]);
+
+  const hasFilters = statusFilter !== "ALL" || search.trim().length > 0;
+
+  // Compteurs par statut pour les chips
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { ALL: procedures.length };
+    for (const p of procedures) {
+      c[p.statut] = (c[p.statut] ?? 0) + 1;
+    }
+    return c;
+  }, [procedures]);
+
+  const handleCancel = useCallback(
+    async (id: string) => {
+      setCancelling(true);
+      const result = await cancelProcedure(id, "Annulation par l'utilisateur");
+      setCancelling(false);
+      if (result) {
+        setSelectedProcedure(result);
+      }
+    },
+    [cancelProcedure],
+  );
+
+  const handleRefresh = useCallback(() => {
+    if (user?.email) findByEmail(user.email);
+  }, [user, findByEmail]);
+
+  const pageConfig = pageConfigs["/mes-procedures"];
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <>
+      <Helmet>
+        <title>{pageConfig?.title ?? "Mes Procédures"}</title>
+      </Helmet>
+
+      <div className="min-h-screen bg-slate-50 pb-20">
+        {/* ── Page hero ── */}
+        <div className="bg-linear-to-br from-sky-500 via-sky-600 to-blue-700 px-5 pt-8 pb-6">
+          {/* greeting */}
+          <div className="mb-4">
+            <p className="text-sky-200 text-xs font-medium uppercase tracking-widest">
+              Tableau de bord
+            </p>
+            <h1 className="text-white text-2xl font-bold mt-0.5 leading-tight">
+              Mes procédures
+            </h1>
+            {user?.firstName && (
+              <p className="text-sky-100 text-sm mt-1">
+                Bonjour, {user.firstName} 👋
+              </p>
+            )}
+          </div>
+
+          {/* stats strip */}
+          <div className="grid grid-cols-3 gap-2">
+            <StatPill
+              label="Total"
+              value={procedures.length}
+              accent="bg-white/20"
+            />
+            <StatPill
+              label="En cours"
+              value={counts["IN_PROGRESS"] ?? 0}
+              accent="bg-white/20"
+            />
+            <StatPill
+              label="Terminées"
+              value={counts["COMPLETED"] ?? 0}
+              accent="bg-white/20"
+            />
+          </div>
+        </div>
+
+        <div className="px-4 -mt-3">
+          {/* ── Search + filter bar ── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex gap-2 mb-4">
+            <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Destination, filière…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none min-w-0"
+              />
+              {search && (
+                <button onClick={() => setSearch("")}>
+                  <X className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setFilterOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors shrink-0
+                ${statusFilter !== "ALL" ? "bg-sky-500 text-white" : "bg-slate-50 text-slate-600 hover:bg-slate-100"}`}
+            >
+              <Filter className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Filtrer</span>
+              {statusFilter !== "ALL" && (
+                <span className="w-4 h-4 bg-white/30 rounded-full text-[10px] font-bold flex items-center justify-center">
+                  1
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={loading.list}
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition-colors shrink-0 disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loading.list ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
+
+          {/* ── Status chips (horizontal scroll) ── */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide -mx-4 px-4">
+            {STATUS_OPTIONS.map((opt) => {
+              const count = counts[opt.value] ?? 0;
+              const active = statusFilter === opt.value;
+              if (opt.value !== "ALL" && count === 0) return null;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatusFilter(opt.value)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all
+                    ${active ? "bg-sky-500 text-white shadow-sm shadow-sky-200" : "bg-white text-slate-500 border border-slate-200 hover:border-sky-300 hover:text-sky-600"}`}
+                >
+                  <span>{opt.label}</span>
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold
+                    ${active ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"}`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Content ── */}
+          {loading.list ? (
+            <div className="flex justify-center py-16">
+              <Loader />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-center px-4">
+              <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-400" />
+              </div>
+              <p className="text-sm text-slate-600">{error}</p>
+              <button
+                onClick={handleRefresh}
+                className="text-sky-600 text-sm font-medium underline underline-offset-2"
+              >
+                Réessayer
+              </button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState hasFilters={hasFilters} />
+          ) : (
+            <>
+              <div className="space-y-3">
+                {filtered.map((p) => (
+                  <ProcedureCard
+                    key={p.id}
+                    procedure={p}
+                    onView={setSelectedProcedure}
+                  />
+                ))}
+              </div>
+
+              {/* result count */}
+              <p className="text-center text-xs text-slate-400 mt-4 pb-2">
+                {filtered.length} procédure{filtered.length > 1 ? "s" : ""}
+                {hasFilters ? " trouvée" : ""}
+                {filtered.length > 1 && hasFilters ? "s" : ""}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Detail modal ── */}
+      {selectedProcedure && (
+        <ProcedureDetailModal
+          procedure={selectedProcedure}
+          onClose={() => setSelectedProcedure(null)}
+          onCancel={handleCancel}
+          cancelling={cancelling}
+        />
+      )}
+
+      {/* ── Filter sheet ── */}
+      <FilterSheet
+        open={filterOpen}
+        selectedStatus={statusFilter}
+        onStatusChange={setStatusFilter}
+        onClose={() => setFilterOpen(false)}
+      />
     </>
   );
-};
+}
 
-export default Maprocedure;
+// ─── StatPill ─────────────────────────────────────────────────────────────────
+
+function StatPill({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent: string;
+}) {
+  return (
+    <div className={`${accent} rounded-xl px-3 py-2.5 text-center`}>
+      <p className="text-white text-lg font-bold leading-none">{value}</p>
+      <p className="text-sky-100 text-[10px] mt-0.5">{label}</p>
+    </div>
+  );
+}

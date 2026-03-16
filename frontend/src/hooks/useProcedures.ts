@@ -472,6 +472,10 @@ export function useProcedures(
   const findByEmail = useCallback(
     async (email: string): Promise<ProcedureResponseDto[]> => {
       if (!isAuthenticated) return [];
+
+      setLoad("list", true);
+      setError(null);
+
       try {
         const data = await ProceduresService.findByEmail(email);
         setProcedures(data);
@@ -488,9 +492,11 @@ export function useProcedures(
         return data;
       } catch {
         return [];
+      } finally {
+        setLoad("list", false);
       }
     },
-    [isAuthenticated, syncPagination],
+    [isAuthenticated, setLoad, syncPagination],
   );
 
   // ─────────────────────────────────────────────────────────────────────────
