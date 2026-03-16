@@ -100,18 +100,50 @@ function App() {
         </ErrorBoundary>
       </Router>
 
-      <Toaster
+     <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
-          style: { background: "#363636", color: "#fff" },
+          // Style par défaut
+          style: {
+            background: "#363636",
+            color: "#fff",
+          },
+          // Style pour les succès (VERT)
           success: {
             duration: 3000,
-            iconTheme: { primary: "#10b981", secondary: "#fff" },
+            style: {
+              background: "#10b981", // Vert
+              color: "#fff",
+            },
+            iconTheme: {
+              primary: "#fff",      // Icône blanche
+              secondary: "#10b981", // Fond vert
+            },
           },
+          // Style pour les erreurs (ROUGE)
           error: {
             duration: 4000,
-            iconTheme: { primary: "#ef4444", secondary: "#fff" },
+            style: {
+              background: "#ef4444", // Rouge
+              color: "#fff",
+            },
+            iconTheme: {
+              primary: "#fff",       // Icône blanche
+              secondary: "#ef4444",  // Fond rouge
+            },
+          },
+          // Style personnalisé pour les warnings (ORANGE)
+          custom: {
+            duration: 3500,
+            style: {
+              background: "#f97316", // Orange
+              color: "#fff",
+            },
+            iconTheme: {
+              primary: "#fff",       // Icône blanche
+              secondary: "#f97316",  // Fond orange
+            },
           },
         }}
       />
