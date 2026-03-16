@@ -77,9 +77,7 @@ const Procedures = () => {
   // Obtenir les destinations uniques pour le filtre
   const destinations = useMemo(() => {
     const uniqueDestinations = [
-      ...new Set(
-        (procedures || []).map((p) => p.destination).filter(Boolean),
-      ),
+      ...new Set((procedures || []).map((p) => p.destination).filter(Boolean)),
     ];
     return uniqueDestinations.sort();
   }, [procedures]);
@@ -130,11 +128,11 @@ const Procedures = () => {
     // Si la procédure a des étapes, calculer la progression basée sur les étapes complétées
     if (procedure.steps && procedure.steps.length > 0) {
       const completedSteps = procedure.steps.filter(
-        (step) => step.statut === "COMPLETED"
+        (step) => step.statut === "COMPLETED",
       ).length;
       return Math.round((completedSteps / procedure.steps.length) * 100);
     }
-    
+
     // Sinon, baser la progression sur le statut
     switch (procedure.statut) {
       case "COMPLETED":
@@ -380,7 +378,9 @@ const Procedures = () => {
                           <div className="flex-1 bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-sky-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${getProcedureProgress(procedure)}%` }}
+                              style={{
+                                width: `${getProcedureProgress(procedure)}%`,
+                              }}
                             ></div>
                           </div>
                           <span className="text-sm text-gray-600">

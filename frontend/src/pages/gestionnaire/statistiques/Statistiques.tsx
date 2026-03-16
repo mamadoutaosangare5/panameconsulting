@@ -141,21 +141,30 @@ const Gestionnaire: React.FC = () => {
         loadProcedureStats(),
         refreshMessages(),
         loadDestinations(),
-      ]).then((results) => {
-        console.log("[Statistiques] ✅ All statistics loaded:", results);
-      }).catch((error) => {
-        console.error("[Statistiques] Error during initial load:", error);
-        toast.error("Impossible de charger les statistiques initiales");
-      });
+      ])
+        .then((results) => {
+          console.log("[Statistiques] ✅ All statistics loaded:", results);
+        })
+        .catch((error) => {
+          console.error("[Statistiques] Error during initial load:", error);
+          toast.error("Impossible de charger les statistiques initiales");
+        });
     }
-  }, [fetchUserStats, isAdmin, loadDestinations, loadProcedureStats, loadRendezvousStats, refreshMessages]); // Seulement dépend de isAdmin
+  }, [
+    fetchUserStats,
+    isAdmin,
+    loadDestinations,
+    loadProcedureStats,
+    loadRendezvousStats,
+    refreshMessages,
+  ]); // Seulement dépend de isAdmin
 
   // Données dynamiques avec useMemo pour éviter les recalculs
   const weeklyActivity = useMemo(() => {
     console.log("[Statistiques] Rendezvous stats:", rendezvousStats);
     console.log("[Statistiques] Procedure stats:", procedureStats);
     console.log("[Statistiques] Message stats:", messageStats);
-    
+
     if (!rendezvousStats || !procedureStats || !messageStats) return [];
 
     return [

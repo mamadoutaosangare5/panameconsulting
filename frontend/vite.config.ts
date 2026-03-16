@@ -4,10 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
 
   define: {
     "import.meta.env.MODE": JSON.stringify(process.env.NODE_ENV),
@@ -15,7 +12,7 @@ export default defineConfig({
 
   css: {
     devSourcemap: false, // Disable sourcemaps in production
-    transformer: 'lightningcss', // Faster CSS processing (requires installation)
+    transformer: "lightningcss", // Faster CSS processing (requires installation)
     // Optimiser le CSS pour le build
     postcss: {
       plugins: [
@@ -27,15 +24,15 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 800, // Ajusté pour les vendors lourdes (antd, charts)
     minify: "oxc", // natif Vite 8, pas besoin d'installation
-    cssMinify: 'lightningcss', // Faster CSS minification
+    cssMinify: "lightningcss", // Faster CSS minification
     sourcemap: false, // Disable sourcemaps in production for faster builds
-    target: 'esnext', // Meilleure optimisation pour les navigateurs modernes
+    target: "esnext", // Meilleure optimisation pour les navigateurs modernes
     rollupOptions: {
       output: {
         // Optimisation du cache busting
-        entryFileNames: 'assets/[name].[hash].js',
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]',
+        entryFileNames: "assets/[name].[hash].js",
+        chunkFileNames: "assets/[name].[hash].js",
+        assetFileNames: "assets/[name].[hash].[ext]",
         // Strategy de chunking optimisée
         manualChunks: (id) => {
           // Librairies de charts - très lourdes, chunk séparé

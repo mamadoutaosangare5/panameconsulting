@@ -30,17 +30,29 @@ const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
 // Pages user
 const Profile = lazy(() => import("./pages/user/profile/MonProfile"));
 const Maprocedure = lazy(() => import("./pages/user/procedures/Maprocedure"));
-const MesRendezVous = lazy(() => import("./pages/user/rendezvous/MesRendezVous"));
+const MesRendezVous = lazy(
+  () => import("./pages/user/rendezvous/MesRendezVous"),
+);
 const RendezVous = lazy(() => import("./pages/user/rendezvous/RendezVous"));
 
 // Pages gestionnaire
-const Statistiques = lazy(() => import("./pages/gestionnaire/statistiques/Statistiques"));
-const Utilisateurs = lazy(() => import("./pages/gestionnaire/utilisateurs/Utilisateurs"));
-const Destinations = lazy(() => import("./pages/gestionnaire/destinations/Destinations"));
-const Rendezvous = lazy(() => import("./pages/gestionnaire/rendezvous/Rendezvous"));
+const Statistiques = lazy(
+  () => import("./pages/gestionnaire/statistiques/Statistiques"),
+);
+const Utilisateurs = lazy(
+  () => import("./pages/gestionnaire/utilisateurs/Utilisateurs"),
+);
+const Destinations = lazy(
+  () => import("./pages/gestionnaire/destinations/Destinations"),
+);
+const Rendezvous = lazy(
+  () => import("./pages/gestionnaire/rendezvous/Rendezvous"),
+);
 const Messages = lazy(() => import("./pages/gestionnaire/messages/Messages"));
 const Profil = lazy(() => import("./pages/gestionnaire/profil/Profil"));
-const Procedures = lazy(() => import("./pages/gestionnaire/procedures/Procedures"));
+const Procedures = lazy(
+  () => import("./pages/gestionnaire/procedures/Procedures"),
+);
 
 // NotFound
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -61,22 +73,61 @@ function App() {
             </Route>
 
             {/* Auth */}
-            <Route path="/connexion" element={<AuthLayout><Login /></AuthLayout>} />
-            <Route path="/inscription" element={<AuthLayout><Register /></AuthLayout>} />
-            <Route path="/mot-de-passe-oublie" element={<AuthLayout><ForgotPassword /></AuthLayout>} />
-            <Route path="/reinitialiser-mot-de-passe" element={<AuthLayout><ResetPassword /></AuthLayout>} />
+            <Route
+              path="/connexion"
+              element={
+                <AuthLayout>
+                  <Login />
+                </AuthLayout>
+              }
+            />
+            <Route
+              path="/inscription"
+              element={
+                <AuthLayout>
+                  <Register />
+                </AuthLayout>
+              }
+            />
+            <Route
+              path="/mot-de-passe-oublie"
+              element={
+                <AuthLayout>
+                  <ForgotPassword />
+                </AuthLayout>
+              }
+            />
+            <Route
+              path="/reinitialiser-mot-de-passe"
+              element={
+                <AuthLayout>
+                  <ResetPassword />
+                </AuthLayout>
+              }
+            />
 
             {/* PDF */}
             <Route
               path="/info/:documentName"
-              element={<ErrorBoundary><PDFViewer /></ErrorBoundary>}
+              element={
+                <ErrorBoundary>
+                  <PDFViewer />
+                </ErrorBoundary>
+              }
             />
 
             {/* Rendez-vous public */}
             <Route path="/rendez-vous" element={<RendezVous />} />
 
             {/* User */}
-            <Route path="/user" element={<UserLayout><Outlet /></UserLayout>}>
+            <Route
+              path="/user"
+              element={
+                <UserLayout>
+                  <Outlet />
+                </UserLayout>
+              }
+            >
               <Route path="mon-profil" element={<Profile />} />
               <Route path="mes-procedures" element={<Maprocedure />} />
               <Route path="mes-rendezvous" element={<MesRendezVous />} />
@@ -100,7 +151,7 @@ function App() {
         </ErrorBoundary>
       </Router>
 
-     <Toaster
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -117,7 +168,7 @@ function App() {
               color: "#fff",
             },
             iconTheme: {
-              primary: "#fff",      // Icône blanche
+              primary: "#fff", // Icône blanche
               secondary: "#10b981", // Fond vert
             },
           },
@@ -129,8 +180,8 @@ function App() {
               color: "#fff",
             },
             iconTheme: {
-              primary: "#fff",       // Icône blanche
-              secondary: "#ef4444",  // Fond rouge
+              primary: "#fff", // Icône blanche
+              secondary: "#ef4444", // Fond rouge
             },
           },
           // Style personnalisé pour les warnings (ORANGE)
@@ -141,8 +192,8 @@ function App() {
               color: "#fff",
             },
             iconTheme: {
-              primary: "#fff",       // Icône blanche
-              secondary: "#f97316",  // Fond orange
+              primary: "#fff", // Icône blanche
+              secondary: "#f97316", // Fond orange
             },
           },
         }}

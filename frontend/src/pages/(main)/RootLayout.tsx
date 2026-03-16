@@ -2,40 +2,29 @@ import { Outlet } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Footer from "../../components/shared/ui/Footer";
 import Header from "../../components/shared/ui/Header";
-import { Loader } from "lucide-react";
+import Loader from "../../components/accueil/Loader";
 import { useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const RootLayout = () => {
   const location = useLocation();
-  const [showHomeLoader, setShowHomeLoader] = useState(false);
-  const timeoutRef = useRef<number | null>(null);
+  const [showHomeLoader, setShowHomeLoader] = useState(
+    location.pathname === "/",
+  );
 
   useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+    // Nettoyer les timeouts précédents
+    const timeoutId = window.setTimeout(() => {
+      setShowHomeLoader(false);
+    }, 3000);
 
-    if (location.pathname === "/") {
-      timeoutRef.current = window.setTimeout(() => {
-        setShowHomeLoader(true);
-        timeoutRef.current = window.setTimeout(() => {
-          setShowHomeLoader(false);
-        }, 3000);
-      }, 0);
-    } else {
-      timeoutRef.current = window.setTimeout(() => {
-        setShowHomeLoader(false);
-      }, 0);
-    }
-
+    // Nettoyage lors du démontage ou changement de route
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearTimeout(timeoutId);
     };
   }, [location.pathname]);
 
+  // Afficher le loader si nécessaire
   if (location.pathname === "/" && showHomeLoader) {
     return <Loader />;
   }

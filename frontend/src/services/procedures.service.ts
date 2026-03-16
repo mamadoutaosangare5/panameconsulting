@@ -124,11 +124,17 @@ export const ProceduresService = {
       });
       const result = await handleResponse<ProcedureStatisticsDto>(res);
       console.log("[ProceduresService] Statistiques reçues .");
-      console.log("[ProceduresService] Statistiques extraites:", Object.keys(result).length);
+      console.log(
+        "[ProceduresService] Statistiques extraites:",
+        Object.keys(result).length,
+      );
       toast.success("Statistiques chargées avec succès");
       return result;
     } catch (error) {
-      console.error("[ProceduresService] Erreur lors de la récupération des statistiques:", error);
+      console.error(
+        "[ProceduresService] Erreur lors de la récupération des statistiques:",
+        error,
+      );
       toast.error("Erreur lors du chargement des statistiques");
       throw error;
     }

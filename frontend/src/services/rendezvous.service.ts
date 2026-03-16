@@ -43,7 +43,9 @@ class RendezvousService {
   /**
    * Calcule les champs effectifs (destination, niveau, filière)
    */
-  private calculateEffectiveFields(rdv: RendezvousResponseDto): RendezvousResponseDto {
+  private calculateEffectiveFields(
+    rdv: RendezvousResponseDto,
+  ): RendezvousResponseDto {
     return {
       ...rdv,
       effectiveDestination: rdv.destinationAutre || rdv.destination || "",
@@ -463,14 +465,17 @@ class RendezvousService {
 
       const result = await response.json();
       console.log("[RendezvousService] ✅ Statistiques reçues:", result);
-      
+
       // Extraire les données du wrapper si nécessaire
       const statistics = result.data || result;
       console.log("[RendezvousService] 📊 Statistiques extraites:", statistics);
-      
+
       return statistics;
     } catch (error) {
-      console.error("[RendezvousService] ❌ Erreur lors de la récupération des statistiques:", error);
+      console.error(
+        "[RendezvousService] ❌ Erreur lors de la récupération des statistiques:",
+        error,
+      );
       toast.error("Erreur lors de la récupération des statistiques");
       throw error;
     }
