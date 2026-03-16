@@ -32,7 +32,13 @@ import Loader from "../../../components/shared/user/Loader";
 
 const STATUS_CONFIG: Record<
   ProcedureStatus,
-  { label: string; color: string; bg: string; icon: React.ReactNode; dot: string }
+  {
+    label: string;
+    color: string;
+    bg: string;
+    icon: React.ReactNode;
+    dot: string;
+  }
 > = {
   PENDING: {
     label: "En attente",
@@ -287,10 +293,7 @@ function ProcedureDetailModal({
               label="Statut"
               value={<StatusBadge status={procedure.statut} />}
             />
-            <InfoCard
-              label="Niveau"
-              value={procedure.effectiveNiveauEtude}
-            />
+            <InfoCard label="Niveau" value={procedure.effectiveNiveauEtude} />
             <InfoCard
               label="Créée le"
               value={formatDate(procedure.createdAt)}
@@ -382,13 +385,7 @@ function ProcedureDetailModal({
   );
 }
 
-function InfoCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function InfoCard({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="bg-slate-50 rounded-xl px-3 py-2.5">
       <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">
@@ -408,7 +405,6 @@ function ProcedureCard({
   procedure: ProcedureResponseDto;
   onView: (p: ProcedureResponseDto) => void;
 }) {
-
   return (
     <div
       className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-sky-200 transition-all duration-200 overflow-hidden cursor-pointer active:scale-[0.99]"
@@ -537,7 +533,9 @@ function FilterSheet({
       />
       <div className="relative w-full bg-white rounded-t-3xl shadow-2xl px-5 py-6 pb-10">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-slate-800 text-base">Filtrer par statut</h3>
+          <h3 className="font-bold text-slate-800 text-base">
+            Filtrer par statut
+          </h3>
           <button
             onClick={onClose}
             className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center"
@@ -573,13 +571,8 @@ function FilterSheet({
 export default function MaProcedures() {
   const { user } = useAuth();
 
-  const {
-    procedures,
-    loading,
-    error,
-    cancelProcedure,
-    findByEmail,
-  } = useProcedures({ autoLoad: false });
+  const { procedures, loading, error, cancelProcedure, findByEmail } =
+    useProcedures({ autoLoad: false });
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProcedureStatus | "ALL">(
@@ -649,6 +642,8 @@ export default function MaProcedures() {
     <>
       <Helmet>
         <title>{pageConfig?.title ?? "Mes Procédures"}</title>
+        <meta name="robots" content="noindex, nofollow" />
+        <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
 
       <div className="min-h-screen bg-slate-50 pb-20">
