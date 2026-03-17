@@ -19,8 +19,7 @@ export class LoggerService implements NestLoggerService {
 
   private initializeLogger() {
     const logLevel = this.configService.get<string>('LOG_LEVEL', 'info');
-    const logPath = this.configService.get<string>('LOG_FILE_PATH', './logs');
-
+    const logPath = this.configService.get<string>('LOG_FILE_PATH', '/app/backend/logs');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const transport = new DailyRotateFile({
       filename: `${logPath}/application-%DATE%.log`,

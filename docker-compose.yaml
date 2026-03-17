@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "10000:10000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:Sangare@host.docker.internal:5432/panameconsultingDb?schema=public
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
