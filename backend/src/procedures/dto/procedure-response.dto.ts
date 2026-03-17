@@ -228,10 +228,11 @@ export class ProcedureStatisticsDto {
 
   @ApiProperty({
     example: {
-      inProgress: 75,
-      completed: 50,
-      rejected: 15,
-      cancelled: 10,
+      PENDING: 10,
+      IN_PROGRESS: 75,
+      COMPLETED: 50,
+      REJECTED: 15,
+      CANCELLED: 10,
     },
   })
   byStatus: Record<string, number>;

@@ -434,6 +434,7 @@ export class ProcedureEntity {
 
   getStatusLabel(): string {
     const labels: Record<ProcedureStatus, string> = {
+      [ProcedureStatus.PENDING]: 'En attente',
       [ProcedureStatus.IN_PROGRESS]: 'En cours',
       [ProcedureStatus.COMPLETED]: 'Terminée',
       [ProcedureStatus.REJECTED]: 'Refusée',
@@ -444,6 +445,7 @@ export class ProcedureEntity {
 
   getStatusColor(): string {
     const colors: Record<ProcedureStatus, string> = {
+      [ProcedureStatus.PENDING]: 'yellow',
       [ProcedureStatus.IN_PROGRESS]: 'blue',
       [ProcedureStatus.COMPLETED]: 'green',
       [ProcedureStatus.REJECTED]: 'red',

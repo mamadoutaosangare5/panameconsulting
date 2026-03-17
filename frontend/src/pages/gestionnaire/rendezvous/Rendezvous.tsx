@@ -20,6 +20,7 @@ import {
   type Destination,
   type NiveauEtude,
   type Filiere,
+  TIME_SLOT_OPTIONS,
 } from "../../../types/rendezvous.types";
 import {
   Calendar,
@@ -248,6 +249,13 @@ const RendezvousAdmin = () => {
     open: boolean;
     id: string | null;
   }>({ open: false, id: null });
+  // ── Effet de montage pour charger les statistiques ─────────────────────
+  useEffect(() => {
+    if (isAdmin) {
+      loadStatistics();
+    }
+  }, [isAdmin, loadStatistics]);
+
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Debounce recherche → loadRendezvous ─────────────────────────────────────
@@ -1622,29 +1630,10 @@ const RendezvousAdmin = () => {
                             time: e.target.value as TimeSlot,
                           })
                         }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
                       >
                         <option value="">Sélectionner</option>
-                        {(
-                          [
-                            "09:00",
-                            "09:30",
-                            "10:00",
-                            "10:30",
-                            "11:00",
-                            "11:30",
-                            "12:00",
-                            "12:30",
-                            "13:00",
-                            "13:30",
-                            "14:00",
-                            "14:30",
-                            "15:00",
-                            "15:30",
-                            "16:00",
-                            "16:30",
-                          ] as TimeSlot[]
-                        ).map((t) => (
+                        {TIME_SLOT_OPTIONS.map((t) => (
                           <option key={t} value={t}>
                             {t}
                           </option>
@@ -1666,7 +1655,7 @@ const RendezvousAdmin = () => {
                             niveauEtude: e.target.value as NiveauEtude,
                           })
                         }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
                       >
                         <option value="">Sélectionner</option>
                         {[
@@ -1697,7 +1686,7 @@ const RendezvousAdmin = () => {
                             filiere: e.target.value as Filiere,
                           })
                         }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
                       >
                         <option value="">Sélectionner</option>
                         {[
@@ -1730,7 +1719,7 @@ const RendezvousAdmin = () => {
                             destination: e.target.value as Destination,
                           })
                         }
-                        className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
+                        className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
                       >
                         <option value="">Sélectionner</option>
                         {DESTINATION_OPTIONS.map((d) => (

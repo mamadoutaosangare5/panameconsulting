@@ -451,7 +451,6 @@ export const useRendezvous = (
         }
 
         toast.success("Rendez-vous mis à jour avec succès");
-       
 
         return updated;
       } catch (err) {
@@ -533,7 +532,6 @@ export const useRendezvous = (
         const avisMsg =
           data.avisAdmin === "FAVORABLE" ? "favorable" : "défavorable";
         toast.success(`Rendez-vous terminé avec avis ${avisMsg}`);
-        
 
         return completed;
       } catch (err) {
@@ -570,7 +568,6 @@ export const useRendezvous = (
         }
 
         toast.success("Rendez-vous supprimé avec succès");
-        
 
         return true;
       } catch (err) {
@@ -597,8 +594,6 @@ export const useRendezvous = (
       ...prev.filter((r) => r.date !== today),
       ...todayRdv,
     ]);
-
-    
   }, [isAdmin, getRendezvousByDate]);
 
   /**
@@ -610,7 +605,7 @@ export const useRendezvous = (
 
       try {
         const upcoming = await rendezvousService.getUpcomingRendezvous(limit);
-        
+
         return upcoming;
       } catch (err) {
         console.error(
@@ -636,7 +631,7 @@ export const useRendezvous = (
       try {
         const csv = await rendezvousService.exportToCSV(filters);
         toast.success("Export CSV réussi");
-        
+
         return csv;
       } catch (err) {
         handleError(err, "Erreur lors de l'export CSV");
@@ -650,6 +645,7 @@ export const useRendezvous = (
 
   /**
    * Crée un nouveau rendez-vous
+   * Le service gère la conversion du TimeSlot automatiquement
    */
   const createRendezvous = useCallback(
     async (
@@ -665,7 +661,7 @@ export const useRendezvous = (
       try {
         const newRdv = await rendezvousService.createRendezvous(data);
         toast.success("Rendez-vous confirmé avec succès !");
-        
+
         return newRdv;
       } catch (err) {
         handleError(err, "Erreur lors de la création du rendez-vous");
@@ -745,6 +741,7 @@ export const useRendezvous = (
 
   /**
    * Vérifie la disponibilité d'un créneau
+   * Convertit le TimeSlot du format frontend vers backend pour l'API
    */
   const checkAvailability = useCallback(
     async (
@@ -754,7 +751,12 @@ export const useRendezvous = (
       setLoadingKey("availability", true);
 
       try {
-        const result = await rendezvousService.checkAvailability(date, time);
+        // Convertir le TimeSlot pour le backend si nécessaire
+        const backendTimeSlot = time.includes(":") ? time : time;
+        const result = await rendezvousService.checkAvailability(
+          date,
+          backendTimeSlot,
+        );
         return result;
       } catch (err) {
         console.error(

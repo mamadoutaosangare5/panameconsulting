@@ -411,7 +411,10 @@ const Utilisateurs = () => {
 
   // ── Handlers création ──────────────────────────────────────
   const handleCreate = async () => {
-    console.log("[Utilisateurs] Creating user with params:", createForm.firstName);
+    console.log(
+      "[Utilisateurs] Creating user with params:",
+      createForm.firstName,
+    );
     const params: CreateUserParams = {
       firstName: createForm.firstName,
       lastName: createForm.lastName,

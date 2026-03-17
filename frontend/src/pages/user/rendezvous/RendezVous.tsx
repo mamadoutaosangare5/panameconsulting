@@ -64,7 +64,7 @@ const RendezVous = () => {
   // ✅ Utiliser useMemo pour isAuthChecked aussi
   const isAuthChecked = useMemo(() => isAuthenticated, [isAuthenticated]);
   const [currentStep, setCurrentStep] = useState(1);
-  
+
   // ✅ Garder un état séparé pour les modifications du formulaire
   const [formData, setFormData] = useState<FormData>(() => ({
     firstName: "",
@@ -80,23 +80,26 @@ const RendezVous = () => {
     date: "",
     time: "" as TimeSlot,
   }));
-  
+
   // ✅ Utiliser useMemo pour calculer les données initiales basées sur user
-  const initialFormData = useMemo<FormData>(() => ({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    email: user?.email || "",
-    telephone: user?.telephone || "",
-    destination: "" as Destination,
-    destinationAutre: "",
-    niveauEtude: "" as NiveauEtude,
-    niveauEtudeAutre: "",
-    filiere: "" as Filiere,
-    filiereAutre: "",
-    date: "",
-    time: "" as TimeSlot,
-  }), [user?.firstName, user?.lastName, user?.email, user?.telephone]);
-  
+  const initialFormData = useMemo<FormData>(
+    () => ({
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      email: user?.email || "",
+      telephone: user?.telephone || "",
+      destination: "" as Destination,
+      destinationAutre: "",
+      niveauEtude: "" as NiveauEtude,
+      niveauEtudeAutre: "",
+      filiere: "" as Filiere,
+      filiereAutre: "",
+      date: "",
+      time: "" as TimeSlot,
+    }),
+    [user?.firstName, user?.lastName, user?.email, user?.telephone],
+  );
+
   // ✅ Réinitialiser le formulaire quand les données utilisateur changent
   useEffect(() => {
     setFormData(initialFormData);
@@ -140,9 +143,7 @@ const RendezVous = () => {
   const fetchAvailableDates = useCallback(async (): Promise<void> => {
     try {
       const dates: AvailableDate[] = await getAvailableDates();
-      const dateStrings = dates
-        .filter((d) => d.hasSlots)
-        .map((d) => d.date);
+      const dateStrings = dates.filter((d) => d.hasSlots).map((d) => d.date);
       setAvailableDates(dateStrings);
     } catch (err) {
       console.error("Erreur lors du chargement des dates:", err);
@@ -207,7 +208,7 @@ const RendezVous = () => {
       }
     }
 
-    // Gestion des champs TimeSlot
+    // Gestion des champs TimeSlot - le frontend utilise HH:MM
     if (name === "time") {
       setFormData((prev) => ({ ...prev, [name]: value as TimeSlot }));
       return;
@@ -486,7 +487,7 @@ const RendezVous = () => {
       filiere: formData.filiere.trim() as Filiere,
       filiereAutre: formData.filiereAutre?.trim() || undefined,
       date: formData.date,
-      time: formData.time,
+      time: formData.time, // Le service gérera la conversion automatiquement
     };
 
     // ✅ Gestion destination "Autre"

@@ -40,10 +40,7 @@ export class RendezvousService {
       '10:30': TimeSlot.SLOT_1030,
       '11:00': TimeSlot.SLOT_1100,
       '11:30': TimeSlot.SLOT_1130,
-      '12:00': TimeSlot.SLOT_1200,
-      '12:30': TimeSlot.SLOT_1230,
-      '13:00': TimeSlot.SLOT_1300,
-      '13:30': TimeSlot.SLOT_1330,
+      // Créneaux de pause déjeuner (12:00-14:00) non disponibles
       '14:00': TimeSlot.SLOT_1400,
       '14:30': TimeSlot.SLOT_1430,
       '15:00': TimeSlot.SLOT_1500,
@@ -1133,6 +1130,9 @@ export class RendezvousService {
     // Statistiques par destination
     const destinationStats = await this.getDestinationStatistics(where);
 
+    // Statistiques temporelles
+    const upcomingStats = await this.getUpcomingStatistics(where);
+
     this.logger.log(
       `[RendezvousService] ${step} -> statistiques calculées: total=${total}`,
     );
@@ -1145,12 +1145,7 @@ export class RendezvousService {
         cancelled,
         pending,
       },
-      upcoming: {
-        today: 0, // TODO: implémenter
-        tomorrow: 0, // TODO: implémenter
-        thisWeek: 0, // TODO: implémenter
-        thisMonth: 0, // TODO: implémenter
-      },
+      upcoming: upcomingStats,
       topDestinations: destinationStats,
       completionRate: total > 0 ? (completed / total) * 100 : 0,
       cancellationRate: total > 0 ? (cancelled / total) * 100 : 0,
@@ -1176,6 +1171,94 @@ export class RendezvousService {
         percentage: 0,
       }))
       .sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * Obtenir les statistiques des rendez-vous à venir
+   */
+  private async getUpcomingStatistics(where: Prisma.RendezvousWhereInput) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Fin de la semaine (dimanche à 23:59:59)
+    const endOfWeek = new Date(today);
+    const daysUntilSunday = 6 - today.getDay(); // 0=dimanche, 6=samedi
+    endOfWeek.setDate(today.getDate() + daysUntilSunday);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    // Fin du mois (dernier jour du mois à 23:59:59)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    this.logger.log(
+      `[RendezvousService] -> Périodes calculées: aujourd'hui=${today.toISOString().split('T')[0]}, finSemaine=${endOfWeek.toISOString().split('T')[0]}, finMois=${endOfMonth.toISOString().split('T')[0]}`,
+    );
+
+    const [todayCount, tomorrowCount, thisWeekCount, thisMonthCount] =
+      await Promise.all([
+        // Aujourd'hui : rendez-vous confirmés pour aujourd'hui
+        this.prisma.rendezvous.count({
+          where: {
+            ...where,
+            date: today.toISOString().split('T')[0],
+            status: {
+              in: [RendezvousStatus.CONFIRMED, RendezvousStatus.PENDING],
+            },
+          },
+        }),
+
+        // Demain : rendez-vous confirmés pour demain
+        this.prisma.rendezvous.count({
+          where: {
+            ...where,
+            date: tomorrow.toISOString().split('T')[0],
+            status: {
+              in: [RendezvousStatus.CONFIRMED, RendezvousStatus.PENDING],
+            },
+          },
+        }),
+
+        // Cette semaine : du jour actuel jusqu'à dimanche inclus
+        this.prisma.rendezvous.count({
+          where: {
+            ...where,
+            date: {
+              gte: today.toISOString().split('T')[0],
+              lte: endOfWeek.toISOString().split('T')[0],
+            },
+            status: {
+              in: [RendezvousStatus.CONFIRMED, RendezvousStatus.PENDING],
+            },
+          },
+        }),
+
+        // Ce mois : du jour actuel jusqu'à la fin du mois inclus
+        this.prisma.rendezvous.count({
+          where: {
+            ...where,
+            date: {
+              gte: today.toISOString().split('T')[0],
+              lte: endOfMonth.toISOString().split('T')[0],
+            },
+            status: {
+              in: [RendezvousStatus.CONFIRMED, RendezvousStatus.PENDING],
+            },
+          },
+        }),
+      ]);
+
+    this.logger.log(
+      `[RendezvousService] -> stats à venir: aujourd'hui=${todayCount}, demain=${tomorrowCount}, semaine=${thisWeekCount}, mois=${thisMonthCount}`,
+    );
+
+    return {
+      today: todayCount,
+      tomorrow: tomorrowCount,
+      thisWeek: thisWeekCount,
+      thisMonth: thisMonthCount,
+    };
   }
 
   /**

@@ -116,13 +116,11 @@ export function useMessages(): UseMessagesReturn {
         endDate: filtersRef.current.endDate,
       };
 
-
       const [listResult, statsResult] = await Promise.all([
         MessagesService.findAll(query),
         MessagesService.getStatistics(),
       ]);
 
-     
       console.log(
         "[useMessages] fetchMessages success - statsResult:",
         statsResult,
@@ -223,7 +221,9 @@ export function useMessages(): UseMessagesReturn {
         await refresh();
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Erreur lors de l'envoi de la réponse";
+          err instanceof Error
+            ? err.message
+            : "Erreur lors de l'envoi de la réponse";
         toast.error(message);
         console.error("[useMessages] respond error:", err);
       }

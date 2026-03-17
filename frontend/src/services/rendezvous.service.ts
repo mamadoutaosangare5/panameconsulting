@@ -505,6 +505,7 @@ class RendezvousService {
 
   /**
    * Prépare les données pour la création en gérant la logique "Autre"
+   * et la conversion des TimeSlot pour le backend
    */
   private prepareCreateData(data: CreateRendezvousDto): CreateRendezvousDto {
     return {
@@ -518,11 +519,14 @@ class RendezvousService {
         data.niveauEtudeAutre,
       ),
       filiere: this.getEffectiveValue(data.filiere, data.filiereAutre),
+      // Convertir le TimeSlot au format attendu par le backend
+      time: this.convertTimeSlotForBackend(data.time),
     };
   }
 
   /**
    * Prépare les données pour la mise à jour en gérant la logique "Autre"
+   * et la conversion des TimeSlot pour le backend
    */
   private prepareUpdateData(data: UpdateRendezvousDto): UpdateRendezvousDto {
     const prepared: UpdateRendezvousDto = { ...data };
@@ -546,7 +550,45 @@ class RendezvousService {
       );
     }
 
+    // Convertir le TimeSlot si présent
+    if (data.time !== undefined) {
+      prepared.time = this.convertTimeSlotForBackend(data.time);
+    }
+
     return prepared;
+  }
+
+  /**
+   * Convertit un TimeSlot pour le backend
+   * Le frontend utilise "09:00" mais le backend attend "SLOT_0900"
+   */
+  private convertTimeSlotForBackend(timeSlot: TimeSlot): TimeSlot {
+    // Si déjà au format SLOT_*, retourner tel quel
+    if (typeof timeSlot === "string" && timeSlot.startsWith("SLOT_")) {
+      return timeSlot;
+    }
+
+    // Convertir du format HH:MM vers SLOT_*
+    const timeMap: Record<string, TimeSlot> = {
+      "09:00": "SLOT_0900" as TimeSlot,
+      "09:30": "SLOT_0930" as TimeSlot,
+      "10:00": "SLOT_1000" as TimeSlot,
+      "10:30": "SLOT_1030" as TimeSlot,
+      "11:00": "SLOT_1100" as TimeSlot,
+      "11:30": "SLOT_1130" as TimeSlot,
+      "12:00": "SLOT_1200" as TimeSlot,
+      "12:30": "SLOT_1230" as TimeSlot,
+      "13:00": "SLOT_1300" as TimeSlot,
+      "13:30": "SLOT_1330" as TimeSlot,
+      "14:00": "SLOT_1400" as TimeSlot,
+      "14:30": "SLOT_1430" as TimeSlot,
+      "15:00": "SLOT_1500" as TimeSlot,
+      "15:30": "SLOT_1530" as TimeSlot,
+      "16:00": "SLOT_1600" as TimeSlot,
+      "16:30": "SLOT_1630" as TimeSlot,
+    };
+
+    return timeMap[timeSlot] || timeSlot;
   }
 
   /**
@@ -584,14 +626,51 @@ class RendezvousService {
 
   /**
    * Récupère les créneaux disponibles sous forme de simple liste
+   * Convertit les TimeSlot du backend vers le format HH:MM pour le frontend
    */
   async getAvailableSlotsList(date: Date | string): Promise<TimeSlot[]> {
     try {
       const slots = await this.getAvailableSlots(date);
-      return slots.availableSlots;
+      // Convertir les TimeSlot du backend (SLOT_*) vers le format frontend (HH:MM)
+      return slots.availableSlots.map((slot) =>
+        this.convertTimeSlotFromBackend(slot),
+      );
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Convertit un TimeSlot du backend vers le format frontend
+   * Backend: SLOT_0900 -> Frontend: 09:00
+   */
+  private convertTimeSlotFromBackend(timeSlot: TimeSlot): TimeSlot {
+    // Si déjà au format HH:MM, retourner tel quel
+    if (typeof timeSlot === "string" && timeSlot.includes(":")) {
+      return timeSlot;
+    }
+
+    // Convertir du format SLOT_* vers HH:MM
+    const timeMap: Record<string, TimeSlot> = {
+      SLOT_0900: "09:00" as TimeSlot,
+      SLOT_0930: "09:30" as TimeSlot,
+      SLOT_1000: "10:00" as TimeSlot,
+      SLOT_1030: "10:30" as TimeSlot,
+      SLOT_1100: "11:00" as TimeSlot,
+      SLOT_1130: "11:30" as TimeSlot,
+      SLOT_1200: "12:00" as TimeSlot,
+      SLOT_1230: "12:30" as TimeSlot,
+      SLOT_1300: "13:00" as TimeSlot,
+      SLOT_1330: "13:30" as TimeSlot,
+      SLOT_1400: "14:00" as TimeSlot,
+      SLOT_1430: "14:30" as TimeSlot,
+      SLOT_1500: "15:00" as TimeSlot,
+      SLOT_1530: "15:30" as TimeSlot,
+      SLOT_1600: "16:00" as TimeSlot,
+      SLOT_1630: "16:30" as TimeSlot,
+    };
+
+    return timeMap[timeSlot] || timeSlot;
   }
 
   /**
@@ -692,6 +771,8 @@ class RendezvousService {
       });
 
       const url = `${this.baseUrl}/admin/rendezvous/all${searchParams.toString() ? `?${searchParams}` : ""}`;
+      console.log("[RendezvousService] GET", url);
+
       const response = await apiFetch(url, { method: "GET" });
 
       if (!response.ok) {
@@ -703,6 +784,7 @@ class RendezvousService {
       }
 
       const result = await response.json();
+      console.log("[RendezvousService] ✅ Rendez-vous reçus:", result);
 
       // Appliquer les champs effectifs
       result.data = result.data.map((rdv: RendezvousResponseDto) =>

@@ -24,7 +24,7 @@ export interface UseProceduresOptions {
   autoLoad?: boolean;
   shouldLoadStatistics?: boolean;
   initialQuery?: ProcedureQueryDto;
-  refreshInterval?: number; // ms — rafraîchissement périodique des procédures en retard
+  refreshInterval?: number;
 }
 
 export interface UseProceduresState {
@@ -77,7 +77,6 @@ export interface UseProceduresActions {
   remove: (id: string, reason?: string) => Promise<boolean>;
 
   // Actions utilisateur
-  // cancel retourne ProcedureResponseDto (200) conformément au controller
   cancelProcedure: (
     id: string,
     reason?: string,
@@ -202,7 +201,7 @@ export function useProcedures(
           syncPagination({
             data: [],
             total: 0,
-            page: 1,
+            page: merged.page ?? 1,
             limit: merged.limit ?? 10,
             totalPages: 0,
             hasNext: false,
@@ -226,7 +225,7 @@ export function useProcedures(
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // loadStatistics — GET /admin/procedures/statistics (ADMIN uniquement)
+  // loadStatistics — GET /admin/procedures/statistics
   // ─────────────────────────────────────────────────────────────────────────
   const loadStatistics = useCallback(async () => {
     if (user?.role !== "ADMIN") return;
@@ -281,7 +280,6 @@ export function useProcedures(
       setError(null);
       try {
         const procedure = await ProceduresService.create(data);
-        // Ajout optimiste en tête de liste
         setProcedures((prev) => [procedure, ...prev]);
         setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
         await loadStatistics();
@@ -316,7 +314,6 @@ export function useProcedures(
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
         return updated;
       } catch (err: unknown) {
-        // Rollback
         if (original)
           setProcedures((prev) =>
             prev.map((p) => (p.id === id ? original : p)),
@@ -398,13 +395,12 @@ export function useProcedures(
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // remove — DELETE /admin/procedures/:id/delete (204 No Content)
+  // remove — DELETE /admin/procedures/:id/delete
   // ─────────────────────────────────────────────────────────────────────────
   const remove = useCallback(
     async (id: string, reason?: string): Promise<boolean> => {
       const original = procedures.find((p) => p.id === id) ?? null;
 
-      // Optimistic update
       setProcedures((prev) => prev.filter((p) => p.id !== id));
       setPagination((prev) => ({
         ...prev,
@@ -419,7 +415,6 @@ export function useProcedures(
         await loadStatistics();
         return true;
       } catch (err: unknown) {
-        // Rollback
         if (original) {
           setProcedures((prev) => [...prev, original]);
           setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
@@ -437,7 +432,6 @@ export function useProcedures(
 
   // ─────────────────────────────────────────────────────────────────────────
   // cancelProcedure — PATCH /procedures/:id/cancel
-  // Retourne ProcedureResponseDto (200) — pas void
   // ─────────────────────────────────────────────────────────────────────────
   const cancelProcedure = useCallback(
     async (
@@ -448,11 +442,8 @@ export function useProcedures(
       setError(null);
       try {
         const updated = await ProceduresService.cancel(id, reason);
-
-        // Mise à jour optimiste à partir de la réponse réelle du backend
         setProcedures((prev) => prev.map((p) => (p.id === id ? updated : p)));
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
-
         return updated;
       } catch (err: unknown) {
         setError(
@@ -479,7 +470,6 @@ export function useProcedures(
       try {
         const data = await ProceduresService.findByEmail(email);
         setProcedures(data);
-        // Synthèse d'une pagination cohérente (cette route ne pagine pas)
         syncPagination({
           data,
           total: data.length,
@@ -546,7 +536,7 @@ export function useProcedures(
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Validation — délégué au service
+  // Validation
   // ─────────────────────────────────────────────────────────────────────────
   const validate = useCallback(
     (data: Partial<CreateProcedureDto>) => ProceduresService.validate(data),
@@ -562,14 +552,17 @@ export function useProcedures(
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!autoLoad) return;
-    const promises: Promise<unknown>[] = [loadProcedures()];
-    if (shouldLoadStatistics) promises.push(loadStatistics());
-    Promise.all(promises);
+    const loadData = async () => {
+      const promises: Promise<unknown>[] = [loadProcedures()];
+      if (shouldLoadStatistics) promises.push(loadStatistics());
+      await Promise.all(promises);
+    };
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionnellement vide — on veut que ça tourne une seule fois au montage
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Rechargement quand le query change (hors premier rendu)
+  // Rechargement quand le query change
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (isFirstRender.current) {

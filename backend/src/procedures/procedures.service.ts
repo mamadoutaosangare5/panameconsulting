@@ -147,6 +147,9 @@ export class ProceduresService {
     total: number;
     page: number;
     limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
   }> {
     const {
       page = 1,
@@ -199,11 +202,19 @@ export class ProceduresService {
       this.proceduresRepository.count(where),
     ]);
 
+    // Calculer les métadonnées de pagination
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrevious = page > 1;
+
     return {
       data: procedures.map((proc) => this.toResponseDto(proc)),
       total,
       page,
       limit,
+      totalPages,
+      hasNext,
+      hasPrevious,
     };
   }
 
@@ -621,7 +632,7 @@ export class ProceduresService {
     ] = await Promise.all([
       this.proceduresRepository.count({ isDeleted: false }),
       this.proceduresRepository.count({
-        statut: ProcedureStatus.IN_PROGRESS,
+        statut: ProcedureStatus.PENDING,
         isDeleted: false,
       }),
       this.proceduresRepository.count({
@@ -740,6 +751,7 @@ export class ProceduresService {
       },
       getStatusLabel: () => {
         const labels: Record<ProcedureStatus, string> = {
+          [ProcedureStatus.PENDING]: 'En attente',
           [ProcedureStatus.IN_PROGRESS]: 'En cours',
           [ProcedureStatus.COMPLETED]: 'Terminée',
           [ProcedureStatus.REJECTED]: 'Refusée',
@@ -749,6 +761,7 @@ export class ProceduresService {
       },
       getStatusColor: () => {
         const colors: Record<ProcedureStatus, string> = {
+          [ProcedureStatus.PENDING]: 'yellow',
           [ProcedureStatus.IN_PROGRESS]: 'blue',
           [ProcedureStatus.COMPLETED]: 'green',
           [ProcedureStatus.REJECTED]: 'red',
@@ -811,11 +824,11 @@ export class ProceduresService {
           [StepStatus.CANCELLED]: 'Annulée',
         }[step.statut],
         statusColor: {
-          [StepStatus.PENDING]: 'gray',
+          [StepStatus.PENDING]: 'yellow',
           [StepStatus.IN_PROGRESS]: 'blue',
           [StepStatus.COMPLETED]: 'green',
           [StepStatus.REJECTED]: 'red',
-          [StepStatus.CANCELLED]: 'orange',
+          [StepStatus.CANCELLED]: 'gray',
         }[step.statut],
       })) || [];
 
@@ -859,6 +872,8 @@ export class ProceduresService {
       userId: procedure.userId,
       steps: stepsWithVirtuals,
       progress: procedureEntity.getProgress(),
+      completedSteps,
+      totalSteps,
       activeStep: procedureEntity.getActiveStep()?.nom,
       canBeModified: procedureEntity.canBeModified(),
       daysSinceCreation: procedureEntity.getDaysSinceCreation(),
@@ -867,8 +882,6 @@ export class ProceduresService {
       statusColor: procedureEntity.getStatusColor(),
       isOverdue: procedureEntity.isOverdue(),
       nextStep: procedureEntity.getNextStep(),
-      totalSteps,
-      completedSteps,
     };
   }
 

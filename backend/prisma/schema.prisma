@@ -39,6 +39,7 @@ enum StepName {
 }
 
 enum ProcedureStatus {
+  PENDING     @map("En attente")
   IN_PROGRESS @map("En cours")
   COMPLETED   @map("Terminée")
   REJECTED    @map("Refusée")
@@ -79,9 +80,9 @@ enum TimeSlot {
   SLOT_1130 @map("11:30")
   // Créneaux pendant la pause déjeuner (12:30-14h) sont exclus
   // SLOT_1200 @map("12:00") - PAUSE DEJEUNER
-  SLOT_1230 @map("12:30") - PAUSE DEJEUNER
-  SLOT_1300 @map("13:00") - PAUSE DEJEUNER
-  SLOT_1330 @map("13:30") - PAUSE DEJEUNER
+  // SLOT_1230 @map("12:30") - PAUSE DEJEUNER
+  // SLOT_1300 @map("13:00") - PAUSE DEJEUNER
+  // SLOT_1330 @map("13:30") - PAUSE DEJEUNER
   SLOT_1400 @map("14:00")
   SLOT_1430 @map("14:30")
   SLOT_1500 @map("15:00")

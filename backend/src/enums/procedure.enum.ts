@@ -14,6 +14,7 @@ export enum StepName {
 }
 
 export enum ProcedureStatus {
+  PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   REJECTED = 'REJECTED',

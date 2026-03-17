@@ -25,26 +25,26 @@ export type Filiere = string;
 
 /**
  * Créneaux horaires - Correspond exactement à Prisma TimeSlot
- * Pause déjeuner 12h-14h exclue
+ * Pause déjeuner 12h30-14h00 exclue
  */
 export const TimeSlot = {
-  "09:00": "09:00",
-  "09:30": "09:30",
-  "10:00": "10:00",
-  "10:30": "10:30",
-  "11:00": "11:00",
-  "11:30": "11:30",
-  // Créneaux pendant la pause déjeuner (12h-14h) sont exclus
-  // "12:00": "12:00",
-  // "12:30": "12:30",
-  // "13:00": "13:00",
-  // "13:30": "13:30",
-  "14:00": "14:00",
-  "14:30": "14:30",
-  "15:00": "15:00",
-  "15:30": "15:30",
-  "16:00": "16:00",
-  "16:30": "16:30",
+  "09:00": "SLOT_0900",
+  "09:30": "SLOT_0930",
+  "10:00": "SLOT_1000",
+  "10:30": "SLOT_1030",
+  "11:00": "SLOT_1100",
+  "11:30": "SLOT_1130",
+  // Créneaux pendant la pause déjeuner (12h30-14h) sont exclus
+  // "12:00": "SLOT_1200",
+  // "12:30": "SLOT_1230",
+  // "13:00": "SLOT_1300",
+  // "13:30": "SLOT_1330",
+  "14:00": "SLOT_1400",
+  "14:30": "SLOT_1430",
+  "15:00": "SLOT_1500",
+  "15:30": "SLOT_1530",
+  "16:00": "SLOT_1600",
+  "16:30": "SLOT_1630",
 } as const;
 export type TimeSlot = (typeof TimeSlot)[keyof typeof TimeSlot];
 
@@ -334,7 +334,7 @@ export const DESTINATION_OPTIONS = [
 
 /**
  * Options de créneaux horaires suggérées pour l'interface
- * Pause déjeuner 12h-14h exclue
+ * Pause déjeuner 12h30-14h00 exclue
  */
 export const TIME_SLOT_OPTIONS = [
   "09:00",
@@ -343,7 +343,7 @@ export const TIME_SLOT_OPTIONS = [
   "10:30",
   "11:00",
   "11:30",
-  // Créneaux pendant la pause déjeuner (12h-14h) sont exclus
+  // Créneaux pendant la pause déjeuner (12h30-14h) sont exclus
   // "12:00",
   // "12:30",
   // "13:00",
@@ -463,9 +463,9 @@ export const formatTimeSlot = (timeSlot: string): string => {
 };
 
 /**
- * Convertit un TimeSlot (ex: SLOT_0930) en format HH:MM pour les calculs (ex: 09:30)
+ * Convertit un TimeSlot (ex: SLOT_0930) en format HH:MM pour l'envoi au backend (ex: 09:30)
  */
-export const timeSlotToDateTime = (timeSlot: string): string => {
+export const timeSlotToBackendFormat = (timeSlot: string): string => {
   const timeMap: Record<string, string> = {
     SLOT_0900: "09:00",
     SLOT_0930: "09:30",
@@ -489,13 +489,41 @@ export const timeSlotToDateTime = (timeSlot: string): string => {
 };
 
 /**
+ * Convertit format HH:MM en TimeSlot enum pour le backend
+ */
+export const timeStringToTimeSlot = (timeString: string): string => {
+  const reverseMap: Record<string, string> = {
+    "09:00": "SLOT_0900",
+    "09:30": "SLOT_0930",
+    "10:00": "SLOT_1000",
+    "10:30": "SLOT_1030",
+    "11:00": "SLOT_1100",
+    "11:30": "SLOT_1130",
+    "12:00": "SLOT_1200",
+    "12:30": "SLOT_1230",
+    "13:00": "SLOT_1300",
+    "13:30": "SLOT_1330",
+    "14:00": "SLOT_1400",
+    "14:30": "SLOT_1430",
+    "15:00": "SLOT_1500",
+    "15:30": "SLOT_1530",
+    "16:00": "SLOT_1600",
+    "16:30": "SLOT_1630",
+  };
+
+  return reverseMap[timeString] || timeString;
+};
+
+/**
  * Vérifie si un rendez-vous peut être annulé
  */
 export const canCancelRendezvous = (rdv: Rendezvous): boolean => {
   // Simple vérification : utiliser la propriété du backend
-  return rdv.canCancel && 
-         (rdv.status === RendezvousStatus.CONFIRMED || 
-          rdv.status === RendezvousStatus.PENDING);
+  return (
+    rdv.canCancel &&
+    (rdv.status === RendezvousStatus.CONFIRMED ||
+      rdv.status === RendezvousStatus.PENDING)
+  );
 };
 
 /**
@@ -506,17 +534,19 @@ export const getRemainingCancellationTime = (
 ): string | null => {
   // Si le RDV ne peut pas être annulé, pas de temps restant
   if (!rdv.canCancel) return null;
-  
+
   // Calculer le temps restant pour l'affichage
   const now = new Date();
-  const rdvDateTime = new Date(`${rdv.date}T${timeSlotToDateTime(rdv.time)}`);
+  const rdvDateTime = new Date(
+    `${rdv.date}T${timeSlotToBackendFormat(rdv.time)}`,
+  );
   const diffMs = rdvDateTime.getTime() - now.getTime();
-  
+
   if (diffMs <= 0) return null; // RDV passé ou en cours
-  
+
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
+
   return diffHours > 0
     ? `${diffHours}h ${diffMinutes}min`
     : `${diffMinutes}min`;

@@ -2,7 +2,8 @@
 # Placé à la RACINE du monorepo
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "nodePackages.pnpm"]
+# Ajout de 'postgresql' pour avoir accès à pg_dump
+nixPkgs = ["nodejs_20", "nodePackages.pnpm", "postgresql"]
 
 [phases.install]
 cmds = [
@@ -18,4 +19,5 @@ cmds = [
 ]
 
 [start]
+# Exécution des migrations Prisma puis lancement du backend
 cmd = "cd backend && pnpm prisma migrate deploy && node dist/src/main.js"

@@ -36,7 +36,6 @@ const MonProfile = () => {
   // Mettre à jour le profil quand l'utilisateur change
   useEffect(() => {
     if (user) {
-
       const newEditedProfile = {
         firstName: user.firstName || "",
         lastName: user.lastName || "",

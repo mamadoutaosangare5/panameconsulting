@@ -106,6 +106,18 @@ export default function AdminSidebar({
       label: "Statistiques",
     },
     {
+      href: "/gestionnaire/rendezvous",
+      icon: Calendar,
+      label: "Rendez-vous",
+    },
+    {
+      href: "/gestionnaire/messages",
+      icon: MessageSquare,
+      label: "Messages",
+      badge: unreadCount,
+      onClick: handleMessagesClick,
+    },
+    {
       href: "/gestionnaire/destinations",
       icon: Globe,
       label: "Destinations",
@@ -121,22 +133,11 @@ export default function AdminSidebar({
       label: "Procédures",
     },
     {
-      href: "/gestionnaire/rendezvous",
-      icon: Calendar,
-      label: "Rendez-vous",
-    },
-    {
       href: "/gestionnaire/profil",
       icon: User,
       label: "Profil",
     },
-    {
-      href: "/gestionnaire/messages",
-      icon: MessageSquare,
-      label: "Messages",
-      badge: unreadCount,
-      onClick: handleMessagesClick,
-    },
+    
   ];
 
   const handleLogout = useCallback(async () => {
@@ -217,30 +218,39 @@ export default function AdminSidebar({
                 <motion.div
                   initial={{ opacity: 1 }}
                   animate={{ opacity: 1 }}
-                  className="flex flex-col items-center space-y-3"
+                  className="flex flex-col items-start space-y-3"
                 >
                   {/* Icône settings en haut */}
-                  <div className="relative">
-                    <Link
-                      to="/"
-                      className="w-10 h-10 bg-linear-to-br from-sky-400 to-sky-600 rounded-lg flex items-center justify-center shadow-md shadow-sky-500/30"
-                    >
-                      {user.role === "ADMIN" ? (
-                        <Settings className="w-5 h-5 text-white" />
-                      ) : (
-                        <User className="w-5 h-5 text-white" />
-                      )}
-                    </Link>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></div>
-                  </div>
+                  <div className="relative flex items-center gap-3">
+                      {/* Icône avec badge de statut */}
+                      <div className="relative">
+                        <Link
+                          to="/"
+                          className="w-10 h-10 bg-linear-to-br from-sky-400 to-sky-600 rounded-lg flex items-center justify-center shadow-md shadow-sky-500/30"
+                        >
+                          {user.role === "ADMIN" ? (
+                            <Settings className="w-5 h-5 text-white" />
+                          ) : (
+                            <User className="w-5 h-5 text-white" />
+                          )}
+                        </Link>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></div>
+                      </div>
+
+                      {/* Texte aligné à droite de l'icône */}
+                      <div className="flex flex-col">
+                        <h2 className="font-bold text-sky-900 text-sm leading-tight">
+                          Gestionnaire
+                        </h2>
+                        <p className="text-xs text-sky-700 leading-tight">
+                          Paname Consulting
+                        </p>
+                      </div>
+                    </div>
 
                   {/* Informations utilisateur en dessous */}
-                  <div className="text-center">
-                    <h2 className="font-bold text-sky-900 text-sm">
-                      Gestionnaire
-                    </h2>
-                    <p className="text-xs text-sky-700">Paname Consulting</p>
-                    <div className="flex flex-col items-center gap-1 mt-1">
+                  <div className="text-start">
+                    <div className="flex flex-col items-start gap-1 mt-1">
                       <span className="text-[10px] text-sky-600 truncate max-w-[200px]">
                         {user.email}
                       </span>

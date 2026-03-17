@@ -1,27 +1,5 @@
 // services/procedures.service.ts
 // Calqué strictement sur procedures.controller.ts (NestJS)
-// Chaque méthode correspond à un endpoint exact du controller.
-//
-// ROUTES BACKEND (controller) :
-//  POST   /admin/procedures/create                       → create()
-//  GET    /admin/procedures/all                          → findAll()
-//  GET    /admin/procedures/statistics                   → getStatistics()
-//  PATCH  /admin/procedures/:id/steps/:stepName          → updateStep()
-//  POST   /admin/procedures/:id/steps/:stepName          → addStep()
-//  DELETE /admin/procedures/:id/delete                   → remove()   — 204 No Content
-//  GET    /procedures/:email                             → findByEmail()
-//  GET    /procedures/:rendezVousId                      → findByRendezvousId()
-//  GET    /procedures/:id/details                        → findById()
-//  PATCH  /procedures/:id/update                         → update()
-//  PATCH  /procedures/:id/cancel                         → cancel()   — retourne ProcedureResponseDto
-//
-// ⚠️  ATTENTION — ambiguïté de routes GET /procedures/:param :
-//      Le controller déclare trois routes avec le même pattern `procedures/:x`,
-//      mais elles sont discriminées par le suffixe `/details`.
-//      Côté frontend on distingue :
-//        - findByEmail      → /procedures/:email           (tableau)
-//        - findByRendezvousId → /procedures/:rendezVousId  (objet unique ou 404)
-//        - findById         → /procedures/:id/details      (objet unique)
 
 import { toast } from "react-hot-toast";
 import type {
@@ -43,18 +21,6 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 // ─── Gestion des réponses ─────────────────────────────────────────────────────
-//
-// Le backend NestJS retourne les réponses de deux façons :
-//   1. Directement : { id, prenom, ... }  ou  [{ ... }, ...]  ou  { data: [...], total, ... }
-//   2. Wrappé      : { data: <T>, message?, statusCode? }
-//
-// Règle appliquée :
-//   - 204 → undefined  (soft delete)
-//   - La réponse paginée (PaginatedProcedureResponseDto) possède une clé `data`
-//     qui EST le tableau de procédures — elle ne doit PAS être dépaquetée.
-//     On la détecte grâce aux clés `total` + `page` + `limit`.
-//   - Sinon, si la réponse possède une clé `data` sans les clés de pagination,
-//     on suppose un wrapper NestJS et on extrait `.data`.
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as unknown as T;
@@ -76,13 +42,14 @@ async function handleResponse<T>(res: Response): Promise<T> {
     throw err;
   }
 
-  // Détecter la réponse paginée : elle a `data` + `total` + `page` + `limit`
-  // → ne pas dépaqueter, la retourner telle quelle
+  // Détection réponse paginée (avec data, total, page, limit, totalPages, hasNext, hasPrevious)
   if (
     body &&
     typeof body === "object" &&
     "data" in body &&
+    Array.isArray((body as unknown as { data: unknown[] }).data) &&
     "total" in body &&
+    typeof (body as unknown as { total: number }).total === "number" &&
     "page" in body &&
     "limit" in body
   ) {
@@ -113,8 +80,6 @@ export const ProceduresService = {
 
   /**
    * POST /admin/procedures/create — ADMIN
-   * Créer une procédure depuis un rendez-vous éligible.
-   * Retourne : ProcedureResponseDto (201)
    */
   async create(data: CreateProcedureDto): Promise<ProcedureResponseDto> {
     try {
@@ -134,27 +99,48 @@ export const ProceduresService = {
 
   /**
    * GET /admin/procedures/all — ADMIN
-   * Liste paginée avec filtres, tri, recherche, plage de dates.
-   * Retourne : PaginatedProcedureResponseDto (200) — objet direct, PAS de wrapper.
+   * Retourne PaginatedProcedureResponseDto avec data, total, page, limit, totalPages, hasNext, hasPrevious
    */
   async findAll(
     query: ProcedureQueryDto = {},
   ): Promise<PaginatedProcedureResponseDto> {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null) {
+      if (value !== undefined && value !== null && value !== "") {
         params.set(key, String(value));
       }
     }
     const url = `${BASE_URL}/admin/procedures/all${params.toString() ? `?${params}` : ""}`;
-    const res = await apiFetch(url, { method: "GET" });
-    return handleResponse<PaginatedProcedureResponseDto>(res);
+    console.log("[ProceduresService] GET", url);
+
+    try {
+      const res = await apiFetch(url, { method: "GET" });
+      console.log("[ProceduresService] Response status:", res.status);
+      const result = await handleResponse<PaginatedProcedureResponseDto>(res);
+      
+      // Validation de la structure paginée
+      if (!result.data || !Array.isArray(result.data)) {
+        console.error("[ProceduresService] Réponse invalide:", result);
+        return {
+          data: [],
+          total: 0,
+          page: query.page || 1,
+          limit: query.limit || 10,
+          totalPages: 0,
+          hasNext: false,
+          hasPrevious: false,
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error("[ProceduresService] Erreur findAll:", error);
+      throw error;
+    }
   },
 
   /**
    * GET /admin/procedures/statistics — ADMIN
-   * Statistiques globales des procédures.
-   * Retourne : ProcedureStatisticsDto (200)
    */
   async getStatistics(): Promise<ProcedureStatisticsDto> {
     try {
@@ -171,8 +157,6 @@ export const ProceduresService = {
 
   /**
    * PATCH /admin/procedures/:id/steps/:stepName — ADMIN
-   * Mettre à jour une étape existante.
-   * Retourne : ProcedureResponseDto (200)
    */
   async updateStep(
     id: string,
@@ -199,9 +183,6 @@ export const ProceduresService = {
 
   /**
    * POST /admin/procedures/:id/steps/:stepName — ADMIN
-   * Ajouter une nouvelle étape.
-   * Erreur 409 si l'étape existe déjà.
-   * Retourne : ProcedureResponseDto (200)
    */
   async addStep(id: string, stepName: StepName): Promise<ProcedureResponseDto> {
     try {
@@ -220,8 +201,7 @@ export const ProceduresService = {
 
   /**
    * DELETE /admin/procedures/:id/delete — ADMIN
-   * Soft delete avec raison optionnelle.
-   * Retourne : 204 No Content
+   * Retourne 204 No Content
    */
   async remove(id: string, reason = "Suppression manuelle"): Promise<void> {
     try {
@@ -242,11 +222,6 @@ export const ProceduresService = {
 
   /**
    * GET /procedures/:email
-   * Récupère toutes les procédures d'un utilisateur par email.
-   * Retourne : ProcedureResponseDto[] directement (pas de wrapper ni pagination).
-   *
-   * ⚠️  Ce endpoint partage le pattern `/procedures/:param` avec findByRendezvousId.
-   *     La distinction est faite par la nature du paramètre (email vs UUID) côté backend.
    */
   async findByEmail(email: string): Promise<ProcedureResponseDto[]> {
     const res = await apiFetch(
@@ -270,7 +245,6 @@ export const ProceduresService = {
       throw err;
     }
 
-    // Le backend retourne directement le tableau ou éventuellement { data: [...] }
     if (Array.isArray(body)) return body as ProcedureResponseDto[];
     if (
       body &&
@@ -285,8 +259,6 @@ export const ProceduresService = {
 
   /**
    * GET /procedures/:rendezVousId
-   * Trouve une procédure via l'ID du rendez-vous associé.
-   * Retourne : ProcedureResponseDto (200) ou null (404)
    */
   async findByRendezvousId(
     rendezVousId: string,
@@ -300,8 +272,6 @@ export const ProceduresService = {
 
   /**
    * GET /procedures/:id/details
-   * Détails complets d'une procédure (avec tous les virtuels calculés).
-   * Retourne : ProcedureResponseDto (200)
    */
   async findById(id: string): Promise<ProcedureResponseDto> {
     const res = await apiFetch(`${BASE_URL}/procedures/${id}/details`, {
@@ -312,8 +282,6 @@ export const ProceduresService = {
 
   /**
    * PATCH /procedures/:id/update
-   * Mettre à jour une procédure (admin ou propriétaire selon le guard).
-   * Retourne : ProcedureResponseDto (200)
    */
   async update(
     id: string,
@@ -329,9 +297,6 @@ export const ProceduresService = {
 
   /**
    * PATCH /procedures/:id/cancel
-   * Annuler une procédure (utilisateur connecté ou admin).
-   * body: { reason?: string }
-   * Retourne : ProcedureResponseDto (200)  ← ⚠️ PAS void, contrairement à l'ancienne version
    */
   async cancel(
     id: string,
@@ -352,11 +317,10 @@ export const ProceduresService = {
     }
   },
 
-  // ── Helpers frontend (pas de nouvelles routes) ────────────────────────────
+  // ── Helpers frontend ────────────────────────────────────────────
 
   /**
-   * Convertit un ProcedureFilters en ProcedureQueryDto et appelle findAll.
-   * Pas de route supplémentaire.
+   * Convertit ProcedureFilters en ProcedureQueryDto et appelle findAll
    */
   async findWithFilters(
     filters: ProcedureFilters,
@@ -377,8 +341,7 @@ export const ProceduresService = {
   },
 
   /**
-   * Récupère les procédures en retard (isOverdue = true).
-   * Virtual calculé côté backend — pas de route dédiée.
+   * Récupère les procédures en retard
    */
   async findOverdue(): Promise<ProcedureResponseDto[]> {
     const result = await this.findAll({
@@ -391,7 +354,6 @@ export const ProceduresService = {
   },
 
   // ── Validation client ─────────────────────────────────────────────────────
-  // Miroir des contraintes de create-procedure.dto.ts (class-validator)
 
   validate(data: Partial<CreateProcedureDto>): Record<string, string> {
     const errors: Record<string, string> = {};

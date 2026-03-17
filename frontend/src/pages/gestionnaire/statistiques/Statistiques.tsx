@@ -114,7 +114,7 @@ const Gestionnaire: React.FC = () => {
   // Hooks de statistiques - Configuration optimisée pour éviter les boucles
   const { statistics: rendezvousStats, loadStatistics: loadRendezvousStats } =
     useRendezvous({
-      autoLoad: false, // Désactiver autoLoad pour contrôler manuellement
+      autoLoad: true, // ✅ Activer autoLoad pour charger les stats automatiquement
       refreshInterval: 0, // Désactiver rafraîchissement automatique
     });
 
@@ -122,7 +122,7 @@ const Gestionnaire: React.FC = () => {
 
   const { statistics: procedureStats, loadStatistics: loadProcedureStats } =
     useProcedures({
-      shouldLoadStatistics: false, // Désactiver chargement automatique
+      shouldLoadStatistics: true, // ✅ Activer le chargement automatique des stats
       refreshInterval: 0, // Désactiver rafraîchissement automatique
     });
 
@@ -160,51 +160,69 @@ const Gestionnaire: React.FC = () => {
 
   // Données dynamiques avec useMemo pour éviter les recalculs
   const weeklyActivity = useMemo(() => {
-
     if (!rendezvousStats || !procedureStats || !messageStats) return [];
+
+    const today = new Date();
+    const currentDay = today.getDay(); // 0=dimanche, 6=samedi
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - currentDay);
 
     return [
       {
         name: "Lun",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 1 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 1 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 1 ? messageStats?.thisWeek || 0 : 0,
       },
       {
         name: "Mar",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 2 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 2 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 2 ? messageStats?.thisWeek || 0 : 0,
       },
       {
         name: "Mer",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 3 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 3 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 3 ? messageStats?.thisWeek || 0 : 0,
       },
       {
         name: "Jeu",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 4 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 4 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 4 ? messageStats?.thisWeek || 0 : 0,
       },
       {
         name: "Ven",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 5 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 5 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 5 ? messageStats?.thisWeek || 0 : 0,
       },
       {
         name: "Sam",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 6 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 6 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 6 ? messageStats?.thisWeek || 0 : 0,
       },
       {
         name: "Dim",
-        rendezvous: rendezvousStats?.upcoming?.today || 0,
-        procedures: procedureStats?.newProcedures?.today || 0,
-        messages: messageStats?.today || 0,
+        rendezvous:
+          currentDay >= 0 ? rendezvousStats?.upcoming?.thisWeek || 0 : 0,
+        procedures:
+          currentDay >= 0 ? procedureStats?.newProcedures?.thisWeek || 0 : 0,
+        messages: currentDay >= 0 ? messageStats?.thisWeek || 0 : 0,
       },
     ];
   }, [rendezvousStats, procedureStats, messageStats]);
@@ -409,6 +427,87 @@ const Gestionnaire: React.FC = () => {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Statistiques mensuelles et hebdomadaires */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Statistiques de la semaine */}
+        <div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-sky-500" />
+            Cette semaine
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Rendez-vous</p>
+                <p className="text-2xl font-bold text-sky-600">
+                  {rendezvousStats?.upcoming?.thisWeek || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Messages</p>
+                <p className="text-2xl font-bold text-amber-600">
+                  {messageStats?.thisWeek || 0}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Procédures</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {procedureStats?.newProcedures?.thisWeek || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Taux complétion</p>
+                <p className="text-2xl font-bold text-violet-600">
+                  {Math.round(procedureStats?.completionRate || 0)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Statistiques du mois */}
+        <div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-indigo-500" />
+            Ce mois
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Rendez-vous</p>
+                <p className="text-2xl font-bold text-indigo-600">
+                  {rendezvousStats?.upcoming?.thisMonth || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Messages</p>
+                <p className="text-2xl font-bold text-amber-600">
+                  {messageStats?.thisMonth || 0}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Procédures</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {procedureStats?.newProcedures?.thisMonth || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Nouveaux utilisateurs
+                </p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {userStats?.recentlyCreated || 0}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

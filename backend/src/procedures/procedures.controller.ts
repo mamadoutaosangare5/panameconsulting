@@ -31,7 +31,10 @@ import { CreateProcedureDto } from './dto/create-procedure.dto';
 import { UpdateProcedureDto } from './dto/update-procedure.dto';
 import { UpdateStepDto } from './dto/update-step.dto';
 import { ProcedureQueryDto } from './dto/procedure-query.dto';
-import { ProcedureResponseDto } from './dto/procedure-response.dto';
+import {
+  ProcedureResponseDto,
+  PaginatedProcedureResponseDto,
+} from './dto/procedure-response.dto';
 import { ProcedureStatus, StepName } from '@prisma/client';
 
 @ApiTags('procedures')
@@ -67,11 +70,15 @@ export class ProceduresController {
   @ApiQuery({ name: 'email', required: false, type: String })
   @ApiQuery({ name: 'destination', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Liste des procédures' })
+  @ApiResponse({
+    status: 200,
+    description: 'Liste paginée des procédures',
+    type: PaginatedProcedureResponseDto,
+  })
   async findAll(
     @Query() query: ProcedureQueryDto,
     @CurrentUser() currentUser: CurrentUserType,
-  ) {
+  ): Promise<PaginatedProcedureResponseDto> {
     return this.proceduresService.findAll(query, currentUser);
   }
 
