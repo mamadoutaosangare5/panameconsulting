@@ -17,6 +17,9 @@ import {
   type UpdateRendezvousData,
   type RendezvousQueryParams,
   type TimeSlot,
+  type Destination,
+  type NiveauEtude,
+  type Filiere,
 } from "../../../types/rendezvous.types";
 import {
   Calendar,
@@ -231,7 +234,16 @@ const RendezvousAdmin = () => {
     AdminOpinion.FAVORABLE,
   );
   const [completeComment, setCompleteComment] = useState("");
-  const [editForm, setEditForm] = useState<UpdateRendezvousData>({});
+  const [editForm, setEditForm] = useState<UpdateRendezvousData>({
+    destination: "" as Destination,
+    destinationAutre: "",
+    niveauEtude: "" as NiveauEtude,
+    niveauEtudeAutre: "",
+    filiere: "" as Filiere,
+    filiereAutre: "",
+    date: "",
+    time: "" as TimeSlot,
+  });
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     id: string | null;
@@ -333,14 +345,14 @@ const RendezvousAdmin = () => {
           firstName: data.firstName,
           lastName: data.lastName,
           telephone: data.telephone,
-          destination: data.destination,
-          niveauEtude: data.niveauEtude,
-          filiere: data.filiere,
+          destination: data.destination as Destination,
+          niveauEtude: data.niveauEtude as NiveauEtude,
+          filiere: data.filiere as Filiere,
           niveauEtudeAutre: data.niveauEtudeAutre || "",
           filiereAutre: data.filiereAutre || "",
           destinationAutre: data.destinationAutre || "",
           date: data.date,
-          time: data.time,
+          time: data.time as TimeSlot,
         });
       } else if (type === "complete") {
         setCompleteOpinion(AdminOpinion.FAVORABLE);
@@ -1560,7 +1572,7 @@ const RendezvousAdmin = () => {
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              [field]: e.target.value,
+                              [field]: e.target.value as string,
                             })
                           }
                           className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
@@ -1641,6 +1653,70 @@ const RendezvousAdmin = () => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Niveau d'étude
+                      </label>
+                      <select
+                        value={editForm.niveauEtude ?? ""}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            niveauEtude: e.target.value as NiveauEtude,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="">Sélectionner</option>
+                        {[
+                          "Bac",
+                          "Bac+1",
+                          "Bac+2",
+                          "Licence",
+                          "Master I",
+                          "Master II",
+                          "Doctorat",
+                          "Autre",
+                        ].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Filière
+                      </label>
+                      <select
+                        value={editForm.filiere ?? ""}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            filiere: e.target.value as Filiere,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="">Sélectionner</option>
+                        {[
+                          "Informatique",
+                          "Médecine",
+                          "Droit",
+                          "Commerce",
+                          "Ingénierie",
+                          "Architecture",
+                          "Autre",
+                        ].map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                       Destination
@@ -1651,7 +1727,7 @@ const RendezvousAdmin = () => {
                         onChange={(e) =>
                           setEditForm({
                             ...editForm,
-                            destination: e.target.value,
+                            destination: e.target.value as Destination,
                           })
                         }
                         className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"

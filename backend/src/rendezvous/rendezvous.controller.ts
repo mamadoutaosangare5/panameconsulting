@@ -483,6 +483,10 @@ export class RendezvousController {
         const minutesDifference =
           (rendezvousDateTime.getTime() - now.getTime()) / (1000 * 60);
 
+        // Vérifier si le créneau est pendant la pause déjeuner (12:30-14h)
+        const [hours] = timeString.split(':').map(Number);
+        const isLunchBreak = hours >= 12.5 && hours < 14;
+
         return {
           ...rdv,
           // Propriétés calculées
@@ -491,11 +495,19 @@ export class RendezvousController {
           effectiveNiveauEtude: rdv.niveauEtudeAutre || rdv.niveauEtude,
           effectiveFiliere: rdv.filiereAutre || rdv.filiere,
           dateTime: rendezvousDateTime,
-          canCancel: rdv.status === 'CONFIRMED' && hoursDifference > 2,
+          // Un utilisateur peut annuler son propre RDV si PENDING ou CONFIRMED (sans contrainte de temps)
+          canCancel: rdv.status === 'PENDING' || rdv.status === 'CONFIRMED',
+          // Un utilisateur peut modifier seulement les RDV CONFIRMED prévus dans plus de 24h
           canModify: rdv.status === 'CONFIRMED' && hoursDifference > 24,
           isPast: rendezvousDateTime < now,
           isToday: rendezvousDateTime.toDateString() === now.toDateString(),
           minutesUntilRendezvous: Math.floor(minutesDifference),
+          // Informations sur la pause déjeuner
+          lunchBreakInfo: {
+            lunchBreakStart: '12:30',
+            lunchBreakEnd: '14:00',
+            isLunchBreak: isLunchBreak,
+          },
         };
       });
 

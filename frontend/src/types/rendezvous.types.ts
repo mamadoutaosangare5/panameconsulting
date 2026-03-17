@@ -25,6 +25,7 @@ export type Filiere = string;
 
 /**
  * Créneaux horaires - Correspond exactement à Prisma TimeSlot
+ * Pause déjeuner 12h-14h exclue
  */
 export const TimeSlot = {
   "09:00": "09:00",
@@ -33,10 +34,11 @@ export const TimeSlot = {
   "10:30": "10:30",
   "11:00": "11:00",
   "11:30": "11:30",
-  "12:00": "12:00",
-  "12:30": "12:30",
-  "13:00": "13:00",
-  "13:30": "13:30",
+  // Créneaux pendant la pause déjeuner (12h-14h) sont exclus
+  // "12:00": "12:00",
+  // "12:30": "12:30",
+  // "13:00": "13:00",
+  // "13:30": "13:30",
   "14:00": "14:00",
   "14:30": "14:30",
   "15:00": "15:00",
@@ -226,6 +228,13 @@ export interface RendezvousResponseDto {
   isPast: boolean;
   isToday: boolean;
   minutesUntilRendezvous: number;
+
+  // Informations sur la pause déjeuner
+  lunchBreakInfo?: {
+    lunchBreakStart: string;
+    lunchBreakEnd: string;
+    isLunchBreak: boolean;
+  };
 }
 
 /**
@@ -321,6 +330,30 @@ export const DESTINATION_OPTIONS = [
   "Algérie",
   "Turquie",
   "Autre",
+] as const;
+
+/**
+ * Options de créneaux horaires suggérées pour l'interface
+ * Pause déjeuner 12h-14h exclue
+ */
+export const TIME_SLOT_OPTIONS = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  // Créneaux pendant la pause déjeuner (12h-14h) sont exclus
+  // "12:00",
+  // "12:30",
+  // "13:00",
+  // "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
 ] as const;
 
 /**
@@ -456,28 +489,34 @@ export const timeSlotToDateTime = (timeSlot: string): string => {
 };
 
 /**
- * Vérifie si un rendez-vous peut être annulé (moins de 2H avant)
+ * Vérifie si un rendez-vous peut être annulé
  */
 export const canCancelRendezvous = (rdv: Rendezvous): boolean => {
-  return (
-    rdv.canCancel &&
-    (rdv.status === RendezvousStatus.CONFIRMED ||
-      rdv.status === RendezvousStatus.PENDING)
-  );
+  // Simple vérification : utiliser la propriété du backend
+  return rdv.canCancel && 
+         (rdv.status === RendezvousStatus.CONFIRMED || 
+          rdv.status === RendezvousStatus.PENDING);
 };
 
 /**
- * Calcule le temps restant avant l'annulation (max 2H avant)
+ * Calcule le temps restant avant le rendez-vous
  */
 export const getRemainingCancellationTime = (
   rdv: Rendezvous,
 ): string | null => {
+  // Si le RDV ne peut pas être annulé, pas de temps restant
   if (!rdv.canCancel) return null;
+  
+  // Calculer le temps restant pour l'affichage
   const now = new Date();
   const rdvDateTime = new Date(`${rdv.date}T${timeSlotToDateTime(rdv.time)}`);
   const diffMs = rdvDateTime.getTime() - now.getTime();
+  
+  if (diffMs <= 0) return null; // RDV passé ou en cours
+  
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
   return diffHours > 0
     ? `${diffHours}h ${diffMinutes}min`
     : `${diffMinutes}min`;

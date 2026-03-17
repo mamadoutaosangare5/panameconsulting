@@ -39,8 +39,7 @@ export class HolidaysService {
 
   // Constantes de configuration
   private readonly MAX_SLOTS_PER_DAY = 24;
-  private readonly LUNCH_BREAK = { start: 12, end: 14 }; // Pause déjeuner 12h-14h
-  private readonly MAX_BOOKING_HOURS_AHEAD = 720; // 30 jours = 720 heures
+  private readonly LUNCH_BREAK = { start: 12.5, end: 14 }; // Pause déjeuner 12:30-14:00
 
   // Jours fériés fixes Mali
   private readonly FIXED_HOLIDAYS = [
@@ -218,17 +217,17 @@ export class HolidaysService {
 
   /**
    * Génère tous les créneaux horaires possibles
+   * Exclut automatiquement les créneaux de pause déjeuner (12:30-14:00)
    */
   public generateAllTimeSlots(): string[] {
     const slots: string[] = [];
     for (let hour = 9; hour <= 16; hour++) {
-      // Ajouter le créneau :00 (sauf 12:00 et 13:00 - pause déjeuner)
+      // Exclure les créneaux pendant la pause déjeuner (12:30-14:00)
       if (hour < this.LUNCH_BREAK.start || hour >= this.LUNCH_BREAK.end) {
+        // Ajouter le créneau :00
         slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      }
 
-      // Ajouter le créneau :30 (sauf 12:30 et 13:30)
-      if (hour < this.LUNCH_BREAK.start || hour >= this.LUNCH_BREAK.end) {
+        // Ajouter le créneau :30 (sauf pour 16h car fin à 16:30)
         if (hour < 16) {
           // Pas de 16:30 car fin à 16:30
           slots.push(`${hour.toString().padStart(2, '0')}:30`);

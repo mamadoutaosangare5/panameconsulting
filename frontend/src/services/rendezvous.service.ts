@@ -42,12 +42,13 @@ class RendezvousService {
 
   /**
    * Calcule les champs effectifs (destination, niveau, filière)
+   * Préserve toutes les propriétés du backend dont canCancel, canModify, etc.
    */
   private calculateEffectiveFields(
     rdv: RendezvousResponseDto,
   ): RendezvousResponseDto {
     return {
-      ...rdv,
+      ...rdv, // Préserver TOUTES les propriétés du backend
       effectiveDestination: rdv.destinationAutre || rdv.destination || "",
       effectiveNiveauEtude: rdv.niveauEtudeAutre || rdv.niveauEtude || "",
       effectiveFiliere: rdv.filiereAutre || rdv.filiere || "",

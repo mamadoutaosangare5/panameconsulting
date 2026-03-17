@@ -519,6 +519,7 @@ const MesRendezvous: React.FC = () => {
             <div className="space-y-4 mb-8">
               {filteredRendezvous.map((rdv, index) => {
                 const canCancel = canCancelRendezvous(rdv);
+                
                 return (
                   <div
                     key={`rdv-${rdv.id}-${index}`}
@@ -707,18 +708,9 @@ const MesRendezvous: React.FC = () => {
                 ✓ Les rendez-vous annulés apparaissent avec la raison
                 d'annulation
               </li>
-              <li>✓ Vous ne pouvez annuler qu'un rendez-vous Confirmé</li>
-              <li className="flex items-start gap-1">
-                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                <span>
-                  L'annulation n'est plus possible à moins de 2 heures du
-                  rendez-vous
-                </span>
-              </li>
-              <li>
-                ✓ Pour les rendez-vous Terminés, l'avis administrateur est
-                affiché
-              </li>
+              <li>✓ Vous pouvez annuler vos rendez-vous en attente ou confirmés à tout moment</li>
+              <li>✓ Pour les rendez-vous Terminés, l'avis administrateur est
+                affiché</li>
               <li>
                 ✓ Un rendez-vous Terminé avec avis Favorable peut déclencher une
                 procédure

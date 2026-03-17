@@ -10,10 +10,14 @@ import {
   CancelledBy,
   TimeSlot,
 } from '@prisma/client';
+import { HolidaysService } from '../holidays/holidays.service';
 
 @Injectable()
 export class RendezvousRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private holidaysService: HolidaysService,
+  ) {}
 
   async create(data: Prisma.RendezvousCreateInput): Promise<Rendezvous> {
     return this.prisma.rendezvous.create({
@@ -143,7 +147,26 @@ export class RendezvousRepository {
         NOT: excludeId ? { id: excludeId } : undefined,
       },
     });
-    return !existing;
+
+    if (existing) {
+      return false; // Créneau déjà pris
+    }
+
+    // Vérifier si le créneau est pendant la pause déjeuner (12:30-14h)
+    const timeStr = String(time);
+    const [hours] = timeStr.split(':').map(Number);
+    const isLunchBreak = hours >= 12.5 && hours < 14;
+
+    if (isLunchBreak) {
+      return false; // Créneau pendant la pause déjeuner
+    }
+
+    // Vérifier si c'est un week-end ou jour férié
+    const dateObj = new Date(date);
+    const isWeekend = this.holidaysService.isWeekend(dateObj);
+    const isHoliday = this.holidaysService.isHoliday(date);
+
+    return !isWeekend && !isHoliday;
   }
 
   async findBookedSlots(date: string): Promise<TimeSlot[]> {

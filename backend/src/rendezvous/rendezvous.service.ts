@@ -138,6 +138,12 @@ export class RendezvousService {
       existingRendezvous,
     );
 
+    // Vérification supplémentaire : s'assurer que le créneau n'est pas pendant la pause déjeuner (12:30-14h)
+    const timeSlotAvailable = await this.rendezvousRepository.checkAvailability(
+      createRendezvousDto.date,
+      createRendezvousDto.time as TimeSlot,
+    );
+
     this.logger.log(
       `[RendezvousService] ${step} -> créneaux disponibles: ${availableTimeSlots.length}`,
     );
@@ -149,9 +155,14 @@ export class RendezvousService {
       this.logger.warn(
         `[RendezvousService] ${step} -> créneau non disponible: ${createRendezvousDto.time}`,
       );
-      throw new BadRequestException(
-        "Le créneau horaire sélectionné n'est pas disponible",
+      throw new BadRequestException('Créneau horaire non disponible');
+    }
+
+    if (!timeSlotAvailable) {
+      this.logger.warn(
+        `[RendezvousService] ${step} -> créneau non disponible (pause déjeuner/week-end/férié): ${createRendezvousDto.time}`,
       );
+      throw new BadRequestException('Créneau horaire non disponible');
     }
 
     // 7. Préparer les données pour Prisma
@@ -1183,22 +1194,28 @@ export class RendezvousService {
       throw new BadRequestException('Ce rendez-vous est déjà annulé');
     }
 
-    // Vérifier les restrictions d'annulation (2h minimum avant pour les utilisateurs normaux)
+    // Vérifier que l'utilisateur peut annuler ce rendez-vous
     if (currentUser.role !== UserRole.ADMIN) {
-      const canCancel = this.canBeCancelled(existing.date, existing.time);
-
-      if (!canCancel) {
-        const rendezvousDateTime = new Date(
-          `${existing.date}T${existing.time}:00`,
-        );
-        const hoursUntilRendezvous =
-          (rendezvousDateTime.getTime() - new Date().getTime()) /
-          (1000 * 60 * 60);
+      // Un utilisateur peut annuler son propre rendez-vous s'il correspond à son email
+      if (existing.email !== currentUser.email) {
         this.logger.warn(
-          `[RendezvousService] ${step} -> annulation impossible: ${Math.floor(hoursUntilRendezvous)}h restantes`,
+          `[RendezvousService] ${step} -> tentative d'annulation non autorisée: ${this.maskEmail(currentUser.email)} vs ${this.maskEmail(existing.email)}`,
+        );
+        throw new ForbiddenException(
+          'Vous ne pouvez annuler que vos propres rendez-vous',
+        );
+      }
+
+      // Un utilisateur ne peut annuler que les rendez-vous en attente ou confirmés
+      if (
+        existing.status !== RendezvousStatus.PENDING &&
+        existing.status !== RendezvousStatus.CONFIRMED
+      ) {
+        this.logger.warn(
+          `[RendezvousService] ${step} -> statut non annulable: ${existing.status}`,
         );
         throw new BadRequestException(
-          `L'annulation n'est possible que 2 heures avant le rendez-vous. Temps restant: ${Math.floor(hoursUntilRendezvous)}h`,
+          'Seuls les rendez-vous en attente ou confirmés peuvent être annulés',
         );
       }
     }
@@ -1213,23 +1230,6 @@ export class RendezvousService {
       `[RendezvousService] ${step} -> 200: rendez-vous annulé avec succès`,
     );
     return cancelled;
-  }
-
-  /**
-   * Vérifie si un rendez-vous peut être annulé (2h minimum avant)
-   */
-  private canBeCancelled(
-    rendezvousDate: string,
-    rendezvousTime: string,
-  ): boolean {
-    const now = new Date();
-    const rendezvousDateTime = new Date(
-      `${rendezvousDate}T${rendezvousTime}:00`,
-    );
-    const hoursDifference =
-      (rendezvousDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    return hoursDifference > 2;
   }
 
   /**

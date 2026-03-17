@@ -116,10 +116,18 @@ export class RendezvousResponseDto {
   @ApiPropertyOptional({ type: ProcedureInfoDto })
   procedure?: ProcedureInfoDto;
 
-  @ApiProperty({ example: true })
+  @ApiProperty({
+    example: true,
+    description:
+      'Un utilisateur peut annuler son propre rendez-vous si le statut est PENDING ou CONFIRMED',
+  })
   canCancel: boolean;
 
-  @ApiProperty({ example: true })
+  @ApiProperty({
+    example: false,
+    description:
+      'Un utilisateur ne peut modifier que les rendez-vous PENDING ou CONFIRMED prévus dans plus de 24h',
+  })
   canModify: boolean;
 
   @ApiProperty({ example: false })
@@ -128,8 +136,25 @@ export class RendezvousResponseDto {
   @ApiProperty({ example: false })
   isToday: boolean;
 
-  @ApiProperty({ example: 45 })
+  @ApiProperty({
+    example: 45,
+    description: 'Minutes restantes avant le rendez-vous (négatif si passé)',
+  })
   minutesUntilRendezvous: number;
+
+  @ApiPropertyOptional({
+    description: 'Informations sur la pause déjeuner (12:30-14h)',
+    example: {
+      lunchBreakStart: '12:30',
+      lunchBreakEnd: '14:00',
+      isLunchBreak: false,
+    },
+  })
+  lunchBreakInfo?: {
+    lunchBreakStart: string;
+    lunchBreakEnd: string;
+    isLunchBreak: boolean;
+  };
 }
 
 export class PaginatedRendezvousResponseDto {

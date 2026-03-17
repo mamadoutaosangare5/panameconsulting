@@ -33,6 +33,9 @@ import {
   type CreateRendezvousData,
   type AvailableDate,
   type TimeSlot,
+  type Destination,
+  type NiveauEtude,
+  type Filiere,
   DESTINATION_OPTIONS,
   NIVEAU_ETUDE_OPTIONS,
   FILIERE_OPTIONS,
@@ -43,14 +46,14 @@ interface FormData {
   lastName: string;
   email: string;
   telephone: string;
-  destination: string;
+  destination: Destination;
   destinationAutre?: string;
-  niveauEtude: string;
+  niveauEtude: NiveauEtude;
   niveauEtudeAutre?: string;
-  filiere: string;
+  filiere: Filiere;
   filiereAutre?: string;
   date: string;
-  time: string;
+  time: TimeSlot;
 }
 
 const RendezVous = () => {
@@ -68,14 +71,14 @@ const RendezVous = () => {
     lastName: "",
     email: "",
     telephone: "",
-    destination: "",
+    destination: "" as Destination,
     destinationAutre: "",
-    niveauEtude: "",
+    niveauEtude: "" as NiveauEtude,
     niveauEtudeAutre: "",
-    filiere: "",
+    filiere: "" as Filiere,
     filiereAutre: "",
     date: "",
-    time: "",
+    time: "" as TimeSlot,
   }));
   
   // ✅ Utiliser useMemo pour calculer les données initiales basées sur user
@@ -84,14 +87,14 @@ const RendezVous = () => {
     lastName: user?.lastName || "",
     email: user?.email || "",
     telephone: user?.telephone || "",
-    destination: "",
+    destination: "" as Destination,
     destinationAutre: "",
-    niveauEtude: "",
+    niveauEtude: "" as NiveauEtude,
     niveauEtudeAutre: "",
-    filiere: "",
+    filiere: "" as Filiere,
     filiereAutre: "",
     date: "",
-    time: "",
+    time: "" as TimeSlot,
   }), [user?.firstName, user?.lastName, user?.email, user?.telephone]);
   
   // ✅ Réinitialiser le formulaire quand les données utilisateur changent
@@ -100,7 +103,7 @@ const RendezVous = () => {
   }, [initialFormData]);
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [showOtherDestination, setShowOtherDestination] = useState(false);
   const [showOtherNiveau, setShowOtherNiveau] = useState(false);
   const [showOtherFiliere, setShowOtherFiliere] = useState(false);
@@ -150,7 +153,7 @@ const RendezVous = () => {
     async (date: string): Promise<void> => {
       try {
         const slots: TimeSlot[] = await getAvailableSlotsList(date);
-        // ✅ TimeSlot[] est déjà un tableau de strings, pas besoin de .time
+        // ✅ TimeSlot[] est déjà un tableau de TimeSlot typés
         setAvailableSlots(slots);
       } catch (err) {
         console.error("Erreur lors du chargement des créneaux:", err);
@@ -171,7 +174,7 @@ const RendezVous = () => {
       if (value !== "Autre") {
         setFormData((prev) => ({
           ...prev,
-          [name]: value,
+          [name]: value as Destination,
           destinationAutre: "", // ✅ Nettoie le champ "Autre"
         }));
         return;
@@ -184,7 +187,7 @@ const RendezVous = () => {
       if (value !== "Autre") {
         setFormData((prev) => ({
           ...prev,
-          [name]: value,
+          [name]: value as NiveauEtude,
           niveauEtudeAutre: "", // ✅ Nettoie le champ "Autre"
         }));
         return;
@@ -197,11 +200,17 @@ const RendezVous = () => {
       if (value !== "Autre") {
         setFormData((prev) => ({
           ...prev,
-          [name]: value,
+          [name]: value as Filiere,
           filiereAutre: "", // ✅ Nettoie le champ "Autre"
         }));
         return;
       }
+    }
+
+    // Gestion des champs TimeSlot
+    if (name === "time") {
+      setFormData((prev) => ({ ...prev, [name]: value as TimeSlot }));
+      return;
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -456,28 +465,28 @@ const RendezVous = () => {
     // Vérification rapide de disponibilité avant soumission
     const availabilityCheck = await checkAvailability(
       formData.date,
-      formData.time as TimeSlot,
+      formData.time,
     );
     if (availabilityCheck && !availabilityCheck.available) {
       fetchAvailableSlots(formData.date);
-      setFormData((prev) => ({ ...prev, time: "" }));
+      setFormData((prev) => ({ ...prev, time: "" as TimeSlot }));
       return;
     }
 
-    // Structure conforme à CreateRendezvousData (valeurs string directes)
+    // Structure conforme à CreateRendezvousData (valeurs typées)
     const submitData: CreateRendezvousData = {
       firstName: formData.firstName.trim(),
       lastName: formData.lastName.trim(),
       email: formData.email.trim().toLowerCase(),
       telephone: formData.telephone.trim(),
-      destination: formData.destination.trim(),
+      destination: formData.destination.trim() as Destination,
       destinationAutre: formData.destinationAutre?.trim() || undefined,
-      niveauEtude: formData.niveauEtude.trim(),
+      niveauEtude: formData.niveauEtude.trim() as NiveauEtude,
       niveauEtudeAutre: formData.niveauEtudeAutre?.trim() || undefined,
-      filiere: formData.filiere.trim(),
+      filiere: formData.filiere.trim() as Filiere,
       filiereAutre: formData.filiereAutre?.trim() || undefined,
       date: formData.date,
-      time: formData.time as TimeSlot,
+      time: formData.time,
     };
 
     // ✅ Gestion destination "Autre"

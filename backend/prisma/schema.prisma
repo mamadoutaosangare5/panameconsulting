@@ -69,6 +69,7 @@ enum EducationLevel {
 }
 
 // Constantes depuis le schema Rendezvous
+// Créneaux horaires disponibles (pause déjeuner 12:30-14h exclue)
 enum TimeSlot {
   SLOT_0900 @map("09:00")
   SLOT_0930 @map("09:30")
@@ -76,10 +77,11 @@ enum TimeSlot {
   SLOT_1030 @map("10:30")
   SLOT_1100 @map("11:00")
   SLOT_1130 @map("11:30")
-  SLOT_1200 @map("12:00")
-  SLOT_1230 @map("12:30")
-  SLOT_1300 @map("13:00")
-  SLOT_1330 @map("13:30")
+  // Créneaux pendant la pause déjeuner (12:30-14h) sont exclus
+  // SLOT_1200 @map("12:00") - PAUSE DEJEUNER
+  SLOT_1230 @map("12:30") - PAUSE DEJEUNER
+  SLOT_1300 @map("13:00") - PAUSE DEJEUNER
+  SLOT_1330 @map("13:30") - PAUSE DEJEUNER
   SLOT_1400 @map("14:00")
   SLOT_1430 @map("14:30")
   SLOT_1500 @map("15:00")
