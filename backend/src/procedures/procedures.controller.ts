@@ -12,7 +12,9 @@ import {
   HttpCode,
   ParseEnumPipe,
   UnauthorizedException,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ProceduresService } from './procedures.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -218,6 +220,43 @@ export class ProceduresController {
       id,
       reason || "Annulation par l'utilisateur",
       user,
+    );
+  }
+
+  /**
+   * GET /admin/procedures/export
+   * Export des procédures au format CSV, Excel ou PDF
+   */
+  @Get('admin/procedures/export')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Exporter les procédures (CSV, Excel, PDF)' })
+  @ApiQuery({
+    name: 'format',
+    required: true,
+    enum: ['csv', 'excel', 'pdf'],
+    description: "Format d'export",
+  })
+  @ApiQuery({ name: 'status', required: false, enum: ProcedureStatus })
+  @ApiQuery({ name: 'email', required: false, type: String })
+  @ApiQuery({ name: 'destination', required: false, type: String })
+  @ApiQuery({ name: 'filiere', required: false, type: String })
+  @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
+  @ApiQuery({ name: 'startDate', required: false, type: String })
+  @ApiQuery({ name: 'endDate', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Fichier exporté avec succès' })
+  @ApiResponse({ status: 403, description: 'Accès non autorisé' })
+  async exportProcedures(
+    @Query('format') format: 'csv' | 'excel' | 'pdf',
+    @Query() query: ProcedureQueryDto,
+    @CurrentUser() currentUser: CurrentUserType,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.proceduresService.exportProcedures(
+      format,
+      query,
+      currentUser,
+      res,
     );
   }
 }

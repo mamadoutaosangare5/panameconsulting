@@ -121,10 +121,6 @@ export function useMessages(): UseMessagesReturn {
         MessagesService.getStatistics(),
       ]);
 
-      console.log(
-        "[useMessages] fetchMessages success - statsResult:",
-        statsResult,
-      );
 
       // Vérifier si listResult est un tableau direct ou un objet avec data
       const messagesData = Array.isArray(listResult)
@@ -232,15 +228,8 @@ export function useMessages(): UseMessagesReturn {
   );
 
   const markAsRead = useCallback(async (id: string, isRead: boolean) => {
-    console.log(
-      "[useMessages] markAsRead called with id:",
-      id,
-      "isRead:",
-      isRead,
-    );
     try {
       await MessagesService.markAsRead(id, isRead);
-      console.log("[useMessages] markAsRead success");
       setMessages((prev) =>
         prev.map((msg) => (msg.id === id ? { ...msg, isRead } : msg)),
       );

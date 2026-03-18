@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, type JSX } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import { useProcedures } from "../../../hooks/useProcedures";
@@ -8,7 +8,8 @@ import ConfirmationModal from "../../../components/shared/admin/ConfirMationModa
 import type { 
   ProcedureStatus, 
   SortOrder,
-  StepName
+  StepName,
+  ExportFormat
 } from "../../../types/procedures.types";
 import {
   Search,
@@ -26,7 +27,7 @@ import {
   AlertTriangle,
   Ban,
 } from "lucide-react";
-import type { JSX } from "react/jsx-runtime";
+import { ProceduresService } from "../../../services/procedures.service";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -245,43 +246,24 @@ const Procedures = () => {
     setConfirmModal({ open: false, id: null });
   }, []);
 
-  // ─── Export des données ─────────────────────────────────────────────────
-  const handleExport = useCallback(async (format: 'csv' | 'excel' | 'pdf' = 'excel') => {
+  // ─── Export des données (utilise le service d'export) ───────────────────
+  const handleExport = useCallback(async (format: ExportFormat = 'excel') => {
     try {
-      // Utilise les données actuelles (déjà filtrées par le backend)
-      const exportData = procedures.map(p => ({
-        ID: p.id,
-        Nom: p.fullName,
-        Email: p.email,
-        Téléphone: p.telephone,
-        Destination: p.effectiveDestination,
-        Filière: p.effectiveFiliere,
-        "Niveau d'étude": p.effectiveNiveauEtude,
-        Statut: p.statusLabel,
-        Progression: `${p.progress}%`,
-        "Étapes complétées": `${p.completedSteps}/${p.totalSteps}`,
-        "Date création": formatDate(p.createdAt),
-        "Dernière modification": formatDate(p.dateDerniereModification || p.updatedAt),
-        "Date complétion": formatDate(p.dateCompletion),
-        "En retard": p.isOverdue ? "Oui" : "Non",
-      }));
-
-      console.log(`Export ${format}:`, exportData);
+      // Récupérer les query params actuels du hook
+      const blob = await ProceduresService.exportProcedures(format, query);
       
-      // TODO: Implémenter l'export réel (CSV, Excel, PDF)
-      // Pour l'instant, on télécharge en JSON
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      // Créer le lien de téléchargement
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `procedures-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `procedures-${new Date().toISOString().split('T')[0]}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
       
     } catch (err) {
       console.error("Erreur export:", err);
     }
-  }, [procedures]);
+  }, [query]);
 
   // ─── Vérification des permissions ──────────────────────────────────────
   if (!isAdmin) {
@@ -353,13 +335,29 @@ const Procedures = () => {
                 Effacer
               </button>
             )}
-            <button 
-              onClick={() => handleExport('excel')}
-              className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Exporter
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => handleExport('csv')}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </button>
+              <button 
+                onClick={() => handleExport('excel')}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Excel
+              </button>
+              <button 
+                onClick={() => handleExport('pdf')}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                PDF
+              </button>
+            </div>
           </div>
         </div>
 

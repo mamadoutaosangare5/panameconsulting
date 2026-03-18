@@ -97,7 +97,7 @@ const StatCard: React.FC<StatCardProps> = ({
         : TrendingUp;
 
   return (
-    <div className="bg-white rounded-2xl border border-sky-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+    <div className="shadow-sm p-5 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div
           className={`w-10 h-10 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center shadow-sm`}

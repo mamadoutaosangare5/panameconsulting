@@ -33,8 +33,10 @@ import {
   X,
   Eye,
   BookOpen,
+  Plus,
 } from "lucide-react";
 import { useRendezvous } from "../../../hooks/useRendezvous";
+import { useDestinations } from "../../../hooks/useDestinations";
 import {
   RendezvousStatus,
   AdminOpinion,
@@ -50,6 +52,7 @@ import {
   type CompleteRendezvousDto,
   type UpdateRendezvousDto,
   type TimeSlot,
+  type CreateRendezvousDto,
 } from "../../../types/rendezvous.types";
 import { timeSlotToDisplay } from "../../../types/rendezvous.types";
 
@@ -57,7 +60,7 @@ import { timeSlotToDisplay } from "../../../types/rendezvous.types";
 // Types locaux
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ModalType = "detail" | "complete" | "cancel" | "update" | null;
+type ModalType = "detail" | "complete" | "cancel" | "update" | "create" | null;
 
 interface ModalState {
   type: ModalType;
@@ -211,6 +214,7 @@ const RendezvousAdmin = () => {
     completeRendezvous,
     cancelRendezvous,
     deleteRendezvous,
+    createRendezvous,
     getRendezvousByDate,
     getUpcomingRendezvous,
     exportRendezvous,
@@ -221,6 +225,18 @@ const RendezvousAdmin = () => {
     autoLoad: true,
     refreshInterval: 30000
   });
+
+  // Destinations dynamiques
+  const { 
+    destinations, 
+    loading: loadingDestinations,
+    loadDestinations 
+  } = useDestinations();
+
+  // Charger les destinations au montage
+  useEffect(() => {
+    loadDestinations();
+  }, [loadDestinations]);
 
   // ── État local ─────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState("");
@@ -257,6 +273,27 @@ const RendezvousAdmin = () => {
   const [showOtherDestination, setShowOtherDestination] = useState(false);
   const [showOtherNiveau, setShowOtherNiveau] = useState(false);
   const [showOtherFiliere, setShowOtherFiliere] = useState(false);
+  
+  // ✅ États pour le formulaire de création
+  const [createForm, setCreateForm] = useState<CreateRendezvousDto>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    telephone: "",
+    destination: "",
+    destinationAutre: "",
+    niveauEtude: "",
+    niveauEtudeAutre: "",
+    filiere: "",
+    filiereAutre: "",
+    date: "",
+    time: "" as TimeSlot,
+  });
+  
+  // ✅ États pour gérer l'affichage des champs "Autre" dans le formulaire de création
+  const [showOtherDestinationCreate, setShowOtherDestinationCreate] = useState(false);
+  const [showOtherNiveauCreate, setShowOtherNiveauCreate] = useState(false);
+  const [showOtherFiliereCreate, setShowOtherFiliereCreate] = useState(false);
   
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
@@ -466,6 +503,46 @@ const RendezvousAdmin = () => {
     }
   };
 
+  const handleCreate = async () => {
+    try {
+      const cleanData: CreateRendezvousDto = {
+        ...createForm,
+        destinationAutre: createForm.destination === "Autre" ? createForm.destinationAutre : undefined,
+        niveauEtudeAutre: createForm.niveauEtude === "Autre" ? createForm.niveauEtudeAutre : undefined,
+        filiereAutre: createForm.filiere === "Autre" ? createForm.filiereAutre : undefined,
+      };
+      
+      const result = await createRendezvous(cleanData);
+      if (result) {
+        closeModal();
+        await loadStatistics();
+        if (activeTab === "today") await loadTodayPanel();
+        if (activeTab === "upcoming") await loadUpcomingPanel();
+        
+        // Réinitialiser le formulaire
+        setCreateForm({
+          firstName: "",
+          lastName: "",
+          email: "",
+          telephone: "",
+          destination: "",
+          destinationAutre: "",
+          niveauEtude: "",
+          niveauEtudeAutre: "",
+          filiere: "",
+          filiereAutre: "",
+          date: "",
+          time: "" as TimeSlot,
+        });
+        setShowOtherDestinationCreate(false);
+        setShowOtherNiveauCreate(false);
+        setShowOtherFiliereCreate(false);
+      }
+    } catch {
+      // Erreur gérée par le hook
+    }
+  };
+
   const handleDelete = async (id: string) => {
     setConfirmModal({ open: true, id });
   };
@@ -526,7 +603,7 @@ const RendezvousAdmin = () => {
   const activeFiltersCount = [
     filters.status,
     filters.destination,
-    filters.dateRange?.start || filters.dateRange?.end,
+    filters.dateRange?.start && filters.dateRange?.end ? `${filters.dateRange.start}-${filters.dateRange?.end}` : null,
     filters.searchTerm,
   ].filter(Boolean).length;
 
@@ -567,6 +644,13 @@ const RendezvousAdmin = () => {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setModal({ type: "create", rdv: null })}
+              className="flex items-center gap-2 px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 text-sm transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Créer un RDV</span>
+            </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm transition-colors"
@@ -1617,6 +1701,287 @@ const RendezvousAdmin = () => {
                       className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
                     >
                       Retour
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* CRÉER */}
+            {modal.type === "create" && (
+              <>
+                <ModalHeader
+                  title="Créer un rendez-vous"
+                  onClose={closeModal}
+                />
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Prénom *
+                      </label>
+                      <input
+                        type="text"
+                        value={createForm.firstName ?? ""}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            firstName: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        placeholder="Prénom"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Nom *
+                      </label>
+                      <input
+                        type="text"
+                        value={createForm.lastName ?? ""}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            lastName: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        placeholder="Nom"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={createForm.email ?? ""}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            email: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Téléphone *
+                      </label>
+                      <input
+                        type="tel"
+                        value={createForm.telephone ?? ""}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            telephone: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        placeholder="+33 6 12 34 56 78"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Destination *
+                    </label>
+                    <select
+                      value={createForm.destination ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setShowOtherDestinationCreate(value === "Autre");
+                        setCreateForm({
+                          ...createForm,
+                          destination: value,
+                          destinationAutre: value !== "Autre" ? "" : createForm.destinationAutre,
+                        });
+                      }}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-none focus:outline-none focus:border-sky-500"
+                      disabled={loadingDestinations}
+                    >
+                      <option value="">Sélectionner</option>
+                      {destinations.map((dest) => (
+                        <option key={dest.id} value={dest.country}>
+                          {dest.country}
+                        </option>
+                      ))}
+                      <option value="Autre">Autre</option>
+                    </select>
+                    
+                    {showOtherDestinationCreate && (
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          value={createForm.destinationAutre || ""}
+                          onChange={(e) =>
+                            setCreateForm({
+                              ...createForm,
+                              destinationAutre: e.target.value,
+                            })
+                          }
+                          placeholder="Précisez la destination"
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Niveau d'étude *
+                      </label>
+                      <select
+                        value={createForm.niveauEtude ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setShowOtherNiveauCreate(value === "Autre");
+                          setCreateForm({
+                            ...createForm,
+                            niveauEtude: value,
+                            niveauEtudeAutre: value !== "Autre" ? "" : createForm.niveauEtudeAutre,
+                          });
+                        }}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="">Sélectionner</option>
+                        {NIVEAU_ETUDE_OPTIONS.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {showOtherNiveauCreate && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            value={createForm.niveauEtudeAutre || ""}
+                            onChange={(e) =>
+                              setCreateForm({
+                                ...createForm,
+                                niveauEtudeAutre: e.target.value,
+                              })
+                            }
+                            placeholder="Précisez votre niveau"
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Filière *
+                      </label>
+                      <select
+                        value={createForm.filiere ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setShowOtherFiliereCreate(value === "Autre");
+                          setCreateForm({
+                            ...createForm,
+                            filiere: value,
+                            filiereAutre: value !== "Autre" ? "" : createForm.filiereAutre,
+                          });
+                        }}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="">Sélectionner</option>
+                        {FILIERE_OPTIONS.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {showOtherFiliereCreate && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            value={createForm.filiereAutre || ""}
+                            onChange={(e) =>
+                              setCreateForm({
+                                ...createForm,
+                                filiereAutre: e.target.value,
+                              })
+                            }
+                            placeholder="Précisez la filière"
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={createForm.date ?? ""}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            date: e.target.value,
+                          })
+                        }
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Créneau horaire *
+                      </label>
+                      <select
+                        value={createForm.time ?? ""}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            time: e.target.value as TimeSlot,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="">Sélectionner</option>
+                        {TIME_SLOT_OPTIONS.map((time) => (
+                          <option key={time} value={`SLOT_${time.replace(':', '')}`}>
+                            {time}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={handleCreate}
+                      disabled={loading.create}
+                      className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {loading.create ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}
+                      Créer
+                    </button>
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                    >
+                      Annuler
                     </button>
                   </div>
                 </div>

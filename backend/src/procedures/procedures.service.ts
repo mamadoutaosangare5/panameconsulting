@@ -26,10 +26,12 @@ import {
   Rendezvous,
   Step,
 } from '@prisma/client';
-import { MailService } from '../mail/mail.service';
 import { QueueService } from '../queue/queue.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../interfaces/current-user.interface';
+import { Response } from 'express';
+import * as ExcelJS from 'exceljs';
+import * as PDFKit from 'pdfkit';
 
 @Injectable()
 export class ProceduresService {
@@ -37,7 +39,6 @@ export class ProceduresService {
 
   constructor(
     private proceduresRepository: ProceduresRepository,
-    private mailService: MailService,
     private queueService: QueueService,
     private prisma: PrismaService,
   ) {}
@@ -1053,6 +1054,328 @@ export class ProceduresService {
   }
 
   // ==================== UTILITAIRES ====================
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EXPORT - CSV, Excel, PDF
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Génère un CSV à partir des procédures
+   */
+  private generateCSV(procedures: ProcedureResponseDto[]): string {
+    const headers = [
+      'ID',
+      'Prénom',
+      'Nom',
+      'Nom complet',
+      'Email',
+      'Téléphone',
+      'Destination',
+      'Filière',
+      "Niveau d'étude",
+      'Statut',
+      'Progression',
+      'Étapes complétées',
+      "Total d'étapes",
+      'Date création',
+      'Date modification',
+      'Date complétion',
+      'Raison rejet',
+      'Supprimé',
+      'Date suppression',
+      'Raison suppression',
+      'Date annulation',
+      'Raison annulation',
+    ];
+
+    const rows = procedures.map((p) => [
+      p.id,
+      p.prenom,
+      p.nom,
+      p.fullName,
+      p.email,
+      p.telephone,
+      p.effectiveDestination,
+      p.effectiveFiliere,
+      p.effectiveNiveauEtude,
+      p.statusLabel,
+      p.progress.toString(),
+      p.completedSteps.toString(),
+      p.totalSteps.toString(),
+      new Date(p.createdAt).toLocaleDateString('fr-FR'),
+      p.dateDerniereModification
+        ? new Date(p.dateDerniereModification).toLocaleDateString('fr-FR')
+        : '',
+      p.dateCompletion
+        ? new Date(p.dateCompletion).toLocaleDateString('fr-FR')
+        : '',
+      p.raisonRejet || '',
+      p.isDeleted ? 'Oui' : 'Non',
+      p.deletedAt ? new Date(p.deletedAt).toLocaleDateString('fr-FR') : '',
+      p.deletionReason || '',
+      p.cancelledAt ? new Date(p.cancelledAt).toLocaleDateString('fr-FR') : '',
+      p.cancelledReason || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    return csvContent;
+  }
+
+  /**
+   * Génère un fichier Excel à partir des procédures
+   */
+  private async generateExcel(
+    procedures: ProcedureResponseDto[],
+  ): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Procédures');
+
+    // Définir les colonnes
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 30 },
+      { header: 'Prénom', key: 'prenom', width: 15 },
+      { header: 'Nom', key: 'nom', width: 15 },
+      { header: 'Nom complet', key: 'fullName', width: 20 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Téléphone', key: 'telephone', width: 15 },
+      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Filière', key: 'filiere', width: 20 },
+      { header: "Niveau d'étude", key: 'niveauEtude', width: 15 },
+      { header: 'Statut', key: 'statut', width: 15 },
+      { header: 'Progression', key: 'progress', width: 10 },
+      { header: 'Étapes complétées', key: 'completedSteps', width: 15 },
+      { header: "Total d'étapes", key: 'totalSteps', width: 15 },
+      { header: 'Date création', key: 'createdAt', width: 15 },
+      { header: 'Date modification', key: 'updatedAt', width: 15 },
+      { header: 'Date complétion', key: 'dateCompletion', width: 15 },
+      { header: 'Raison rejet', key: 'raisonRejet', width: 30 },
+      { header: 'Supprimé', key: 'isDeleted', width: 10 },
+      { header: 'Date suppression', key: 'deletedAt', width: 15 },
+      { header: 'Raison suppression', key: 'deletionReason', width: 30 },
+      { header: 'Date annulation', key: 'cancelledAt', width: 15 },
+      { header: 'Raison annulation', key: 'cancelledReason', width: 30 },
+    ];
+
+    // Ajouter les données
+    procedures.forEach((p) => {
+      worksheet.addRow({
+        id: p.id,
+        prenom: p.prenom,
+        nom: p.nom,
+        fullName: p.fullName,
+        email: p.email,
+        telephone: p.telephone,
+        destination: p.effectiveDestination,
+        filiere: p.effectiveFiliere,
+        niveauEtude: p.effectiveNiveauEtude,
+        statut: p.statusLabel,
+        progress: p.progress,
+        completedSteps: p.completedSteps,
+        totalSteps: p.totalSteps,
+        createdAt: p.createdAt
+          ? new Date(p.createdAt).toLocaleDateString('fr-FR')
+          : '',
+        updatedAt: p.dateDerniereModification
+          ? new Date(p.dateDerniereModification).toLocaleDateString('fr-FR')
+          : '',
+        dateCompletion: p.dateCompletion
+          ? new Date(p.dateCompletion).toLocaleDateString('fr-FR')
+          : '',
+        raisonRejet: p.raisonRejet || '',
+        isDeleted: p.isDeleted ? 'Oui' : 'Non',
+        deletedAt: p.deletedAt
+          ? new Date(p.deletedAt).toLocaleDateString('fr-FR')
+          : '',
+        deletionReason: p.deletionReason || '',
+        cancelledAt: p.cancelledAt
+          ? new Date(p.cancelledAt).toLocaleDateString('fr-FR')
+          : '',
+        cancelledReason: p.cancelledReason || '',
+      });
+    });
+
+    // Styliser l'en-tête
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF0284C7' },
+    };
+    headerRow.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as Buffer;
+  }
+
+  /**
+   * Génère un fichier PDF à partir des procédures
+   */
+  private async generatePDF(
+    procedures: ProcedureResponseDto[],
+  ): Promise<Buffer> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      const doc = new PDFKit({ margin: 50, size: 'A4', layout: 'landscape' });
+
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      // Titre
+      doc
+        .fontSize(18)
+        .font('Helvetica-Bold')
+        .text('Liste des procédures', { align: 'center' });
+      doc.moveDown();
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, {
+          align: 'center',
+        });
+      doc.moveDown(2);
+
+      // Tableau
+      const tableTop = 150;
+      const rowHeight = 25;
+      const colWidths = [80, 100, 80, 80, 60, 80, 80];
+
+      // En-têtes
+      const headers = [
+        'Nom',
+        'Email',
+        'Destination',
+        'Filière',
+        'Statut',
+        'Progression',
+        'Date création',
+      ];
+
+      let y = tableTop;
+      doc.font('Helvetica-Bold').fontSize(9);
+      headers.forEach((header, i) => {
+        const x = 50 + colWidths.slice(0, i).reduce((a, b) => a + b, 0);
+        doc.text(header, x, y, { width: colWidths[i] - 5, align: 'left' });
+      });
+
+      // Lignes
+      doc.font('Helvetica').fontSize(8);
+      y += rowHeight;
+
+      procedures.slice(0, 30).forEach((p, index) => {
+        const row = [
+          p.fullName,
+          p.email,
+          p.effectiveDestination,
+          p.effectiveFiliere,
+          p.statusLabel,
+          `${p.progress}%`,
+          new Date(p.createdAt).toLocaleDateString('fr-FR'),
+        ];
+
+        row.forEach((cell, i) => {
+          const x = 50 + colWidths.slice(0, i).reduce((a, b) => a + b, 0);
+          doc.text(cell, x, y, { width: colWidths[i] - 5, align: 'left' });
+        });
+
+        y += rowHeight;
+
+        // Nouvelle page si nécessaire
+        if (y > 550 && index < procedures.length - 1) {
+          doc.addPage();
+          y = 50;
+
+          // Réafficher les en-têtes
+          doc.font('Helvetica-Bold').fontSize(9);
+          headers.forEach((header, i) => {
+            const x = 50 + colWidths.slice(0, i).reduce((a, b) => a + b, 0);
+            doc.text(header, x, y, { width: colWidths[i] - 5, align: 'left' });
+          });
+          doc.font('Helvetica').fontSize(8);
+          y += rowHeight;
+        }
+      });
+
+      doc.end();
+    });
+  }
+
+  /**
+   * Export des procédures au format demandé
+   */
+  async exportProcedures(
+    format: 'csv' | 'excel' | 'pdf',
+    query: ProcedureQueryDto,
+    currentUser: CurrentUser,
+    res: Response,
+  ): Promise<void> {
+    // Vérifier les permissions (admin uniquement)
+    if (currentUser.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Seul un administrateur peut exporter les procédures',
+      );
+    }
+
+    // Récupérer toutes les procédures (sans pagination)
+    const { data: procedures } = await this.findAll(
+      { ...query, limit: 1000 }, // Limite raisonnable
+      currentUser,
+    );
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `procedures-${timestamp}`;
+
+    switch (format) {
+      case 'csv': {
+        const csv = this.generateCSV(procedures);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${filename}.csv"`,
+        );
+        res.send(csv);
+        break;
+      }
+
+      case 'excel': {
+        const buffer = await this.generateExcel(procedures);
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${filename}.xlsx"`,
+        );
+        res.send(buffer);
+        break;
+      }
+
+      case 'pdf': {
+        const buffer = await this.generatePDF(procedures);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${filename}.pdf"`,
+        );
+        res.send(buffer);
+        break;
+      }
+
+      default:
+        throw new BadRequestException(
+          `Format non supporté: ${format as string}`,
+        );
+    }
+
+    this.logger.log(
+      `Export ${format as string} des procédures effectué par ${currentUser.email}`,
+    );
+  }
 
   private generateProcedureCreatedContent(procedure: {
     id: string;

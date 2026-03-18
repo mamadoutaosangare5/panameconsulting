@@ -59,7 +59,7 @@ export class ProcedureResponseDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   id: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiPropertyOptional({ example: '123e4567-e89b-12d3-a456-426614174000' })
   rendezVousId?: string;
 
   @ApiProperty({ example: 'Jean' })
@@ -133,6 +133,24 @@ export class ProcedureResponseDto {
 
   @ApiPropertyOptional({ example: '123e4567-e89b-12d3-a456-426614174000' })
   userId?: string | null;
+
+  @ApiPropertyOptional({
+    example: '2024-01-20T09:15:00.000Z',
+    description: 'Date à laquelle la procédure a été annulée',
+  })
+  cancelledAt?: Date | null;
+
+  @ApiPropertyOptional({
+    example: "Annulation par l'utilisateur",
+    description: "Raison de l'annulation",
+  })
+  cancelledReason?: string | null;
+
+  @ApiPropertyOptional({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: "ID de l'utilisateur ayant annulé la procédure",
+  })
+  cancelledBy?: string | null;
 
   @ApiProperty({ type: [StepResponseDto] })
   steps: StepResponseDto[];

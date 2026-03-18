@@ -12,6 +12,7 @@ import type {
   ProcedureQueryDto,
   StepName,
   ApiError,
+  ExportFormat,
 } from "../types/procedures.types";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -71,6 +72,8 @@ const API = {
   ADMIN_STEP: (id: string, stepName: StepName) =>
     `/admin/procedures/${id}/steps/${stepName}`,
   ADMIN_DELETE: (id: string) => `/admin/procedures/${id}/delete`,
+  ADMIN_EXPORT: "/admin/procedures/export",
+
 
   // Routes mixtes
   PROCEDURE_BY_EMAIL: (email: string) =>
@@ -233,6 +236,43 @@ export const ProceduresService = {
       return result;
     } catch (error) {
       toast.error(`Erreur lors de la mise à jour de l'étape ${stepName}`);
+      throw error;
+    }
+  },
+
+   /**
+   * GET /admin/procedures/export
+   * @see ProceduresController.exportProcedures()
+   */
+  async exportProcedures(
+    format: ExportFormat,
+    query: ProcedureQueryDto = {},
+  ): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      params.set('format', format);
+      
+      // Ajouter tous les paramètres de query
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== null && value !== '') {
+          params.set(key, String(value));
+        }
+      }
+      
+      const url = `${BASE_URL}${API.ADMIN_EXPORT}?${params}`;
+      
+      const res = await apiFetch(url, { 
+        method: "GET",
+        // Pas de headers JSON car on attend un blob
+      });
+
+      if (!res.ok) {
+        throw new Error(`Erreur ${res.status} lors de l'export`);
+      }
+
+      return await res.blob();
+    } catch (error) {
+      toast.error("Erreur lors de l'export des données");
       throw error;
     }
   },
