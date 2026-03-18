@@ -172,11 +172,10 @@ const RendezVous = () => {
     loading,
     createRendezvous,
     checkAvailability,
-    getAvailableSlots,
-    getAvailableDates,
+    getAvailableSlots, // ✅ AJOUTÉ: fonction pour charger les créneaux
     error: hookError,
   } = useRendezvous({
-    autoLoad: false,
+    autoLoad: true,
   });
 
   const isAuthChecked = useMemo(() => isAuthenticated, [isAuthenticated]);
@@ -254,24 +253,12 @@ const RendezVous = () => {
     }
   }, [isLoading, isAuthenticated, isAuthChecked, navigate]);
 
-  // ✅ Charger les dates disponibles via le hook
-  useEffect(() => {
-    const loadDates = async () => {
-      try {
-        await getAvailableDates();
-      } catch {
-        setLocalError("Impossible de charger les dates disponibles");
-      }
-    };
-    loadDates();
-  }, [getAvailableDates]);
-
-  // ✅ Charger les créneaux quand la date change
+  // ✅ CORRIGÉ: Charger les créneaux quand la date change avec getAvailableSlots (fonction)
   useEffect(() => {
     if (formData.date) {
       const loadSlots = async () => {
         try {
-          await getAvailableSlots(formData.date);
+          await getAvailableSlots(formData.date); // ✅ Utilisation de la fonction, pas de l'état
         } catch {
           setLocalError("Impossible de charger les créneaux pour cette date");
         }
@@ -462,7 +449,7 @@ const RendezVous = () => {
     setTimeout(() => AOS.refreshHard(), 50);
   }, []);
 
-  // ✅ Validation finale avec vérification de disponibilité
+  // ✅ CORRIGÉ: Validation finale avec vérification de disponibilité
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
 
@@ -478,14 +465,14 @@ const RendezVous = () => {
 
       if (!availabilityCheck) {
         setLocalError("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
-        await getAvailableSlots(formData.date);
+        await getAvailableSlots(formData.date); // ✅ CORRIGÉ: utilisation de getAvailableSlots
         setFormData((prev) => ({ ...prev, time: "" }));
         return;
       }
 
       if (!availabilityCheck.available) {
         setLocalError("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
-        await getAvailableSlots(formData.date);
+        await getAvailableSlots(formData.date); // ✅ CORRIGÉ: utilisation de getAvailableSlots
         setFormData((prev) => ({ ...prev, time: "" }));
         return;
       }

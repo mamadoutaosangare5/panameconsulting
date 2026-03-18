@@ -229,14 +229,8 @@ const RendezvousAdmin = () => {
   // Destinations dynamiques
   const { 
     destinations, 
-    loading: loadingDestinations,
-    loadDestinations 
+    loading: loadingDestinations
   } = useDestinations();
-
-  // Charger les destinations au montage
-  useEffect(() => {
-    loadDestinations();
-  }, [loadDestinations]);
 
   // ── État local ─────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState("");
@@ -788,17 +782,17 @@ const RendezvousAdmin = () => {
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
                   <Star className="w-4 h-4 text-amber-500" /> Top destinations
                 </h3>
-                {(statistics.topDestinations ?? []).length === 0 ? (
+                {(statistics?.topDestinations ?? []).length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-4">
                     Aucune donnée
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {(statistics.topDestinations ?? [])
+                    {(statistics?.topDestinations ?? [])
                       .slice(0, 5)
                       .map((d, i) => {
                         const max =
-                          (statistics.topDestinations ?? [])[0]?.count ?? 1;
+                          (statistics?.topDestinations ?? [])[0]?.count ?? 1;
                         const pct = Math.round((d.count / max) * 100);
                         return (
                           <div
@@ -889,8 +883,8 @@ const RendezvousAdmin = () => {
           {(
             [
               { key: "list", label: "Tous", count: pagination.total },
-              { key: "today", label: "Aujourd'hui", count: todayList.length },
-              { key: "upcoming", label: "À venir", count: upcomingList.length },
+              { key: "today", label: "Aujourd'hui", count: (todayList || []).length },
+              { key: "upcoming", label: "À venir", count: (upcomingList || []).length },
             ] as const
           ).map(({ key, label, count }) => (
             <button
@@ -1088,13 +1082,13 @@ const RendezvousAdmin = () => {
               <div className="flex justify-center py-10">
                 <RefreshCw className="w-6 h-6 text-sky-500 animate-spin" />
               </div>
-            ) : todayList.length === 0 ? (
+            ) : (todayList || []).length === 0 ? (
               <p className="text-center py-10 text-gray-400 text-sm">
                 Aucun rendez-vous aujourd'hui
               </p>
             ) : (
               <div className="divide-y divide-gray-50">
-                {todayList.map((rdv) => (
+                {(todayList || []).map((rdv) => (
                   <PanelRow
                     key={rdv.id}
                     rdv={rdv}
@@ -1125,13 +1119,13 @@ const RendezvousAdmin = () => {
               <div className="flex justify-center py-10">
                 <RefreshCw className="w-6 h-6 text-indigo-500 animate-spin" />
               </div>
-            ) : upcomingList.length === 0 ? (
+            ) : (upcomingList || []).length === 0 ? (
               <p className="text-center py-10 text-gray-400 text-sm">
                 Aucun rendez-vous à venir
               </p>
             ) : (
               <div className="divide-y divide-gray-50">
-                {upcomingList.map((rdv) => (
+                {(upcomingList || []).map((rdv) => (
                   <PanelRow
                     key={rdv.id}
                     rdv={rdv}
@@ -1150,7 +1144,7 @@ const RendezvousAdmin = () => {
               <div className="flex justify-center py-16">
                 <RefreshCw className="w-8 h-8 text-sky-500 animate-spin" />
               </div>
-            ) : rendezvous.length === 0 ? (
+            ) : (rendezvous || []).length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 font-medium">Aucun rendez-vous</p>
@@ -1680,7 +1674,7 @@ const RendezvousAdmin = () => {
                       className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 resize-none"
                     />
                     <p className="text-xs text-gray-400 text-right mt-1">
-                      {cancelReason.length}/500
+                      {(cancelReason || '').length}/500
                     </p>
                   </div>
                   <div className="flex gap-3">

@@ -1209,7 +1209,7 @@ export class ProceduresService {
     headerRow.font = { color: { argb: 'FFFFFFFF' }, bold: true };
 
     const buffer = await workbook.xlsx.writeBuffer();
-    return buffer as Buffer;
+    return Buffer.from(buffer);
   }
 
   /**
