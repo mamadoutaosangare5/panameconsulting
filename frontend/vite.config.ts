@@ -16,10 +16,7 @@ export default defineConfig({
     // Optimiser le CSS pour le build
     postcss: {
       plugins: [
-        // Ajout des optimisations PostCSS 
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require('autoprefixer')
-        
+        // Ajout des optimisations PostCSS           
       ],
     },
   },
