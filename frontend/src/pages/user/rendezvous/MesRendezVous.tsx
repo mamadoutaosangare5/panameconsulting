@@ -24,38 +24,73 @@ import {
 import { useAuth } from "../../../hooks/useAuth";
 import { useRendezvous } from "../../../hooks/useRendezvous";
 import {
-  formatTimeSlot,
-  getRemainingCancellationTime,
-  canCancelRendezvous,
-  type Rendezvous,
-  type CancelRendezvousData,
-} from "../../../types/rendezvous.types";
-import {
-  RendezvousStatus as RendezvousStatusEnum,
-  AdminOpinion as AdminOpinionEnum,
-  CancelledBy as CancelledByEnum,
+  type RendezvousResponseDto,
+  type CancelRendezvousDto,
+  RendezvousStatus,
+  AdminOpinion,
+  CancelledBy,
+  RendezvousStatusLabels,
+  AdminOpinionLabels,
+  timeSlotToDisplay,
 } from "../../../types/rendezvous.types";
 import { pageConfigs } from "../../../components/shared/user/UserHeader.config";
 import Loader from "../../../components/shared/user/Loader";
 
+// ==================== FONCTIONS UTILITAIRES ====================
+
+/**
+ * Vérifie si un rendez-vous peut être annulé
+ */
+const canCancelRendezvous = (rdv: RendezvousResponseDto): boolean => {
+  return (
+    rdv.canCancel &&
+    (rdv.status === RendezvousStatus.PENDING ||
+      rdv.status === RendezvousStatus.CONFIRMED)
+  );
+};
+
+/**
+ * Calcule le temps restant avant le rendez-vous pour l'annulation
+ */
+const getRemainingCancellationTime = (
+  rdv: RendezvousResponseDto,
+): string | null => {
+  if (!rdv.canCancel) return null;
+
+  const now = new Date();
+  const rdvDateTime = new Date(
+    `${rdv.date}T${timeSlotToDisplay(rdv.time)}:00`,
+  );
+  const diffMs = rdvDateTime.getTime() - now.getTime();
+
+  if (diffMs <= 0) return null;
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  return diffHours > 0
+    ? `${diffHours}h ${diffMinutes}min`
+    : `${diffMinutes}min`;
+};
+
 // ==================== CONSTANTES ====================
 
-const statusOptions: { value: RendezvousStatusEnum | ""; label: string }[] = [
+const statusOptions: { value: RendezvousStatus | ""; label: string }[] = [
   { value: "", label: "Tous les statuts" },
-  { value: RendezvousStatusEnum.PENDING, label: "En attente" },
-  { value: RendezvousStatusEnum.CONFIRMED, label: "Confirmé" },
-  { value: RendezvousStatusEnum.COMPLETED, label: "Terminé" },
-  { value: RendezvousStatusEnum.CANCELLED, label: "Annulé" },
+  { value: RendezvousStatus.PENDING, label: RendezvousStatusLabels.PENDING },
+  { value: RendezvousStatus.CONFIRMED, label: RendezvousStatusLabels.CONFIRMED },
+  { value: RendezvousStatus.COMPLETED, label: RendezvousStatusLabels.COMPLETED },
+  { value: RendezvousStatus.CANCELLED, label: RendezvousStatusLabels.CANCELLED },
 ];
 
-const statusColors: Record<RendezvousStatusEnum, string> = {
+const statusColors: Record<RendezvousStatus, string> = {
   PENDING: "bg-amber-100 text-amber-800 border-amber-300",
   CONFIRMED: "bg-sky-100 text-sky-800 border-sky-300",
   COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-300",
   CANCELLED: "bg-red-100 text-red-800 border-red-300",
 };
 
-const avisColors: Record<AdminOpinionEnum, string> = {
+const avisColors: Record<AdminOpinion, string> = {
   FAVORABLE: "bg-emerald-100 text-emerald-800 border-emerald-300",
   UNFAVORABLE: "bg-red-100 text-red-800 border-red-300",
 };
@@ -70,22 +105,13 @@ const formatDate = (dateString: string): string =>
     day: "numeric",
   });
 
-// ==================== TYPES ====================
-
-interface PaginationState {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
 // ==================== COMPOSANT MODAL ====================
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (reason?: string) => Promise<void>;
-  rdv: Rendezvous | null;
+  rdv: RendezvousResponseDto | null;
   isCancelling: boolean;
 }
 
@@ -147,7 +173,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                   <Clock className="mt-0.5 h-4 w-4 text-gray-500" />
                   <span className="text-gray-700">
                     <span className="font-medium">Heure :</span>{" "}
-                    {formatTimeSlot(rdv.time)}
+                    {timeSlotToDisplay(rdv.time)}
                   </span>
                 </div>
                 <div className="flex items-start gap-2">
@@ -259,34 +285,37 @@ const MesRendezvous: React.FC = () => {
   const location = useLocation();
   const [headerHeight, setHeaderHeight] = useState(0);
 
-  // Utiliser le hook useRendezvous pour une meilleure gestion
+  // ✅ DÉLÉGATION COMPLÈTE AU HOOK
   const {
+    rendezvous,
+    loading,
+    pagination,
     getRendezvousByEmail,
     cancelRendezvous,
-    loading,
-    rendezvous: allRendezvous,
-    // Utiliser l'état du hook pour les rendez-vous
-  } = useRendezvous({ autoLoad: false });
-  const [cancelling, setCancelling] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<
-    RendezvousStatusEnum | ""
-  >("");
-  const [pagination, setPagination] = useState<PaginationState>({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
+    setFilters,
+    resetFilters,
+    nextPage,
+    previousPage,
+    goToPage,
+  } = useRendezvous({
+    autoLoad: false,
+    initialParams: {
+      limit: 10,
+      sortBy: "date",
+      sortOrder: "desc",
+    },
   });
 
-  // État local pour les rendez-vous filtrés et paginés
-  const [filteredRendezvous, setFilteredRendezvous] = useState<Rendezvous[]>(
-    [],
+  // État local pour le statut sélectionné
+  const [selectedStatus, setSelectedStatus] = useState<RendezvousStatus | "">(
+    "",
   );
 
   // Modal
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedRdvForCancel, setSelectedRdvForCancel] =
-    useState<Rendezvous | null>(null);
+    useState<RendezvousResponseDto | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Hauteur du header
   useEffect(() => {
@@ -298,13 +327,10 @@ const MesRendezvous: React.FC = () => {
   const getCurrentPageConfig = useCallback(() => {
     const currentPath = location.pathname;
 
-    // Vérification exacte d'abord
     if (pageConfigs[currentPath as keyof typeof pageConfigs]) {
       return pageConfigs[currentPath as keyof typeof pageConfigs];
     }
 
-    // Vérification avec startsWith mais en évitant les conflits
-    // Vérifier les chemins plus longs d'abord pour éviter /user/mes-rendezvous -> /mes-rendezvous
     const sortedPaths = Object.keys(pageConfigs).sort(
       (a, b) => b.length - a.length,
     );
@@ -317,7 +343,6 @@ const MesRendezvous: React.FC = () => {
       }
     }
 
-    // Configuration par défaut
     return pageConfigs["/mes-rendezvous"];
   }, [location.pathname]);
 
@@ -328,59 +353,35 @@ const MesRendezvous: React.FC = () => {
   const fetchRendezvous = useCallback(async () => {
     if (!user?.email) return;
     try {
-      // Utiliser la méthode du hook
       await getRendezvousByEmail(user.email);
-      // Le hook gère déjà l'état, pas besoin de setAllRendezvous
-    } catch (err) {
-      console.error("[MesRendezvous] Erreur chargement:", err);
-      // Le hook gère déjà les erreurs avec des toasts
+    } catch {
+      // Les erreurs sont gérées par le hook
     }
   }, [user?.email, getRendezvousByEmail]);
 
-  // Chargement initial - charge dès que l'utilisateur est connecté
+  // Chargement initial
   useEffect(() => {
     if (user?.email) {
       fetchRendezvous();
     }
   }, [user?.email, fetchRendezvous]);
 
-  // Filtrage + pagination côté client (le backend renvoie un tableau brut non paginé)
+  // ✅ Appliquer le filtre de statut via le hook
   useEffect(() => {
-    console.log("[MesRendezvous] Debug - selectedStatus:", selectedStatus);
-    console.log(
-      "[MesRendezvous] Debug - allRendezvous length:",
-      allRendezvous.length,
-    );
-
-    // Log détaillé de chaque rendez-vous
-    allRendezvous.forEach((rdv, index) => {
-      console.log(`[MesRendezvous] RDV ${index}:`, {
-        status: rdv.status,
-        statusType: typeof rdv.status,
-      });
-    });
-
-    const filtered = selectedStatus
-      ? allRendezvous.filter((rdv) => rdv.status === selectedStatus)
-      : allRendezvous;
-    console.log("[MesRendezvous] Debug - filtered length:", filtered.length);
-
-    const total = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / pagination.limit));
-    // Recaler la page si elle dépasse le nombre de pages après filtrage
-    const safePage = Math.min(pagination.page, totalPages);
-    const start = (safePage - 1) * pagination.limit;
-
-    setFilteredRendezvous(filtered.slice(start, start + pagination.limit));
-    setPagination((prev) => ({ ...prev, page: safePage, total, totalPages }));
-  }, [allRendezvous, selectedStatus, pagination.page, pagination.limit]);
+    if (selectedStatus) {
+      setFilters({ status: selectedStatus });
+    } else {
+      resetFilters();
+    }
+  }, [selectedStatus, setFilters, resetFilters]);
 
   // ==================== ANNULATION ====================
 
-  const openCancelModal = (rdv: Rendezvous) => {
+  const openCancelModal = (rdv: RendezvousResponseDto) => {
     setSelectedRdvForCancel(rdv);
     setShowCancelModal(true);
   };
+
   const closeCancelModal = () => {
     setShowCancelModal(false);
     setSelectedRdvForCancel(null);
@@ -390,18 +391,15 @@ const MesRendezvous: React.FC = () => {
     if (!selectedRdvForCancel) return;
     setCancelling(true);
     try {
-      const cancelData: CancelRendezvousData = {
+      const cancelData: CancelRendezvousDto = {
         reason: reason?.trim() || "Annulation par l'utilisateur",
-        cancelledBy: CancelledByEnum.USER,
+        cancelledBy: CancelledBy.USER,
       };
 
-      // Utiliser la méthode du hook
       await cancelRendezvous(selectedRdvForCancel.id, cancelData);
-
-      // Le hook met à jour automatiquement l'état
       closeCancelModal();
-    } catch (err) {
-      console.error("[MesRendezvous] Erreur annulation:", err);
+    } catch {
+      // Les erreurs sont gérées par le hook
     } finally {
       setCancelling(false);
     }
@@ -409,48 +407,40 @@ const MesRendezvous: React.FC = () => {
 
   // ==================== GESTIONNAIRES ====================
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination((prev) => ({ ...prev, page: newPage }));
-    }
-  };
-
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedStatus(e.target.value as RendezvousStatusEnum | "");
-    setPagination((prev) => ({ ...prev, page: 1 }));
+    setSelectedStatus(e.target.value as RendezvousStatus | "");
   };
 
   // ==================== BADGES ====================
 
-  const renderStatusBadge = (status: RendezvousStatusEnum) => (
+  const renderStatusBadge = (status: RendezvousStatus) => (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
         statusColors[status] ?? "bg-gray-100 text-gray-800 border-gray-300"
       }`}
     >
-      {status === RendezvousStatusEnum.PENDING && (
+      {status === RendezvousStatus.PENDING && (
         <AlertCircle className="mr-1 h-3 w-3" />
       )}
-      {status === RendezvousStatusEnum.CONFIRMED && (
+      {status === RendezvousStatus.CONFIRMED && (
         <CheckCircle className="mr-1 h-3 w-3" />
       )}
-      {status === RendezvousStatusEnum.COMPLETED && (
+      {status === RendezvousStatus.COMPLETED && (
         <CheckCircle className="mr-1 h-3 w-3" />
       )}
-      {status === RendezvousStatusEnum.CANCELLED && (
+      {status === RendezvousStatus.CANCELLED && (
         <XCircle className="mr-1 h-3 w-3" />
       )}
-      {status}
+      {RendezvousStatusLabels[status]}
     </span>
   );
 
-  const renderAvisBadge = (avis: AdminOpinionEnum) => (
+  const renderAvisBadge = (avis: AdminOpinion) => (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${avisColors[avis]}`}
     >
       <Star className="mr-1 h-3 w-3" />
-      {avis === AdminOpinionEnum.FAVORABLE && "Favorable"}
-      {avis === AdminOpinionEnum.UNFAVORABLE && "Défavorable"}
+      {AdminOpinionLabels[avis]}
     </span>
   );
 
@@ -502,6 +492,18 @@ const MesRendezvous: React.FC = () => {
                 Actualiser
               </button>
             </div>
+
+            {/* Pagination info du hook */}
+            <div className="text-sm text-gray-600">
+              {pagination.total > 0 ? (
+                <>
+                  {pagination.total} rendez-vous • Page {pagination.page}/
+                  {pagination.totalPages}
+                </>
+              ) : (
+                "Aucun rendez-vous"
+              )}
+            </div>
           </div>
 
           {/* Chargement */}
@@ -514,10 +516,10 @@ const MesRendezvous: React.FC = () => {
             </div>
           )}
 
-          {/* Liste */}
-          {!loading.list && filteredRendezvous.length > 0 && (
+          {/* Liste - utilise directement rendezvous du hook */}
+          {!loading.list && rendezvous.length > 0 && (
             <div className="space-y-4 mb-8">
-              {filteredRendezvous.map((rdv, index) => {
+              {rendezvous.map((rdv, index) => {
                 const canCancel = canCancelRendezvous(rdv);
 
                 return (
@@ -529,7 +531,7 @@ const MesRendezvous: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-3">
                           {renderStatusBadge(rdv.status)}
-                          {rdv.status === RendezvousStatusEnum.COMPLETED &&
+                          {rdv.status === RendezvousStatus.COMPLETED &&
                             rdv.avisAdmin &&
                             renderAvisBadge(rdv.avisAdmin)}
                         </div>
@@ -542,7 +544,7 @@ const MesRendezvous: React.FC = () => {
                             </span>
                             <Clock className="ml-4 mr-2 h-4 w-4 text-sky-500" />
                             <span className="font-medium">
-                              {formatTimeSlot(rdv.time)}
+                              {timeSlotToDisplay(rdv.time)}
                             </span>
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
@@ -572,7 +574,7 @@ const MesRendezvous: React.FC = () => {
                           </button>
                         )}
 
-                        {rdv.status === RendezvousStatusEnum.COMPLETED &&
+                        {rdv.status === RendezvousStatus.COMPLETED &&
                           rdv.avisAdmin && (
                             <div className="text-xs text-gray-500 flex items-center">
                               <Info className="mr-1 h-3 w-3" />
@@ -587,7 +589,7 @@ const MesRendezvous: React.FC = () => {
                       </div>
                     </div>
 
-                    {rdv.status === RendezvousStatusEnum.CANCELLED &&
+                    {rdv.status === RendezvousStatus.CANCELLED &&
                       rdv.cancellationReason && (
                         <div className="mt-3 pt-3 border-t border-gray-100">
                           <div className="text-sm text-gray-600">
@@ -613,7 +615,7 @@ const MesRendezvous: React.FC = () => {
           )}
 
           {/* État vide */}
-          {!loading.list && filteredRendezvous.length === 0 && (
+          {!loading.list && rendezvous.length === 0 && (
             <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
               <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
                 <Calendar className="h-8 w-8 text-gray-400" />
@@ -623,7 +625,7 @@ const MesRendezvous: React.FC = () => {
               </h3>
               <p className="text-gray-600 mb-6 max-w-md mx-auto">
                 {selectedStatus
-                  ? `Vous n'avez pas de rendez-vous avec le statut "${selectedStatus}"`
+                  ? `Vous n'avez pas de rendez-vous avec le statut "${RendezvousStatusLabels[selectedStatus as RendezvousStatus]}"`
                   : "Vous n'avez pas encore pris de rendez-vous"}
               </p>
               <button
@@ -636,18 +638,19 @@ const MesRendezvous: React.FC = () => {
             </div>
           )}
 
-          {/* Pagination */}
+          {/* Pagination - utilise les méthodes du hook */}
           {!loading.list && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
                 Page {pagination.page} sur {pagination.totalPages} • Total :{" "}
-                {pagination.total} rendez-vous{pagination.total > 1 ? "s" : ""}
+                {pagination.total} rendez-vous
+                {pagination.total > 1 ? "s" : ""}
               </div>
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={pagination.page === 1}
+                  onClick={previousPage}
+                  disabled={!pagination.hasPrevious || loading.list}
                   className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -671,7 +674,8 @@ const MesRendezvous: React.FC = () => {
                       return (
                         <button
                           key={`page-${pageNum}`}
-                          onClick={() => handlePageChange(pageNum)}
+                          onClick={() => goToPage(pageNum)}
+                          disabled={loading.list}
                           className={`min-w-10 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                             pagination.page === pageNum
                               ? "bg-sky-600 text-white"
@@ -686,8 +690,8 @@ const MesRendezvous: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={pagination.page === pagination.totalPages}
+                  onClick={nextPage}
+                  disabled={!pagination.hasNext || loading.list}
                   className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Suivant

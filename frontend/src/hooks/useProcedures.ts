@@ -1,8 +1,8 @@
 // hooks/useProcedures.ts
-// Calqué strictement sur ProceduresService + procedures.types.ts
+// STRICTEMENT CALQUÉ sur ProceduresService + procedures.types.ts
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ProceduresService } from "../services/procedures.service";
+import { ProceduresService, ProcedureValidation } from "../services/procedures.service";
 import { useAuth } from "./useAuth";
 import type {
   ProcedureResponseDto,
@@ -166,7 +166,7 @@ export function useProcedures(
   // ── Helpers ───────────────────────────────────────────────────────────────
   const setLoad = useCallback(
     (k: keyof ProcedureLoadingState, v: boolean) =>
-      setLoading((prev) => ({ ...prev, [k]: v })),
+      setLoading((prev: ProcedureLoadingState) => ({ ...prev, [k]: v })),
     [],
   );
 
@@ -280,8 +280,8 @@ export function useProcedures(
       setError(null);
       try {
         const procedure = await ProceduresService.create(data);
-        setProcedures((prev) => [procedure, ...prev]);
-        setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
+        setProcedures((prev: ProcedureResponseDto[]) => [procedure, ...prev]);
+        setPagination((prev: ProcedurePagination) => ({ ...prev, total: prev.total + 1 }));
         await loadStatistics();
         return procedure;
       } catch (err: unknown) {
@@ -310,12 +310,14 @@ export function useProcedures(
       setError(null);
       try {
         const updated = await ProceduresService.update(id, data);
-        setProcedures((prev) => prev.map((p) => (p.id === id ? updated : p)));
+        setProcedures((prev: ProcedureResponseDto[]) => 
+          prev.map((p) => (p.id === id ? updated : p))
+        );
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
         return updated;
       } catch (err: unknown) {
         if (original)
-          setProcedures((prev) =>
+          setProcedures((prev: ProcedureResponseDto[]) =>
             prev.map((p) => (p.id === id ? original : p)),
           );
         setError(
@@ -344,12 +346,14 @@ export function useProcedures(
       setError(null);
       try {
         const updated = await ProceduresService.updateStep(id, stepName, data);
-        setProcedures((prev) => prev.map((p) => (p.id === id ? updated : p)));
+        setProcedures((prev: ProcedureResponseDto[]) => 
+          prev.map((p) => (p.id === id ? updated : p))
+        );
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
         return updated;
       } catch (err: unknown) {
         if (original)
-          setProcedures((prev) =>
+          setProcedures((prev: ProcedureResponseDto[]) =>
             prev.map((p) => (p.id === id ? original : p)),
           );
         setError(
@@ -377,7 +381,9 @@ export function useProcedures(
       setError(null);
       try {
         const updated = await ProceduresService.addStep(id, stepName);
-        setProcedures((prev) => prev.map((p) => (p.id === id ? updated : p)));
+        setProcedures((prev: ProcedureResponseDto[]) => 
+          prev.map((p) => (p.id === id ? updated : p))
+        );
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
         return updated;
       } catch (err: unknown) {
@@ -401,8 +407,9 @@ export function useProcedures(
     async (id: string, reason?: string): Promise<boolean> => {
       const original = procedures.find((p) => p.id === id) ?? null;
 
-      setProcedures((prev) => prev.filter((p) => p.id !== id));
-      setPagination((prev) => ({
+      // Optimistic update
+      setProcedures((prev: ProcedureResponseDto[]) => prev.filter((p) => p.id !== id));
+      setPagination((prev: ProcedurePagination) => ({
         ...prev,
         total: Math.max(0, prev.total - 1),
       }));
@@ -415,9 +422,10 @@ export function useProcedures(
         await loadStatistics();
         return true;
       } catch (err: unknown) {
+        // Rollback
         if (original) {
-          setProcedures((prev) => [...prev, original]);
-          setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
+          setProcedures((prev: ProcedureResponseDto[]) => [...prev, original]);
+          setPagination((prev: ProcedurePagination) => ({ ...prev, total: prev.total + 1 }));
         }
         setError(
           err instanceof Error ? err.message : "Erreur lors de la suppression",
@@ -442,7 +450,9 @@ export function useProcedures(
       setError(null);
       try {
         const updated = await ProceduresService.cancel(id, reason);
-        setProcedures((prev) => prev.map((p) => (p.id === id ? updated : p)));
+        setProcedures((prev: ProcedureResponseDto[]) => 
+          prev.map((p) => (p.id === id ? updated : p))
+        );
         if (selectedProcedure?.id === id) setSelectedProcedure(updated);
         return updated;
       } catch (err: unknown) {
@@ -458,7 +468,7 @@ export function useProcedures(
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // findByEmail — GET /procedures/:email
+  // findByEmail — GET /procedures/by-email/:email
   // ─────────────────────────────────────────────────────────────────────────
   const findByEmail = useCallback(
     async (email: string): Promise<ProcedureResponseDto[]> => {
@@ -490,7 +500,7 @@ export function useProcedures(
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // findByRendezvousId — GET /procedures/:rendezVousId
+  // findByRendezvousId — GET /procedures/by-rendezvous/:rendezVousId
   // ─────────────────────────────────────────────────────────────────────────
   const findByRendezvousId = useCallback(
     async (rendezVousId: string): Promise<ProcedureResponseDto | null> => {
@@ -507,18 +517,35 @@ export function useProcedures(
   // Gestion des filtres & pagination
   // ─────────────────────────────────────────────────────────────────────────
   const setQuery = useCallback((partial: Partial<ProcedureQueryDto>) => {
-    setQueryState((prev) => ({ ...prev, ...partial, page: 1 }));
+    setQueryState((prev: ProcedureQueryDto) => ({ ...prev, ...partial, page: 1 }));
   }, []);
+
+  const setFilters = useCallback(
+    (f: ProcedureFilters | ((prev: ProcedureFilters) => ProcedureFilters)) => {
+      setFiltersState(f);
+    },
+    [],
+  );
 
   const applyFilters = useCallback(async () => {
     try {
-      const res = await ProceduresService.findWithFilters(filters);
+      const res = await ProceduresService.findAll({
+        ...query,
+        status: filters.status,
+        email: filters.email,
+        destination: filters.destination,
+        filiere: filters.filiere,
+        includeDeleted: filters.includeDeleted,
+        search: filters.searchTerm,
+        startDate: filters.dateRange?.start.toISOString().split("T")[0],
+        endDate: filters.dateRange?.end.toISOString().split("T")[0],
+      });
       setProcedures(res.data);
       syncPagination(res);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors du filtrage");
     }
-  }, [filters, syncPagination]);
+  }, [filters, query, syncPagination]);
 
   const resetFilters = useCallback(() => {
     setFiltersState(DEFAULT_FILTERS);
@@ -526,30 +553,48 @@ export function useProcedures(
   }, [initialQuery]);
 
   const setPage = useCallback(
-    (page: number) => setQueryState((prev) => ({ ...prev, page })),
+    (page: number) => setQueryState((prev: ProcedureQueryDto) => ({ ...prev, page })),
     [],
   );
 
   const setLimit = useCallback(
-    (limit: number) => setQueryState((prev) => ({ ...prev, limit, page: 1 })),
+    (limit: number) => setQueryState((prev: ProcedureQueryDto) => ({ ...prev, limit, page: 1 })),
     [],
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Validation
+  // Validation (utilise ProcedureValidation)
   // ─────────────────────────────────────────────────────────────────────────
   const validate = useCallback(
-    (data: Partial<CreateProcedureDto>) => ProceduresService.validate(data),
+    (data: Partial<CreateProcedureDto>) => ProcedureValidation.validate(data),
     [],
   );
+  
   const isValid = useCallback(
-    (data: Partial<CreateProcedureDto>) => ProceduresService.isValid(data),
+    (data: Partial<CreateProcedureDto>) => ProcedureValidation.isValid(data),
     [],
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Chargement initial
+  // Chargement des procédures en retard
   // ─────────────────────────────────────────────────────────────────────────
+  const loadOverdue = useCallback(async () => {
+    try {
+      const result = await ProceduresService.findAll({
+        status: "IN_PROGRESS",
+        limit: 100,
+      });
+      setOverdue(result.data.filter((p) => p.isOverdue));
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Effets
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Chargement initial
   useEffect(() => {
     if (!autoLoad) return;
     const loadData = async () => {
@@ -558,12 +603,9 @@ export function useProcedures(
       await Promise.all(promises);
     };
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [autoLoad, shouldLoadStatistics, loadProcedures, loadStatistics]);
 
-  // ─────────────────────────────────────────────────────────────────────────
   // Rechargement quand le query change
-  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -586,17 +628,13 @@ export function useProcedures(
     loadProcedures,
   ]);
 
-  // ─────────────────────────────────────────────────────────────────────────
   // Rafraîchissement périodique des procédures en retard
-  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!autoLoad || !refreshInterval) return;
-    const id = setInterval(async () => {
-      const list = await ProceduresService.findOverdue();
-      setOverdue(list);
-    }, refreshInterval);
+    loadOverdue();
+    const id = setInterval(loadOverdue, refreshInterval);
     return () => clearInterval(id);
-  }, [autoLoad, refreshInterval]);
+  }, [autoLoad, refreshInterval, loadOverdue]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Retour du hook
@@ -626,7 +664,7 @@ export function useProcedures(
 
     // Filtres
     setQuery,
-    setFilters: setFiltersState,
+    setFilters,
     applyFilters,
     resetFilters,
 

@@ -11,7 +11,7 @@ const execAsync = promisify(exec);
 @Injectable()
 export class DatabaseBackupCron {
   private readonly logger = new Logger(DatabaseBackupCron.name);
-  private readonly backupPath = './backups';
+  private readonly backupPath = '/app/backend/backups';
 
   constructor(private configService: ConfigService) {
     // Créer le dossier backups s'il n'existe pas

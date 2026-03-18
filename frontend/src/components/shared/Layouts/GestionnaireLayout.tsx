@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Outlet, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useAuth } from "../../hooks/useAuth";
-import AdminSidebar from "../../components/shared/admin/AdminSidebar";
-import Loader from "../../components/shared/admin/Loader";
+import { useAuth } from "../../../hooks/useAuth";
+import AdminSidebar from "../../../components/shared/admin/AdminSidebar";
+import Loader from "../../../components/shared/admin/Loader";
 
 const GestionnaireLayout = () => {
   const { isAuthenticated, isLoading, user } = useAuth();

@@ -1,6 +1,5 @@
 // types/procedures.types.ts
-// Source unique de vérité pour tout le module Procedures (frontend)
-// Synchronisé strictement avec le backend (NestJS)
+// STRICTEMENT CALQUÉ sur les entités backend + DTOs
 
 // ─── Enums (miroir Prisma) ────────────────────────────────────────────────────
 
@@ -25,20 +24,56 @@ export type StepStatus = (typeof StepStatus)[keyof typeof StepStatus];
 
 export const StepName = {
   DEMANDE_ADMISSION: "DEMANDE_ADMISSION",
-  PREPARATION_DOSSIERS: "PREPARATION_DOSSIERS",
-  SOUMISSION_DOSSIERS: "SOUMISSION_DOSSIERS",
-  ATTENTE_DECISION: "ATTENTE_DECISION",
+  ENTRETIEN_MOTIVATION: "ENTRETIEN_MOTIVATION",
   DEMANDE_VISA: "DEMANDE_VISA",
   PREPARATIF_VOYAGE: "PREPARATIF_VOYAGE",
-  ARRIVEE_PAYS: "ARRIVEE_PAYS",
-  INSCRIPTION_ETABLISSEMENT: "INSCRIPTION_ETABLISSEMENT",
 } as const;
 export type StepName = (typeof StepName)[keyof typeof StepName];
 
 export type SortOrder = "asc" | "desc";
 export type GroupBy = "day" | "month" | "year";
 export type ExportFormat = "csv" | "excel" | "pdf";
-export type StatusColor = "blue" | "green" | "red" | "gray" | "yellow" | "orange" | "purple";
+export type StatusColor =
+  | "blue"
+  | "green"
+  | "red"
+  | "gray"
+  | "yellow"
+  | "orange"
+  | "purple";
+
+// ─── Types pour le hook (AJOUTÉS) ────────────────────────────────────────────
+
+export interface ProcedureFilters {
+  status?: ProcedureStatus;
+  dateRange?: { start: Date; end: Date };
+  searchTerm?: string;
+  email?: string;
+  destination?: string;
+  filiere?: string;
+  includeDeleted?: boolean;
+}
+
+export interface ProcedureLoadingState {
+  list: boolean;
+  details: boolean;
+  statistics: boolean;
+  create: boolean;
+  update: boolean;
+  updateStep: boolean;
+  delete: boolean;
+  report: boolean;
+  export: boolean;
+}
+
+export interface ProcedurePagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
 
 // ─── DTO Création (create-procedure.dto.ts) ───────────────────────────────────
 
@@ -96,7 +131,7 @@ export interface ProcedureStatsQueryDto {
   groupBy?: GroupBy;
 }
 
-// ─── DTO Réponse étape (StepResponseDto) ─────────────────────────
+// ─── DTO Réponse étape (StepResponseDto) ──────────────────────────────────────
 
 export interface StepResponseDto {
   id: string;
@@ -106,7 +141,8 @@ export interface StepResponseDto {
   dateCreation: Date;
   dateMaj: Date;
   dateCompletion?: Date;
-  // Virtuels calculés
+
+  // Virtuals calculés (depuis procedure.entity.ts)
   canBeModified: boolean;
   duration?: number;
   isOverdue: boolean;
@@ -114,7 +150,7 @@ export interface StepResponseDto {
   statusColor: StatusColor;
 }
 
-// ─── DTO Réponse procédure (ProcedureResponseDto) ─────────────────
+// ─── DTO Réponse procédure (ProcedureResponseDto) ─────────────────────────────
 
 export interface ProcedureResponseDto {
   id: string;
@@ -143,15 +179,21 @@ export interface ProcedureResponseDto {
   createdAt: Date;
   updatedAt: Date;
   userId?: string | null;
+  cancelledAt?: Date | null;
+  cancelledReason?: string | null;
+  cancelledBy?: string | null;
+
+  // Relations
   steps: StepResponseDto[];
-  // Virtuels calculés
+  rendezvousStatus?: string;
+  rendezvousDate?: string;
+
+  // Virtuals calculés (depuis procedure.entity.ts)
   progress: number;
   completedSteps: number;
   totalSteps: number;
   activeStep?: StepName;
   nextStep?: StepName;
-  rendezvousStatus?: string;
-  rendezvousDate?: string;
   statusLabel: string;
   statusColor: StatusColor;
   canBeModified: boolean;
@@ -172,7 +214,7 @@ export interface PaginatedProcedureResponseDto {
   hasPrevious: boolean;
 }
 
-// ─── DTO Statistiques (ProcedureStatisticsDto) ───────────────────
+// ─── DTO Statistiques (ProcedureStatisticsDto) ────────────────────────────────
 
 export interface ProcedureStatisticsDto {
   total: number;
@@ -206,63 +248,4 @@ export interface ApiResponse<T = unknown> {
   statusCode?: number;
   message?: string;
   data: T;
-}
-
-// ─── Types hook useProcedures ─────────────────────────────────────────────────
-
-export interface ProcedureLoadingState {
-  list: boolean;
-  details: boolean;
-  statistics: boolean;
-  create: boolean;
-  update: boolean;
-  updateStep: boolean;
-  delete: boolean;
-  report: boolean;
-  export: boolean;
-}
-
-export interface ProcedurePagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrevious: boolean;
-}
-
-export interface ProcedureFilters {
-  status?: ProcedureStatus;
-  dateRange?: { start: Date; end: Date };
-  searchTerm?: string;
-  email?: string;
-  destination?: string;
-  filiere?: string;
-  includeDeleted?: boolean;
-}
-
-// ─── Types export & rapport ───────────────────────────────────────────────────
-
-export interface ProcedureExportData {
-  format: ExportFormat;
-  filters?: ProcedureFilters;
-  includeSteps?: boolean;
-  includeAudit?: boolean;
-}
-
-export interface ProcedureReport {
-  id: string;
-  title: string;
-  description: string;
-  generatedAt: Date;
-  generatedBy: string;
-  data: {
-    totalProcedures: number;
-    byStatus: Record<string, number>;
-    byDestination: Record<string, number>;
-    byFiliere: Record<string, number>;
-    completionTimes: number[];
-    averageCompletionTime: number;
-    dateRange: { start: Date; end: Date };
-  };
 }

@@ -15,7 +15,7 @@ const MissionCard: React.FC<MissionCardProps> = ({
   return (
     <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow border-l-4 border-sky-500 group">
       <div className="flex items-start space-x-4">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <div className="w-12 h-12 bg-sky-500 rounded-lg flex items-center justify-center text-white group-hover:bg-sky-600 transition-colors">
             {icon}
           </div>

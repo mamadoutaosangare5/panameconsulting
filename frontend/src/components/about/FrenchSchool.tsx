@@ -88,7 +88,7 @@ const FrenchSchool: React.FC = () => {
           {formationsData.map((formation) => (
             <div
               key={formation.id}
-              className={`bg-gradient-to-br ${formation.bgColor} rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border ${formation.borderColor} overflow-hidden group`}
+              className={`bg-linear-to-br ${formation.bgColor} rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border ${formation.borderColor} overflow-hidden group`}
             >
               {/* En-tête de la carte */}
               <div className="p-6 border-b border-sky-100">
@@ -116,7 +116,7 @@ const FrenchSchool: React.FC = () => {
                     key={index}
                     className="flex items-start space-x-3 bg-[#fafafa] rounded-lg p-3"
                   >
-                    <div className="flex-shrink-0 mt-0.5">
+                    <div className="shrink-0 mt-0.5">
                       {item.icon || (
                         <CheckCircle2 className="w-5 h-5 text-sky-500" />
                       )}

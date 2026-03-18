@@ -1,52 +1,31 @@
 // ============================================================
 // rendezvous.types.ts
-// Version COMPLÈTE alignée sur le backend Prisma
+// Version alignée strictement sur le backend Prisma
 // ============================================================
 
-// ==================== TYPES PERSONNALISÉS (STRING) ====================
-
-/**
- * Destinations - Accepte n'importe quelle valeur string
- * Valeurs communes suggérées pour l'UI
- */
-export type Destination = string;
-
-/**
- * Niveaux d'étude - Accepte n'importe quelle valeur string
- * Valeurs communes suggérées pour l'UI
- */
-export type NiveauEtude = string;
-
-/**
- * Filières - Accepte n'importe quelle valeur string
- * Valeurs communes suggérées pour l'UI
- */
-export type Filiere = string;
+// ==================== ENUMS (Miroir EXACT du backend) ====================
 
 /**
  * Créneaux horaires - Correspond exactement à Prisma TimeSlot
- * Pause déjeuner 12h30-14h00 exclue
+ * Pause déjeuner : 12:00 est autorisé, 12:30-14:00 exclu
  */
 export const TimeSlot = {
-  "09:00": "SLOT_0900",
-  "09:30": "SLOT_0930",
-  "10:00": "SLOT_1000",
-  "10:30": "SLOT_1030",
-  "11:00": "SLOT_1100",
-  "11:30": "SLOT_1130",
-  // Créneaux pendant la pause déjeuner (12h30-14h) sont exclus
-  // "12:00": "SLOT_1200",
-  // "12:30": "SLOT_1230",
-  // "13:00": "SLOT_1300",
-  // "13:30": "SLOT_1330",
-  "14:00": "SLOT_1400",
-  "14:30": "SLOT_1430",
-  "15:00": "SLOT_1500",
-  "15:30": "SLOT_1530",
-  "16:00": "SLOT_1600",
-  "16:30": "SLOT_1630",
+  SLOT_0900: "SLOT_0900",
+  SLOT_0930: "SLOT_0930",
+  SLOT_1000: "SLOT_1000",
+  SLOT_1030: "SLOT_1030",
+  SLOT_1100: "SLOT_1100",
+  SLOT_1130: "SLOT_1130",
+  SLOT_1200: "SLOT_1200", // 12:00 est autorisé
+  // Pause déjeuner 12:30-14:00 exclue
+  SLOT_1400: "SLOT_1400",
+  SLOT_1430: "SLOT_1430",
+  SLOT_1500: "SLOT_1500",
+  SLOT_1530: "SLOT_1530",
+  SLOT_1600: "SLOT_1600",
+  SLOT_1630: "SLOT_1630",
 } as const;
-export type TimeSlot = (typeof TimeSlot)[keyof typeof TimeSlot];
+export type TimeSlot = keyof typeof TimeSlot;
 
 /**
  * Statuts du rendez-vous - Correspond exactement à Prisma RendezvousStatus
@@ -57,8 +36,7 @@ export const RendezvousStatus = {
   COMPLETED: "COMPLETED",
   CANCELLED: "CANCELLED",
 } as const;
-export type RendezvousStatus =
-  (typeof RendezvousStatus)[keyof typeof RendezvousStatus];
+export type RendezvousStatus = typeof RendezvousStatus[keyof typeof RendezvousStatus];
 
 /**
  * Avis administrateur - Correspond exactement à Prisma AdminOpinion
@@ -67,7 +45,7 @@ export const AdminOpinion = {
   FAVORABLE: "FAVORABLE",
   UNFAVORABLE: "UNFAVORABLE",
 } as const;
-export type AdminOpinion = (typeof AdminOpinion)[keyof typeof AdminOpinion];
+export type AdminOpinion = typeof AdminOpinion[keyof typeof AdminOpinion];
 
 /**
  * Annulé par - Correspond exactement à Prisma CancelledBy
@@ -77,32 +55,30 @@ export const CancelledBy = {
   ADMIN: "ADMIN",
   SYSTEM: "SYSTEM",
 } as const;
-export type CancelledBy = (typeof CancelledBy)[keyof typeof CancelledBy];
+export type CancelledBy = typeof CancelledBy[keyof typeof CancelledBy];
 
-// ==================== DTOs REQUÊTE ====================
+// ==================== DTOs REQUÊTE (Miroir EXACT du backend) ====================
 
 /**
- * POST /rendezvous
- * Miroir EXACT de CreateRendezvousDto (backend)
+ * POST /rendezvous - CreateRendezvousDto
  */
 export interface CreateRendezvousDto {
   firstName: string;
   lastName: string;
   email: string;
   telephone: string;
-  destination: Destination;
+  destination: string;
   destinationAutre?: string;
-  niveauEtude: NiveauEtude;
+  niveauEtude: string;
   niveauEtudeAutre?: string;
-  filiere: Filiere;
+  filiere: string;
   filiereAutre?: string;
   date: string; // Format: YYYY-MM-DD
-  time: TimeSlot; // Format: HH:MM (parmi TimeSlot)
+  time: TimeSlot;
 }
 
 /**
- * PATCH /admin/rendezvous/:id/patch
- * Miroir EXACT de UpdateRendezvousDto (backend)
+ * PATCH /admin/rendezvous/:id/patch - UpdateRendezvousDto
  */
 export interface UpdateRendezvousDto extends Partial<CreateRendezvousDto> {
   avisAdmin?: AdminOpinion;
@@ -111,8 +87,7 @@ export interface UpdateRendezvousDto extends Partial<CreateRendezvousDto> {
 }
 
 /**
- * PATCH /rendezvous/:id/cancel
- * Miroir EXACT de CancelRendezvousDto (backend)
+ * PATCH /rendezvous/:id/cancel - CancelRendezvousDto
  */
 export interface CancelRendezvousDto {
   reason: string;
@@ -120,8 +95,7 @@ export interface CancelRendezvousDto {
 }
 
 /**
- * PATCH /admin/rendezvous/:id/complete
- * Miroir EXACT de CompleteRendezvousDto (backend)
+ * PATCH /admin/rendezvous/:id/complete - CompleteRendezvousDto
  */
 export interface CompleteRendezvousDto {
   avisAdmin: AdminOpinion;
@@ -129,19 +103,18 @@ export interface CompleteRendezvousDto {
 }
 
 /**
- * GET /admin/rendezvous/all — Query params
- * Miroir EXACT de RendezvousQueryDto (backend)
+ * GET /admin/rendezvous/all - RendezvousQueryDto
  */
 export interface RendezvousQueryDto {
   page?: number;
   limit?: number;
   status?: RendezvousStatus;
-  date?: string; // YYYY-MM-DD
+  date?: string;
   email?: string;
   destination?: string;
   filiere?: string;
-  startDate?: string; // YYYY-MM-DD
-  endDate?: string; // YYYY-MM-DD
+  startDate?: string;
+  endDate?: string;
   search?: string;
   hasAvis?: boolean;
   hasProcedure?: boolean;
@@ -149,7 +122,7 @@ export interface RendezvousQueryDto {
   sortOrder?: "asc" | "desc";
 }
 
-// ==================== DTOs RÉPONSE ====================
+// ==================== DTOs RÉPONSE (Miroir EXACT du backend) ====================
 
 /**
  * User info dans les relations
@@ -171,65 +144,42 @@ export interface ProcedureInfoDto {
 }
 
 /**
- * RendezvousResponseDto - Miroir EXACT de ce que le backend renvoie
+ * RendezvousResponseDto - Correspond exactement à ce que le backend renvoie
  */
 export interface RendezvousResponseDto {
-  // Identifiants
   id: string;
-
-  // Informations personnelles
   firstName: string;
   lastName: string;
   fullName: string;
   email: string;
   telephone: string;
-
-  // Destination
   destination: string;
   destinationAutre?: string | null;
   effectiveDestination: string;
-
-  // Niveau d'étude
   niveauEtude: string;
   niveauEtudeAutre?: string | null;
   effectiveNiveauEtude: string;
-
-  // Filière
   filiere: string;
   filiereAutre?: string | null;
   effectiveFiliere: string;
-
-  // Date et heure
-  date: string; // YYYY-MM-DD
-  time: TimeSlot; // HH:MM
-  dateTime: string; // ISO string
-
-  // Statut
+  date: string;
+  time: TimeSlot;
+  dateTime: string;
   status: RendezvousStatus;
   avisAdmin?: AdminOpinion | null;
-
-  // Annulation
-  cancelledAt?: string | null; // ISO string
+  cancelledAt?: string | null;
   cancelledBy?: CancelledBy | null;
   cancellationReason?: string | null;
-
-  // Métadonnées
-  createdAt: string; // ISO string
-  updatedAt: string; // ISO string
+  createdAt: string;
+  updatedAt: string;
   userId?: string | null;
-
-  // Relations
   user?: UserInfoDto | null;
   procedure?: ProcedureInfoDto | null;
-
-  // Propriétés calculées (virtuelles)
   canCancel: boolean;
   canModify: boolean;
   isPast: boolean;
   isToday: boolean;
   minutesUntilRendezvous: number;
-
-  // Informations sur la pause déjeuner
   lunchBreakInfo?: {
     lunchBreakStart: string;
     lunchBreakEnd: string;
@@ -238,7 +188,7 @@ export interface RendezvousResponseDto {
 }
 
 /**
- * PaginatedRendezvousResponseDto - Miroir EXACT du backend
+ * PaginatedRendezvousResponseDto
  */
 export interface PaginatedRendezvousResponseDto {
   data: RendezvousResponseDto[];
@@ -251,7 +201,7 @@ export interface PaginatedRendezvousResponseDto {
 }
 
 /**
- * RendezvousStatisticsDto - Miroir EXACT du backend
+ * RendezvousStatisticsDto
  */
 export interface RendezvousStatisticsDto {
   total: number;
@@ -273,129 +223,61 @@ export interface RendezvousStatisticsDto {
 }
 
 /**
- * AvailableSlotsDto - Ce que le backend renvoie pour /available-slots/:date
+ * TimeSlot with metadata
+ */
+export interface TimeSlotWithMeta {
+  time: string;
+  available: boolean;
+  isPast?: boolean;
+  isLunchBreak?: boolean;
+  isHoliday?: boolean;
+  isWeekend?: boolean;
+}
+
+/**
+ * AvailableSlotsDto
  */
 export interface AvailableSlotsDto {
-  date: string; // ISO string
+  date: string;
   available: boolean;
-  availableSlots: TimeSlot[]; // Liste des créneaux disponibles
+  reason?: string;
+  availableSlots: TimeSlotWithMeta[];
   totalSlots: number;
   occupiedSlots: number;
 }
 
 /**
- * AvailabilityCheckDto - Ce que le backend renvoie pour /check-availability
+ * AvailabilityCheckDto
  */
 export interface AvailabilityCheckDto {
   available: boolean;
-  date: string; // YYYY-MM-DD
-  time: TimeSlot; // HH:MM
-  alternativeSlots?: TimeSlot[]; // Créneaux alternatifs
+  date: string;
+  time: TimeSlot;
+  message?: string;
+  alternativeSlots?: string[];
   nextAvailableSlot?: { date: string; time: TimeSlot };
 }
 
 /**
- * AvailableDatesResponseDto - Ce que le backend renvoie pour /available-dates
+ * AvailableDatesResponseDto
  */
 export interface AvailableDatesResponseDto {
-  date: string; // YYYY-MM-DD
+  date: string;
   availableSlots: number;
   hasSlots: boolean;
 }
 
-// ==================== FILTRES INTERNES ====================
+// ==================== TYPES INTERNES POUR LE HOOK ====================
 
-export interface RendezvousFilterEntity {
+export interface RendezvousFilters {
   status?: RendezvousStatus | RendezvousStatus[];
   dateRange?: { start: string; end: string };
-  destinations?: string[];
   searchTerm?: string;
   hasProcedure?: boolean;
   avisAdmin?: AdminOpinion;
-  createdAfter?: string;
-  createdBefore?: string;
+  destination?: string;
+  filiere?: string;
 }
-
-// ==================== OPTIONS SUGGÉRÉES POUR L'UI ====================
-
-/**
- * Options de destination suggérées pour l'interface
- */
-export const DESTINATION_OPTIONS = [
-  "France",
-  "Russie",
-  "Chypre",
-  "Chine",
-  "Maroc",
-  "Algérie",
-  "Turquie",
-  "Autre",
-] as const;
-
-/**
- * Options de créneaux horaires suggérées pour l'interface
- * Pause déjeuner 12h30-14h00 exclue
- */
-export const TIME_SLOT_OPTIONS = [
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-  "11:30",
-  // Créneaux pendant la pause déjeuner (12h30-14h) sont exclus
-  // "12:00",
-  // "12:30",
-  // "13:00",
-  // "13:30",
-  "14:00",
-  "14:30",
-  "15:00",
-  "15:30",
-  "16:00",
-  "16:30",
-] as const;
-
-/**
- * Options de niveau d'étude suggérées pour l'interface
- */
-export const NIVEAU_ETUDE_OPTIONS = [
-  "Bac",
-  "Bac+1",
-  "Bac+2",
-  "Licence",
-  "Master I",
-  "Master II",
-  "Doctorat",
-  "Autre",
-] as const;
-
-/**
- * Options de filière suggérées pour l'interface
- */
-export const FILIERE_OPTIONS = [
-  "Informatique",
-  "Médecine",
-  "Droit",
-  "Commerce",
-  "Ingénierie",
-  "Architecture",
-  "Autre",
-] as const;
-
-// ==================== ALIASES FRONTEND ====================
-
-export type Rendezvous = RendezvousResponseDto;
-export type CreateRendezvousData = CreateRendezvousDto;
-export type UpdateRendezvousData = UpdateRendezvousDto;
-export type CancelRendezvousData = CancelRendezvousDto;
-export type CompleteRendezvousData = CompleteRendezvousDto;
-export type RendezvousQueryParams = RendezvousQueryDto;
-export type RendezvousStatistics = RendezvousStatisticsDto;
-export type AvailableSlots = AvailableSlotsDto;
-export type AvailabilityCheck = AvailabilityCheckDto;
-export type AvailableDate = AvailableDatesResponseDto;
-export type RendezvousFilters = RendezvousFilterEntity;
 
 // ==================== ERREURS API ====================
 
@@ -434,39 +316,74 @@ export const CancelledByLabels: Record<CancelledBy, string> = {
   SYSTEM: "Système",
 };
 
+/**
+ * Options de destination pour l'interface
+ */
+export const DESTINATION_OPTIONS = [
+  "France",
+  "Russie",
+  "Chypre",
+  "Chine",
+  "Maroc",
+  "Algérie",
+  "Turquie",
+  "Autre",
+];
+
+/**
+ * Options de créneaux horaires pour l'interface
+ * Format: HH:MM pour l'affichage, sera converti en SLOT_* pour le backend
+ */
+export const TIME_SLOT_OPTIONS = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+];
+
+/**
+ * Options de niveau d'étude pour l'interface
+ */
+export const NIVEAU_ETUDE_OPTIONS = [
+  "Bac",
+  "Bac+1",
+  "Bac+2",
+  "Licence",
+  "Master I",
+  "Master II",
+  "Doctorat",
+  "Autre",
+];
+
+/**
+ * Options de filière pour l'interface
+ */
+export const FILIERE_OPTIONS = [
+  "Informatique",
+  "Médecine",
+  "Droit",
+  "Commerce",
+  "Ingénierie",
+  "Architecture",
+  "Autre",
+];
+
 // ==================== UTILITAIRES TIMESLOT ====================
 
 /**
- * Convertit un TimeSlot (ex: SLOT_0930) en format lisible (ex: 9H30)
+ * Convertit un TimeSlot (SLOT_*) en format HH:MM pour l'affichage
  */
-export const formatTimeSlot = (timeSlot: string): string => {
-  const timeMap: Record<string, string> = {
-    SLOT_0900: "9H00",
-    SLOT_0930: "9H30",
-    SLOT_1000: "10H00",
-    SLOT_1030: "10H30",
-    SLOT_1100: "11H00",
-    SLOT_1130: "11H30",
-    SLOT_1200: "12H00",
-    SLOT_1230: "12H30",
-    SLOT_1300: "13H00",
-    SLOT_1330: "13H30",
-    SLOT_1400: "14H00",
-    SLOT_1430: "14H30",
-    SLOT_1500: "15H00",
-    SLOT_1530: "15H30",
-    SLOT_1600: "16H00",
-    SLOT_1630: "16H30",
-  };
-
-  return timeMap[timeSlot] || timeSlot;
-};
-
-/**
- * Convertit un TimeSlot (ex: SLOT_0930) en format HH:MM pour l'envoi au backend (ex: 09:30)
- */
-export const timeSlotToBackendFormat = (timeSlot: string): string => {
-  const timeMap: Record<string, string> = {
+export const timeSlotToDisplay = (timeSlot: TimeSlot): string => {
+  const map: Record<TimeSlot, string> = {
     SLOT_0900: "09:00",
     SLOT_0930: "09:30",
     SLOT_1000: "10:00",
@@ -474,9 +391,6 @@ export const timeSlotToBackendFormat = (timeSlot: string): string => {
     SLOT_1100: "11:00",
     SLOT_1130: "11:30",
     SLOT_1200: "12:00",
-    SLOT_1230: "12:30",
-    SLOT_1300: "13:00",
-    SLOT_1330: "13:30",
     SLOT_1400: "14:00",
     SLOT_1430: "14:30",
     SLOT_1500: "15:00",
@@ -484,15 +398,14 @@ export const timeSlotToBackendFormat = (timeSlot: string): string => {
     SLOT_1600: "16:00",
     SLOT_1630: "16:30",
   };
-
-  return timeMap[timeSlot] || timeSlot;
+  return map[timeSlot] || timeSlot;
 };
 
 /**
- * Convertit format HH:MM en TimeSlot enum pour le backend
+ * Convertit un format HH:MM en TimeSlot (SLOT_*) pour le backend
  */
-export const timeStringToTimeSlot = (timeString: string): string => {
-  const reverseMap: Record<string, string> = {
+export const displayToTimeSlot = (display: string): TimeSlot => {
+  const map: Record<string, TimeSlot> = {
     "09:00": "SLOT_0900",
     "09:30": "SLOT_0930",
     "10:00": "SLOT_1000",
@@ -500,9 +413,6 @@ export const timeStringToTimeSlot = (timeString: string): string => {
     "11:00": "SLOT_1100",
     "11:30": "SLOT_1130",
     "12:00": "SLOT_1200",
-    "12:30": "SLOT_1230",
-    "13:00": "SLOT_1300",
-    "13:30": "SLOT_1330",
     "14:00": "SLOT_1400",
     "14:30": "SLOT_1430",
     "15:00": "SLOT_1500",
@@ -510,44 +420,5 @@ export const timeStringToTimeSlot = (timeString: string): string => {
     "16:00": "SLOT_1600",
     "16:30": "SLOT_1630",
   };
-
-  return reverseMap[timeString] || timeString;
-};
-
-/**
- * Vérifie si un rendez-vous peut être annulé
- */
-export const canCancelRendezvous = (rdv: Rendezvous): boolean => {
-  // Simple vérification : utiliser la propriété du backend
-  return (
-    rdv.canCancel &&
-    (rdv.status === RendezvousStatus.CONFIRMED ||
-      rdv.status === RendezvousStatus.PENDING)
-  );
-};
-
-/**
- * Calcule le temps restant avant le rendez-vous
- */
-export const getRemainingCancellationTime = (
-  rdv: Rendezvous,
-): string | null => {
-  // Si le RDV ne peut pas être annulé, pas de temps restant
-  if (!rdv.canCancel) return null;
-
-  // Calculer le temps restant pour l'affichage
-  const now = new Date();
-  const rdvDateTime = new Date(
-    `${rdv.date}T${timeSlotToBackendFormat(rdv.time)}`,
-  );
-  const diffMs = rdvDateTime.getTime() - now.getTime();
-
-  if (diffMs <= 0) return null; // RDV passé ou en cours
-
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-  return diffHours > 0
-    ? `${diffHours}h ${diffMinutes}min`
-    : `${diffMinutes}min`;
+  return map[display] || (display as TimeSlot);
 };

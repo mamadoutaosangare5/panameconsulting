@@ -1,5 +1,5 @@
 // services/procedures.service.ts
-// Calqué strictement sur procedures.controller.ts (NestJS)
+// STRICTEMENT CALQUÉ sur procedures.controller.ts (backend)
 
 import { toast } from "react-hot-toast";
 import type {
@@ -10,7 +10,6 @@ import type {
   UpdateProcedureDto,
   UpdateStepDto,
   ProcedureQueryDto,
-  ProcedureFilters,
   StepName,
   ApiError,
 } from "../types/procedures.types";
@@ -20,341 +19,75 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+// ─── Types d'erreur ──────────────────────────────────────────────────────────
+
+class ProcedureServiceError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public apiError?: ApiError,
+  ) {
+    super(message);
+    this.name = "ProcedureServiceError";
+  }
+}
+
 // ─── Gestion des réponses ─────────────────────────────────────────────────────
 
 async function handleResponse<T>(res: Response): Promise<T> {
+  // 204 No Content
   if (res.status === 204) return undefined as unknown as T;
 
-  let body: unknown;
+  let responseBody: unknown;
   try {
-    body = await res.json();
+    responseBody = await res.json();
   } catch {
-    body = { message: `Erreur ${res.status}` };
+    responseBody = { message: `Erreur ${res.status}` };
   }
 
   if (!res.ok) {
-    const apiError = body as ApiError;
-    const err = new Error(
+    const apiError = responseBody as ApiError;
+    throw new ProcedureServiceError(
       apiError.message || `Erreur ${res.status}`,
-    ) as Error & { apiError: ApiError; status: number };
-    err.apiError = apiError;
-    err.status = res.status;
-    throw err;
+      res.status,
+      apiError,
+    );
   }
 
-  // Détection réponse paginée (avec data, total, page, limit, totalPages, hasNext, hasPrevious)
-  if (
-    body &&
-    typeof body === "object" &&
-    "data" in body &&
-    Array.isArray((body as unknown as { data: unknown[] }).data) &&
-    "total" in body &&
-    typeof (body as unknown as { total: number }).total === "number" &&
-    "page" in body &&
-    "limit" in body
-  ) {
-    return body as T;
-  }
-
-  // Wrapper NestJS simple { data: T, message?, statusCode? }
-  if (
-    body &&
-    typeof body === "object" &&
-    "data" in body &&
-    !("id" in body) &&
-    !Array.isArray(body)
-  ) {
-    return (body as { data: T }).data;
-  }
-
-  return body as T;
+  // Le backend retourne directement la structure attendue
+  return responseBody as T;
 }
 
 // ─── Fetch authentifié ────────────────────────────────────────────────────────
 import { apiFetch } from "../context/AuthContext";
 
-// ─── Service ─────────────────────────────────────────────────────────────────
+// ─── URLs constants (miroir des routes controller) ────────────────────────────
 
-export const ProceduresService = {
-  // ── Routes Admin ─────────────────────────────────────────────────────────
+const API = {
+  // Routes admin
+  ADMIN_CREATE: "/admin/procedures/create",
+  ADMIN_ALL: "/admin/procedures/all",
+  ADMIN_STATISTICS: "/admin/procedures/statistics",
+  ADMIN_STEP: (id: string, stepName: StepName) =>
+    `/admin/procedures/${id}/steps/${stepName}`,
+  ADMIN_DELETE: (id: string) => `/admin/procedures/${id}/delete`,
 
+  // Routes mixtes
+  PROCEDURE_BY_EMAIL: (email: string) =>
+    `/procedures/by-email/${encodeURIComponent(email)}`,
+  PROCEDURE_BY_RENDEZVOUS: (rendezVousId: string) =>
+    `/procedures/by-rendezvous/${rendezVousId}`,
+  PROCEDURE_DETAILS: (id: string) => `/procedures/${id}/details`,
+  PROCEDURE_UPDATE: (id: string) => `/procedures/${id}/update`,
+  PROCEDURE_CANCEL: (id: string) => `/procedures/${id}/cancel`,
+};
+
+// ─── Helpers de validation (exportés séparément) ─────────────────────────────
+
+export const ProcedureValidation = {
   /**
-   * POST /admin/procedures/create — ADMIN
+   * Valide les données côté client
    */
-  async create(data: CreateProcedureDto): Promise<ProcedureResponseDto> {
-    try {
-      const res = await apiFetch(`${BASE_URL}/admin/procedures/create`, {
-        method: "POST",
-        headers: JSON_HEADERS,
-        body: JSON.stringify(data),
-      });
-      const result = await handleResponse<ProcedureResponseDto>(res);
-      toast.success("Procédure créée avec succès");
-      return result;
-    } catch (error) {
-      toast.error("Erreur lors de la création de la procédure");
-      throw error;
-    }
-  },
-
-  /**
-   * GET /admin/procedures/all — ADMIN
-   * Retourne PaginatedProcedureResponseDto avec data, total, page, limit, totalPages, hasNext, hasPrevious
-   */
-  async findAll(
-    query: ProcedureQueryDto = {},
-  ): Promise<PaginatedProcedureResponseDto> {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== "") {
-        params.set(key, String(value));
-      }
-    }
-    const url = `${BASE_URL}/admin/procedures/all${params.toString() ? `?${params}` : ""}`;
-    console.log("[ProceduresService] GET", url);
-
-    try {
-      const res = await apiFetch(url, { method: "GET" });
-      console.log("[ProceduresService] Response status:", res.status);
-      const result = await handleResponse<PaginatedProcedureResponseDto>(res);
-      
-      // Validation de la structure paginée
-      if (!result.data || !Array.isArray(result.data)) {
-        console.error("[ProceduresService] Réponse invalide:", result);
-        return {
-          data: [],
-          total: 0,
-          page: query.page || 1,
-          limit: query.limit || 10,
-          totalPages: 0,
-          hasNext: false,
-          hasPrevious: false,
-        };
-      }
-      
-      return result;
-    } catch (error) {
-      console.error("[ProceduresService] Erreur findAll:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * GET /admin/procedures/statistics — ADMIN
-   */
-  async getStatistics(): Promise<ProcedureStatisticsDto> {
-    try {
-      const res = await apiFetch(`${BASE_URL}/admin/procedures/statistics`, {
-        method: "GET",
-      });
-      const result = await handleResponse<ProcedureStatisticsDto>(res);
-      return result;
-    } catch (error) {
-      toast.error("Erreur lors du chargement des statistiques");
-      throw error;
-    }
-  },
-
-  /**
-   * PATCH /admin/procedures/:id/steps/:stepName — ADMIN
-   */
-  async updateStep(
-    id: string,
-    stepName: StepName,
-    data: UpdateStepDto,
-  ): Promise<ProcedureResponseDto> {
-    try {
-      const res = await apiFetch(
-        `${BASE_URL}/admin/procedures/${id}/steps/${stepName}`,
-        {
-          method: "PATCH",
-          headers: JSON_HEADERS,
-          body: JSON.stringify(data),
-        },
-      );
-      const result = await handleResponse<ProcedureResponseDto>(res);
-      toast.success(`Étape ${stepName} mise à jour avec succès`);
-      return result;
-    } catch (error) {
-      toast.error(`Erreur lors de la mise à jour de l'étape ${stepName}`);
-      throw error;
-    }
-  },
-
-  /**
-   * POST /admin/procedures/:id/steps/:stepName — ADMIN
-   */
-  async addStep(id: string, stepName: StepName): Promise<ProcedureResponseDto> {
-    try {
-      const res = await apiFetch(
-        `${BASE_URL}/admin/procedures/${id}/steps/${stepName}`,
-        { method: "POST" },
-      );
-      const result = await handleResponse<ProcedureResponseDto>(res);
-      toast.success(`Étape ${stepName} ajoutée avec succès`);
-      return result;
-    } catch (error) {
-      toast.error(`Erreur lors de l'ajout de l'étape ${stepName}`);
-      throw error;
-    }
-  },
-
-  /**
-   * DELETE /admin/procedures/:id/delete — ADMIN
-   * Retourne 204 No Content
-   */
-  async remove(id: string, reason = "Suppression manuelle"): Promise<void> {
-    try {
-      const res = await apiFetch(`${BASE_URL}/admin/procedures/${id}/delete`, {
-        method: "DELETE",
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ reason }),
-      });
-      await handleResponse<void>(res);
-      toast.success("Procédure supprimée avec succès");
-    } catch (error) {
-      toast.error("Erreur lors de la suppression de la procédure");
-      throw error;
-    }
-  },
-
-  // ── Routes mixtes (admin + utilisateur connecté) ──────────────────────────
-
-  /**
-   * GET /procedures/:email
-   */
-  async findByEmail(email: string): Promise<ProcedureResponseDto[]> {
-    const res = await apiFetch(
-      `${BASE_URL}/procedures/${encodeURIComponent(email)}`,
-      { method: "GET" },
-    );
-    if (res.status === 204) return [];
-
-    let body: unknown;
-    try {
-      body = await res.json();
-    } catch {
-      return [];
-    }
-
-    if (!res.ok) {
-      const err = new Error(
-        (body as { message?: string })?.message ?? `Erreur ${res.status}`,
-      ) as Error & { apiError: unknown };
-      err.apiError = body;
-      throw err;
-    }
-
-    if (Array.isArray(body)) return body as ProcedureResponseDto[];
-    if (
-      body &&
-      typeof body === "object" &&
-      "data" in body &&
-      Array.isArray((body as { data: unknown }).data)
-    ) {
-      return (body as { data: ProcedureResponseDto[] }).data;
-    }
-    return [];
-  },
-
-  /**
-   * GET /procedures/:rendezVousId
-   */
-  async findByRendezvousId(
-    rendezVousId: string,
-  ): Promise<ProcedureResponseDto | null> {
-    const res = await apiFetch(`${BASE_URL}/procedures/${rendezVousId}`, {
-      method: "GET",
-    });
-    if (res.status === 404) return null;
-    return handleResponse<ProcedureResponseDto>(res);
-  },
-
-  /**
-   * GET /procedures/:id/details
-   */
-  async findById(id: string): Promise<ProcedureResponseDto> {
-    const res = await apiFetch(`${BASE_URL}/procedures/${id}/details`, {
-      method: "GET",
-    });
-    return handleResponse<ProcedureResponseDto>(res);
-  },
-
-  /**
-   * PATCH /procedures/:id/update
-   */
-  async update(
-    id: string,
-    data: UpdateProcedureDto,
-  ): Promise<ProcedureResponseDto> {
-    const res = await apiFetch(`${BASE_URL}/procedures/${id}/update`, {
-      method: "PATCH",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(data),
-    });
-    return handleResponse<ProcedureResponseDto>(res);
-  },
-
-  /**
-   * PATCH /procedures/:id/cancel
-   */
-  async cancel(
-    id: string,
-    reason = "Annulation par l'utilisateur",
-  ): Promise<ProcedureResponseDto> {
-    try {
-      const res = await apiFetch(`${BASE_URL}/procedures/${id}/cancel`, {
-        method: "PATCH",
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ reason }),
-      });
-      const result = await handleResponse<ProcedureResponseDto>(res);
-      toast.success("Procédure annulée avec succès");
-      return result;
-    } catch (error) {
-      toast.error("Erreur lors de l'annulation de la procédure");
-      throw error;
-    }
-  },
-
-  // ── Helpers frontend ────────────────────────────────────────────
-
-  /**
-   * Convertit ProcedureFilters en ProcedureQueryDto et appelle findAll
-   */
-  async findWithFilters(
-    filters: ProcedureFilters,
-  ): Promise<PaginatedProcedureResponseDto> {
-    const query: ProcedureQueryDto = {
-      status: filters.status,
-      email: filters.email,
-      destination: filters.destination,
-      filiere: filters.filiere,
-      includeDeleted: filters.includeDeleted,
-      search: filters.searchTerm,
-    };
-    if (filters.dateRange) {
-      query.startDate = filters.dateRange.start.toISOString().split("T")[0];
-      query.endDate = filters.dateRange.end.toISOString().split("T")[0];
-    }
-    return this.findAll(query);
-  },
-
-  /**
-   * Récupère les procédures en retard
-   */
-  async findOverdue(): Promise<ProcedureResponseDto[]> {
-    const result = await this.findAll({
-      status: "IN_PROGRESS",
-      limit: 100,
-      sortBy: "createdAt",
-      sortOrder: "asc",
-    });
-    return result.data.filter((p) => p.isOverdue);
-  },
-
-  // ── Validation client ─────────────────────────────────────────────────────
-
   validate(data: Partial<CreateProcedureDto>): Record<string, string> {
     const errors: Record<string, string> = {};
     const UUID_RE =
@@ -405,7 +138,242 @@ export const ProceduresService = {
     return errors;
   },
 
+  /**
+   * Vérifie si les données sont valides
+   */
   isValid(data: Partial<CreateProcedureDto>): boolean {
     return Object.keys(this.validate(data)).length === 0;
+  },
+};
+
+// ─── Service principal ────────────────────────────────────────────────────────
+
+export const ProceduresService = {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Routes ADMIN (procédures.controller.ts)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * POST /admin/procedures/create
+   * @see ProceduresController.createFromRendezvous()
+   */
+  async create(data: CreateProcedureDto): Promise<ProcedureResponseDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.ADMIN_CREATE}`, {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse<ProcedureResponseDto>(res);
+      toast.success("Procédure créée avec succès");
+      return result;
+    } catch (error) {
+      toast.error("Erreur lors de la création de la procédure");
+      throw error;
+    }
+  },
+
+  /**
+   * GET /admin/procedures/all
+   * @see ProceduresController.findAll()
+   */
+  async findAll(
+    query: ProcedureQueryDto = {},
+  ): Promise<PaginatedProcedureResponseDto> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== "") {
+        params.set(key, String(value));
+      }
+    }
+    const url = `${BASE_URL}${API.ADMIN_ALL}${params.toString() ? `?${params}` : ""}`;
+
+    try {
+      const res = await apiFetch(url, { method: "GET" });
+      return await handleResponse<PaginatedProcedureResponseDto>(res);
+    } catch (error) {
+      console.error("[ProceduresService] findAll error:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * GET /admin/procedures/statistics
+   * @see ProceduresController.getStatistics()
+   */
+  async getStatistics(): Promise<ProcedureStatisticsDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.ADMIN_STATISTICS}`, {
+        method: "GET",
+      });
+      return await handleResponse<ProcedureStatisticsDto>(res);
+    } catch (error) {
+      toast.error("Erreur lors du chargement des statistiques");
+      throw error;
+    }
+  },
+
+  /**
+   * PATCH /admin/procedures/:id/steps/:stepName
+   * @see ProceduresController.updateStep()
+   */
+  async updateStep(
+    id: string,
+    stepName: StepName,
+    data: UpdateStepDto,
+  ): Promise<ProcedureResponseDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.ADMIN_STEP(id, stepName)}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse<ProcedureResponseDto>(res);
+      toast.success(`Étape ${stepName} mise à jour avec succès`);
+      return result;
+    } catch (error) {
+      toast.error(`Erreur lors de la mise à jour de l'étape ${stepName}`);
+      throw error;
+    }
+  },
+
+  /**
+   * POST /admin/procedures/:id/steps/:stepName
+   * @see ProceduresController.addStep()
+   */
+  async addStep(id: string, stepName: StepName): Promise<ProcedureResponseDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.ADMIN_STEP(id, stepName)}`, {
+        method: "POST",
+      });
+      const result = await handleResponse<ProcedureResponseDto>(res);
+      toast.success(`Étape ${stepName} ajoutée avec succès`);
+      return result;
+    } catch (error) {
+      toast.error(`Erreur lors de l'ajout de l'étape ${stepName}`);
+      throw error;
+    }
+  },
+
+  /**
+   * DELETE /admin/procedures/:id/delete
+   * @see ProceduresController.remove()
+   * Retourne 204 No Content
+   */
+  async remove(id: string, reason = "Suppression manuelle"): Promise<void> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.ADMIN_DELETE(id)}`, {
+        method: "DELETE",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ reason }),
+      });
+      await handleResponse<void>(res);
+      toast.success("Procédure supprimée avec succès");
+    } catch (error) {
+      toast.error("Erreur lors de la suppression de la procédure");
+      throw error;
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Routes mixtes (admin + utilisateur connecté)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * GET /procedures/by-email/:email
+   * @see ProceduresController.findByUserEmail()
+   */
+  async findByEmail(email: string): Promise<ProcedureResponseDto[]> {
+    const res = await apiFetch(`${BASE_URL}${API.PROCEDURE_BY_EMAIL(email)}`, {
+      method: "GET",
+    });
+
+    // 204 = pas de contenu mais pas d'erreur
+    if (res.status === 204) return [];
+
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      return [];
+    }
+
+    if (!res.ok) {
+      const err = new ProcedureServiceError(
+        (body as { message?: string })?.message ?? `Erreur ${res.status}`,
+        res.status,
+        body as ApiError,
+      );
+      throw err;
+    }
+
+    // Le backend retourne un tableau directement
+    if (Array.isArray(body)) return body as ProcedureResponseDto[];
+    return [];
+  },
+
+  /**
+   * GET /procedures/by-rendezvous/:rendezVousId
+   * @see ProceduresController.findByRendezvousId()
+   */
+  async findByRendezvousId(
+    rendezVousId: string,
+  ): Promise<ProcedureResponseDto | null> {
+    const res = await apiFetch(
+      `${BASE_URL}${API.PROCEDURE_BY_RENDEZVOUS(rendezVousId)}`,
+      { method: "GET" },
+    );
+    if (res.status === 404) return null;
+    return handleResponse<ProcedureResponseDto>(res);
+  },
+
+  /**
+   * GET /procedures/:id/details
+   * @see ProceduresController.findOne()
+   */
+  async findById(id: string): Promise<ProcedureResponseDto> {
+    const res = await apiFetch(`${BASE_URL}${API.PROCEDURE_DETAILS(id)}`, {
+      method: "GET",
+    });
+    return handleResponse<ProcedureResponseDto>(res);
+  },
+
+  /**
+   * PATCH /procedures/:id/update
+   * @see ProceduresController.update()
+   */
+  async update(
+    id: string,
+    data: UpdateProcedureDto,
+  ): Promise<ProcedureResponseDto> {
+    const res = await apiFetch(`${BASE_URL}${API.PROCEDURE_UPDATE(id)}`, {
+      method: "PATCH",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(data),
+    });
+    return handleResponse<ProcedureResponseDto>(res);
+  },
+
+  /**
+   * PATCH /procedures/:id/cancel
+   * @see ProceduresController.cancel()
+   */
+  async cancel(
+    id: string,
+    reason = "Annulation par l'utilisateur",
+  ): Promise<ProcedureResponseDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.PROCEDURE_CANCEL(id)}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ reason }),
+      });
+      const result = await handleResponse<ProcedureResponseDto>(res);
+      toast.success("Procédure annulée avec succès");
+      return result;
+    } catch (error) {
+      toast.error("Erreur lors de l'annulation de la procédure");
+      throw error;
+    }
   },
 };

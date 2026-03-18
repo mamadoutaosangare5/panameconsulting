@@ -18,30 +18,32 @@ export class EmailProcessor {
     this.logger.log('Traitement email');
 
     try {
-      // Envoyer l'email
-      await this.mailService.sendEmail({
+      const result = await this.mailService.sendEmail({
         to: data.to,
         from: data.from,
         fromName: data.fromName,
         subject: data.subject,
         html: data.html,
         attachments: data.attachments,
+        cc: data.cc,
+        bcc: data.bcc,
+        replyTo: data.replyTo,
       });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Échec envoi email');
+      }
 
       this.logger.log('Email envoyé avec succès');
 
       return {
         success: true,
-        jobId: LoggerSanitizer.maskId(job.id.toString()),
-        to: Array.isArray(data.to)
-          ? data.to.map((email) => LoggerSanitizer.maskEmail(email))
-          : LoggerSanitizer.maskEmail(data.to),
+        jobId: job.id,
         subject: data.subject,
       };
     } catch (error) {
-      this.logger.error('Erreur envoi email');
+      this.logger.error('Erreur envoi email', (error as Error).stack);
 
-      // Log spécial pour dernière tentative
       if (job.attemptsMade >= (job.opts.attempts || 3) - 1) {
         this.logger.log('Échec définitif');
       }

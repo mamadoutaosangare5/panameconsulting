@@ -1,5 +1,3 @@
-// create-rendezvous.dto.ts
-
 import {
   IsString,
   IsNotEmpty,
@@ -11,10 +9,9 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RENDEZVOUS_CONSTANTS } from '../../holidays/holidays.service';
 
 export class CreateRendezvousDto {
-  // ==================== INFORMATIONS PERSONNELLES ====================
-
   @ApiProperty({
     description: 'Prénom',
     example: 'Jean',
@@ -69,8 +66,6 @@ export class CreateRendezvousDto {
   @MaxLength(20, { message: 'Le téléphone ne peut pas dépasser 20 caractères' })
   telephone: string;
 
-  // ==================== DESTINATION ====================
-
   @ApiProperty({
     description: 'Destination choisie',
     example: 'France',
@@ -114,8 +109,6 @@ export class CreateRendezvousDto {
       'La destination personnalisée ne peut contenir que des lettres, espaces, tirets, plus et apostrophes',
   })
   destinationAutre?: string;
-
-  // ==================== NIVEAU D'ÉTUDE ====================
 
   @ApiProperty({
     description: "Niveau d'étude",
@@ -163,8 +156,6 @@ export class CreateRendezvousDto {
   })
   niveauEtudeAutre?: string;
 
-  // ==================== FILIÈRE ====================
-
   @ApiProperty({
     description: 'Filière choisie',
     example: 'Informatique',
@@ -209,8 +200,6 @@ export class CreateRendezvousDto {
   })
   filiereAutre?: string;
 
-  // ==================== DATE ET HEURE ====================
-
   @ApiProperty({
     description: 'Date du rendez-vous (format YYYY-MM-DD)',
     example: '2024-12-25',
@@ -226,6 +215,7 @@ export class CreateRendezvousDto {
   @ApiProperty({
     description: 'Heure du rendez-vous (format HH:MM)',
     example: '14:30',
+    enum: RENDEZVOUS_CONSTANTS.TIME_SLOTS.ALL,
   })
   @IsString({ message: "L'heure doit être une chaîne de caractères" })
   @IsNotEmpty({ message: "L'heure est requise" })
@@ -233,5 +223,16 @@ export class CreateRendezvousDto {
     message:
       "Format d'heure invalide (HH:MM requis avec des heures entre 00-23 et minutes entre 00-59)",
   })
+  @ValidateIf(
+    (o: CreateRendezvousDto) => {
+      if (!o.time) return true;
+      const [hours, minutes] = o.time.split(':').map(Number);
+      const isLunchBreak = (hours === 12 && minutes >= 30) || hours === 13;
+      return !isLunchBreak;
+    },
+    {
+      message: RENDEZVOUS_CONSTANTS.VALIDATION_MESSAGES.LUNCH_BREAK,
+    },
+  )
   time: string;
 }

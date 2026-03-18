@@ -1,32 +1,24 @@
 // ============================================================
 // rendezvous.service.ts
-// Version COMPLÈTE alignée sur le backend Prisma
+// Version alignée strictement sur le backend
 // ============================================================
 
 import { apiFetch } from "../context/AuthContext";
-import { toast } from "react-hot-toast";
 import type {
-  // Enums
   TimeSlot,
-
-  // DTOs Requête
   CreateRendezvousDto,
   UpdateRendezvousDto,
   CancelRendezvousDto,
   CompleteRendezvousDto,
   RendezvousQueryDto,
-
-  // DTOs Réponse
   RendezvousResponseDto,
   PaginatedRendezvousResponseDto,
   RendezvousStatisticsDto,
   AvailableSlotsDto,
   AvailabilityCheckDto,
   AvailableDatesResponseDto,
-
-  // Types utilitaires
-  ApiError,
   RendezvousFilters,
+  ApiError,
 } from "../types/rendezvous.types";
 
 class RendezvousService {
@@ -36,38 +28,17 @@ class RendezvousService {
     this.baseUrl = import.meta.env.VITE_API_URL as string;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Helper functions
-  // ─────────────────────────────────────────────────────────────
-
-  /**
-   * Calcule les champs effectifs (destination, niveau, filière)
-   * Préserve toutes les propriétés du backend dont canCancel, canModify, etc.
-   */
-  private calculateEffectiveFields(
-    rdv: RendezvousResponseDto,
-  ): RendezvousResponseDto {
-    return {
-      ...rdv, // Préserver TOUTES les propriétés du backend
-      effectiveDestination: rdv.destinationAutre || rdv.destination || "",
-      effectiveNiveauEtude: rdv.niveauEtudeAutre || rdv.niveauEtude || "",
-      effectiveFiliere: rdv.filiereAutre || rdv.filiere || "",
-    };
-  }
-
-  // ==================== UTILITAIRES PRIVÉS ====================
-
   /**
    * Construit l'URL avec les paramètres de requête
    */
   private buildUrl(
     path: string,
-    params?: Record<string, string | number | boolean> | RendezvousQueryDto,
+    params?: Record<string, string | number | boolean>,
   ): string {
     const url = new URL(`${this.baseUrl}${path}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
+        if (value !== undefined && value !== null) {
           url.searchParams.append(key, String(value));
         }
       });
@@ -84,7 +55,7 @@ class RendezvousService {
   }
 
   /**
-   * Gère les erreurs API de manière centralisée
+   * Gère les erreurs API
    */
   private async handleError(response: Response): Promise<never> {
     let errorMessage = `Erreur ${response.status}`;
@@ -92,105 +63,47 @@ class RendezvousService {
     try {
       const errorData: ApiError = await response.json();
       errorMessage = errorData.message || errorMessage;
-
-      // Afficher les erreurs de validation détaillées
-      if (errorData.errors?.length) {
-        errorData.errors.forEach((err) => {
-          toast.error(`${err.field}: ${err.message}`);
-        });
-      } else {
-        toast.error(errorMessage);
-      }
     } catch {
-      toast.error(errorMessage);
+      // Ignorer
     }
 
     throw new Error(errorMessage);
   }
 
   /**
-   * Traite la réponse API de manière uniforme
+   * Traite la réponse API
    */
   private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) await this.handleError(response);
-
-    // Cas 204 No Content
-    if (response.status === 204) return undefined as T;
-
-    try {
-      const data = await response.json();
-
-      // Cas 1: Réponse enveloppée { data, message, statusCode }
-      if (data && typeof data === "object" && "data" in data) {
-        return data.data as T;
-      }
-
-      // Cas 2: Réponse directe
-      return data as T;
-    } catch (error) {
-      console.error("Erreur parsing JSON:", error);
-      throw new Error("Réponse invalide du serveur", { cause: error });
+    if (!response.ok) {
+      await this.handleError(response);
     }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    const data = await response.json();
+
+    if (data && typeof data === "object" && "data" in data) {
+      return data.data as T;
+    }
+
+    return data as T;
   }
-
-  /**
-   * Masque les données sensibles pour les logs
-   */
-  private maskSensitiveData(data: unknown): unknown {
-    if (!data || typeof data !== "object") return data;
-
-    const masked = { ...data } as Record<string, unknown>;
-
-    if (masked.email && typeof masked.email === "string") {
-      const [local, domain] = masked.email.split("@");
-      masked.email = `${local.charAt(0)}***@${domain}`;
-    }
-
-    if (masked.telephone && typeof masked.telephone === "string") {
-      masked.telephone = masked.telephone.replace(/\d(?=\d{4})/g, "*");
-    }
-
-    return masked;
-  }
-
-  // ==================== ROUTES PUBLIQUES ====================
 
   /**
    * GET /rendezvous/available-slots/:date
-   * Récupère les créneaux disponibles pour une date donnée
    */
   async getAvailableSlots(date: Date | string): Promise<AvailableSlotsDto> {
     const dateStr = this.formatDate(date);
     const url = `${this.baseUrl}/rendezvous/available-slots/${encodeURIComponent(dateStr)}`;
 
-    try {
-      const response = await apiFetch(url);
-      const result = await this.handleResponse<AvailableSlotsDto>(response);
-
-      console.log(
-        `[RendezvousService]  ${result.availableSlots.length} créneaux disponibles pour ${dateStr}`,
-      );
-      toast.success(
-        `${result.availableSlots.length} créneaux disponibles pour ${dateStr}`,
-      );
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService] Erreur getAvailableSlots:`, error);
-
-      // Fallback en cas d'erreur
-      return {
-        date: new Date().toISOString(),
-        available: false,
-        availableSlots: [],
-        totalSlots: 16,
-        occupiedSlots: 0,
-      };
-    }
+    const response = await apiFetch(url);
+    return this.handleResponse<AvailableSlotsDto>(response);
   }
 
   /**
    * GET /rendezvous/available-dates
-   * Récupère les dates disponibles sur une période
    */
   async getAvailableDates(
     startDate?: Date | string,
@@ -202,27 +115,13 @@ class RendezvousService {
     if (endDate) params.endDate = this.formatDate(endDate);
 
     const url = this.buildUrl("/rendezvous/available-dates", params);
-    console.log(`[RendezvousService] GET ${url}`);
+    const response = await apiFetch(url);
 
-    try {
-      const response = await apiFetch(url);
-      const result =
-        await this.handleResponse<AvailableDatesResponseDto[]>(response);
-
-      console.log(
-        `[RendezvousService]  ${result.length} dates disponibles trouvées`,
-      );
-      toast.success(`${result.length} dates disponibles`);
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService]  Erreur getAvailableDates:`, error);
-      return [];
-    }
+    return this.handleResponse<AvailableDatesResponseDto[]>(response);
   }
 
   /**
    * GET /rendezvous/check-availability
-   * Vérifie la disponibilité d'un créneau spécifique
    */
   async checkAvailability(
     date: Date | string,
@@ -231,179 +130,125 @@ class RendezvousService {
     const dateStr = this.formatDate(date);
     const url = `${this.baseUrl}/rendezvous/check-availability?date=${encodeURIComponent(dateStr)}&time=${encodeURIComponent(time)}`;
 
-    console.log(`[RendezvousService] GET ${url}`);
-
-    try {
-      const response = await apiFetch(url);
-      const result = await this.handleResponse<AvailabilityCheckDto>(response);
-      if (result.available) {
-        toast.success(`Créneau ${dateStr} ${time} disponible`);
-      } else {
-        toast.error(`Créneau ${dateStr} ${time} non disponible`);
-      }
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService]  Erreur checkAvailability:`, error);
-
-      // Fallback
-      return {
-        available: false,
-        date: dateStr,
-        time,
-        alternativeSlots: [],
-      };
-    }
+    const response = await apiFetch(url);
+    return this.handleResponse<AvailabilityCheckDto>(response);
   }
-
-  // ==================== ROUTES UTILISATEUR ====================
 
   /**
    * POST /rendezvous
-   * Crée un nouveau rendez-vous
    */
   async createRendezvous(
     data: CreateRendezvousDto,
   ): Promise<RendezvousResponseDto> {
-    // Valider les champs "Autre" obligatoires
-    this.validateAutreFields(data);
-
-    // Préparer les données en gérant la logique "Autre"
-    const preparedData = this.prepareCreateData(data);
-
     const url = `${this.baseUrl}/rendezvous`;
-    const maskedData = this.maskSensitiveData(preparedData);
 
-    console.log(`[RendezvousService] POST ${url}`, maskedData);
+    const response = await apiFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
-    try {
-      const response = await apiFetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preparedData),
-      });
-
-      const result = await this.handleResponse<RendezvousResponseDto>(response);
-      toast.success(`Rendez-vous créé avec succès`);
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService]  Erreur createRendezvous:`, error);
-      throw error;
-    }
+    return this.handleResponse<RendezvousResponseDto>(response);
   }
 
   /**
    * GET /rendezvous/by-email/:email
-   * Récupère les rendez-vous d'un utilisateur par email
    */
   async getRendezvousByEmail(email: string): Promise<RendezvousResponseDto[]> {
     const url = `${this.baseUrl}/rendezvous/by-email/${encodeURIComponent(email)}`;
-    console.log(`[RendezvousService] GET ${url}`);
 
-    try {
-      const response = await apiFetch(url);
-      const result =
-        await this.handleResponse<RendezvousResponseDto[]>(response);
-
-      // Appliquer les champs effectifs
-      const processedResult = result.map((rdv: RendezvousResponseDto) =>
-        this.calculateEffectiveFields(rdv),
-      );
-
-      toast.success(`${processedResult.length} rendez-vous trouvés`);
-      return processedResult;
-    } catch (error) {
-      console.error(`[RendezvousService]  Erreur getRendezvousByEmail:`, error);
-      toast.error("Erreur lors de la récupération des rendez-vous");
-      return [];
-    }
+    const response = await apiFetch(url);
+    return this.handleResponse<RendezvousResponseDto[]>(response);
   }
 
   /**
    * GET /rendezvous/:id
-   * Récupère un rendez-vous par son ID
    */
   async getRendezvousById(id: string): Promise<RendezvousResponseDto> {
     const url = `${this.baseUrl}/rendezvous/${id}`;
-    console.log(`[RendezvousService] GET ${url}`);
 
-    try {
-      const response = await apiFetch(url);
-      const result = await this.handleResponse<RendezvousResponseDto>(response);
-      toast.success(`Rendez-vous trouvé`);
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService] Erreur getRendezvousById:`, error);
-      toast.error("Erreur lors de la récupération du rendez-vous");
-      throw error;
-    }
+    const response = await apiFetch(url);
+    return this.handleResponse<RendezvousResponseDto>(response);
   }
 
   /**
    * PATCH /rendezvous/:id/cancel
-   * Annule un rendez-vous
    */
   async cancelRendezvous(
     id: string,
     data: CancelRendezvousDto,
   ): Promise<RendezvousResponseDto> {
     const url = `${this.baseUrl}/rendezvous/${id}/cancel`;
-    console.log(`[RendezvousService] PATCH ${url}`, data);
 
-    try {
-      const response = await apiFetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+    const response = await apiFetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
-      const result = await this.handleResponse<RendezvousResponseDto>(response);
-      toast.success(`Rendez-vous annulé`);
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService]  Erreur cancelRendezvous:`, error);
-      toast.error("Erreur lors de l'annulation du rendez-vous");
-      throw error;
-    }
+    return this.handleResponse<RendezvousResponseDto>(response);
   }
 
-  // ==================== ROUTES ADMIN ====================
+  /**
+   * GET /admin/rendezvous/all
+   */
+  async searchRendezvous(
+    params: RendezvousQueryDto,
+  ): Promise<PaginatedRendezvousResponseDto> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    const url = `${this.baseUrl}/admin/rendezvous/all${
+      searchParams.toString() ? `?${searchParams}` : ""
+    }`;
+
+    const response = await apiFetch(url);
+    return this.handleResponse<PaginatedRendezvousResponseDto>(response);
+  }
+
+  /**
+   * GET /admin/rendezvous/statistics
+   */
+  async getStatistics(): Promise<RendezvousStatisticsDto> {
+    const response = await apiFetch(`${this.baseUrl}/admin/rendezvous/statistics`);
+    return this.handleResponse<RendezvousStatisticsDto>(response);
+  }
+
+  /**
+   * GET /rendezvous/by-date/:date
+   */
+  async getRendezvousByDate(date: string): Promise<RendezvousResponseDto[]> {
+    const url = `${this.baseUrl}/rendezvous/by-date/${encodeURIComponent(date)}`;
+
+    const response = await apiFetch(url);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  }
 
   /**
    * PATCH /admin/rendezvous/:id/patch
-   * Met à jour un rendez-vous
    */
   async updateRendezvous(
     id: string,
     data: UpdateRendezvousDto,
   ): Promise<RendezvousResponseDto> {
-    // Valider les champs "Autre" obligatoires
-    this.validateAutreFields(data as CreateRendezvousDto);
-
-    // Préparer les données en gérant la logique "Autre"
-    const preparedData = this.prepareUpdateData(data);
-
     const url = `${this.baseUrl}/admin/rendezvous/${id}/patch`;
 
-    try {
-      const response = await apiFetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preparedData),
-      });
+    const response = await apiFetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
-      const result = await this.handleResponse<RendezvousResponseDto>(response);
-      toast.success(`Rendez-vous mis à jour`);
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService] Erreur updateRendezvous:`, error);
-      toast.error("Erreur lors de la mise à jour du rendez-vous");
-      throw error;
-    }
+    return this.handleResponse<RendezvousResponseDto>(response);
   }
 
   /**
    * PATCH /admin/rendezvous/:id/complete
-   * Marque un rendez-vous comme terminé (avec avis admin)
    */
   async completeRendezvous(
     id: string,
@@ -411,398 +256,65 @@ class RendezvousService {
   ): Promise<RendezvousResponseDto> {
     const url = `${this.baseUrl}/admin/rendezvous/${id}/complete`;
 
-    try {
-      const response = await apiFetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+    const response = await apiFetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
-      const result = await this.handleResponse<RendezvousResponseDto>(response);
-      toast.success(`Rendez-vous marqué comme terminé`);
-      return result;
-    } catch (error) {
-      console.error(`[RendezvousService] Erreur completeRendezvous:`, error);
-      toast.error("Erreur lors de la marquage du rendez-vous comme terminé");
-      throw error;
-    }
+    return this.handleResponse<RendezvousResponseDto>(response);
   }
 
   /**
    * DELETE /admin/rendezvous/:id/delete
-   * Supprime (soft delete) un rendez-vous
    */
   async deleteRendezvous(id: string): Promise<void> {
     const url = `${this.baseUrl}/admin/rendezvous/${id}/delete`;
 
-    try {
-      const response = await apiFetch(url, { method: "DELETE" });
-      await this.handleResponse<void>(response);
-      toast.success(`Rendez-vous supprimé`);
-    } catch (error) {
-      console.error(`[RendezvousService]  Erreur deleteRendezvous:`, error);
-      toast.error("Erreur lors de la suppression du rendez-vous");
-      throw error;
-    }
+    const response = await apiFetch(url, { method: "DELETE" });
+    await this.handleResponse<void>(response);
   }
 
   /**
-   * GET /admin/rendezvous/statistics
-   * Récupère les statistiques des rendez-vous (admin seulement)
-   */
-  async getStatistics(): Promise<RendezvousStatisticsDto> {
-    try {
-      console.log("[RendezvousService] Récupération des statistiques...");
-      const response = await apiFetch(
-        `${this.baseUrl}/admin/rendezvous/statistics`,
-        {
-          method: "GET",
-        },
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.message ||
-          "Erreur lors de la récupération des statistiques";
-        console.error("[RendezvousService] Erreur:", errorMessage, errorData);
-        toast.error(errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log("[RendezvousService] ✅ Statistiques reçues:", result);
-
-      // Extraire les données du wrapper si nécessaire
-      const statistics = result.data || result;
-      console.log("[RendezvousService] 📊 Statistiques extraites:", statistics);
-
-      return statistics;
-    } catch (error) {
-      console.error(
-        "[RendezvousService] ❌ Erreur lors de la récupération des statistiques:",
-        error,
-      );
-      toast.error("Erreur lors de la récupération des statistiques");
-      throw error;
-    }
-  }
-
-  // ==================== MÉTHODES UTILITAIRES POUR VALEURS PERSONNALISÉES ====================
-
-  /**
-   * Récupère la valeur effective d'un champ (gère la logique "Autre")
-   */
-  private getEffectiveValue(
-    mainValue: string,
-    autreValue?: string | null,
-  ): string {
-    if (mainValue?.toLowerCase().trim() === "autre" && autreValue) {
-      return autreValue.trim();
-    }
-    return mainValue?.trim() || "";
-  }
-
-  /**
-   * Prépare les données pour la création en gérant la logique "Autre"
-   * et la conversion des TimeSlot pour le backend
-   */
-  private prepareCreateData(data: CreateRendezvousDto): CreateRendezvousDto {
-    return {
-      ...data,
-      destination: this.getEffectiveValue(
-        data.destination,
-        data.destinationAutre,
-      ),
-      niveauEtude: this.getEffectiveValue(
-        data.niveauEtude,
-        data.niveauEtudeAutre,
-      ),
-      filiere: this.getEffectiveValue(data.filiere, data.filiereAutre),
-      // Convertir le TimeSlot au format attendu par le backend
-      time: this.convertTimeSlotForBackend(data.time),
-    };
-  }
-
-  /**
-   * Prépare les données pour la mise à jour en gérant la logique "Autre"
-   * et la conversion des TimeSlot pour le backend
-   */
-  private prepareUpdateData(data: UpdateRendezvousDto): UpdateRendezvousDto {
-    const prepared: UpdateRendezvousDto = { ...data };
-
-    if (data.destination !== undefined) {
-      prepared.destination = this.getEffectiveValue(
-        data.destination,
-        data.destinationAutre,
-      );
-    }
-    if (data.niveauEtude !== undefined) {
-      prepared.niveauEtude = this.getEffectiveValue(
-        data.niveauEtude,
-        data.niveauEtudeAutre,
-      );
-    }
-    if (data.filiere !== undefined) {
-      prepared.filiere = this.getEffectiveValue(
-        data.filiere,
-        data.filiereAutre,
-      );
-    }
-
-    // Convertir le TimeSlot si présent
-    if (data.time !== undefined) {
-      prepared.time = this.convertTimeSlotForBackend(data.time);
-    }
-
-    return prepared;
-  }
-
-  /**
-   * Convertit un TimeSlot pour le backend
-   * Le frontend utilise "09:00" mais le backend attend "SLOT_0900"
-   */
-  private convertTimeSlotForBackend(timeSlot: TimeSlot): TimeSlot {
-    // Si déjà au format SLOT_*, retourner tel quel
-    if (typeof timeSlot === "string" && timeSlot.startsWith("SLOT_")) {
-      return timeSlot;
-    }
-
-    // Convertir du format HH:MM vers SLOT_*
-    const timeMap: Record<string, TimeSlot> = {
-      "09:00": "SLOT_0900" as TimeSlot,
-      "09:30": "SLOT_0930" as TimeSlot,
-      "10:00": "SLOT_1000" as TimeSlot,
-      "10:30": "SLOT_1030" as TimeSlot,
-      "11:00": "SLOT_1100" as TimeSlot,
-      "11:30": "SLOT_1130" as TimeSlot,
-      "12:00": "SLOT_1200" as TimeSlot,
-      "12:30": "SLOT_1230" as TimeSlot,
-      "13:00": "SLOT_1300" as TimeSlot,
-      "13:30": "SLOT_1330" as TimeSlot,
-      "14:00": "SLOT_1400" as TimeSlot,
-      "14:30": "SLOT_1430" as TimeSlot,
-      "15:00": "SLOT_1500" as TimeSlot,
-      "15:30": "SLOT_1530" as TimeSlot,
-      "16:00": "SLOT_1600" as TimeSlot,
-      "16:30": "SLOT_1630" as TimeSlot,
-    };
-
-    return timeMap[timeSlot] || timeSlot;
-  }
-
-  /**
-   * Valide les champs "Autre" obligatoires
-   */
-  private validateAutreFields(data: CreateRendezvousDto): void {
-    const errors: string[] = [];
-
-    if (data.destination?.toLowerCase().trim() === "autre") {
-      if (!data.destinationAutre?.trim()) {
-        errors.push('La destination "Autre" nécessite une précision');
-      }
-    }
-
-    if (data.niveauEtude?.toLowerCase().trim() === "autre") {
-      if (!data.niveauEtudeAutre?.trim()) {
-        errors.push('Le niveau d\'étude "Autre" nécessite une précision');
-      }
-    }
-
-    if (data.filiere?.toLowerCase().trim() === "autre") {
-      if (!data.filiereAutre?.trim()) {
-        errors.push('La filière "Autre" nécessite une précision');
-      }
-    }
-
-    if (errors.length > 0) {
-      const errorMessage = errors.join(". ");
-      toast.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }
-
-  // ==================== MÉTHODES UTILITAIRES AVANCÉES ====================
-
-  /**
-   * Récupère les créneaux disponibles sous forme de simple liste
-   * Convertit les TimeSlot du backend vers le format HH:MM pour le frontend
-   */
-  async getAvailableSlotsList(date: Date | string): Promise<TimeSlot[]> {
-    try {
-      const slots = await this.getAvailableSlots(date);
-      // Convertir les TimeSlot du backend (SLOT_*) vers le format frontend (HH:MM)
-      return slots.availableSlots.map((slot) =>
-        this.convertTimeSlotFromBackend(slot),
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Convertit un TimeSlot du backend vers le format frontend
-   * Backend: SLOT_0900 -> Frontend: 09:00
-   */
-  private convertTimeSlotFromBackend(timeSlot: TimeSlot): TimeSlot {
-    // Si déjà au format HH:MM, retourner tel quel
-    if (typeof timeSlot === "string" && timeSlot.includes(":")) {
-      return timeSlot;
-    }
-
-    // Convertir du format SLOT_* vers HH:MM
-    const timeMap: Record<string, TimeSlot> = {
-      SLOT_0900: "09:00" as TimeSlot,
-      SLOT_0930: "09:30" as TimeSlot,
-      SLOT_1000: "10:00" as TimeSlot,
-      SLOT_1030: "10:30" as TimeSlot,
-      SLOT_1100: "11:00" as TimeSlot,
-      SLOT_1130: "11:30" as TimeSlot,
-      SLOT_1200: "12:00" as TimeSlot,
-      SLOT_1230: "12:30" as TimeSlot,
-      SLOT_1300: "13:00" as TimeSlot,
-      SLOT_1330: "13:30" as TimeSlot,
-      SLOT_1400: "14:00" as TimeSlot,
-      SLOT_1430: "14:30" as TimeSlot,
-      SLOT_1500: "15:00" as TimeSlot,
-      SLOT_1530: "15:30" as TimeSlot,
-      SLOT_1600: "16:00" as TimeSlot,
-      SLOT_1630: "16:30" as TimeSlot,
-    };
-
-    return timeMap[timeSlot] || timeSlot;
-  }
-
-  /**
-   * Rendez-vous du jour (admin)
-   */
-  async getTodayRendezvous(): Promise<RendezvousResponseDto[]> {
-    const today = new Date();
-    const dateStr = this.formatDate(today);
-    const response = await apiFetch(
-      `${this.baseUrl}/rendezvous/by-date/${dateStr}`,
-      {
-        method: "GET",
-      },
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message ||
-        "Erreur lors de la récupération des rendez-vous du jour";
-      toast.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const result = await response.json();
-    return Array.isArray(result) ? result : [];
-  }
-
-  /**
-   * Prochains rendez-vous confirmés (admin)
+   * GET /admin/rendezvous/all avec filtres simplifiés
    */
   async getUpcomingRendezvous(limit = 10): Promise<RendezvousResponseDto[]> {
-    try {
-      const today = new Date();
-      const dateStr = this.formatDate(today);
-      const response = await apiFetch(
-        `${this.baseUrl}/admin/rendezvous/all?status=CONFIRMED&startDate=${dateStr}&sortBy=date&sortOrder=asc&limit=${limit}`,
-        {
-          method: "GET",
-        },
-      );
+    const today = new Date();
+    const dateStr = this.formatDate(today);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.message ||
-          "Erreur lors de la récupération des prochains rendez-vous";
-        toast.error(errorMessage);
-        throw new Error(errorMessage);
-      }
+    const params: RendezvousQueryDto = {
+      status: "CONFIRMED",
+      date: dateStr,
+      sortBy: "date",
+      sortOrder: "asc",
+      limit,
+    };
 
-      const result = await response.json();
-      return result.data || [];
-    } catch (error) {
-      toast.error("Erreur lors de la récupération des prochains rendez-vous");
-      throw error;
-    }
+    const result = await this.searchRendezvous(params);
+    return result.data;
   }
 
   /**
-   * Recherche avancée avec filtres
-   */
-  async searchRendezvous(
-    filters: RendezvousFilters,
-    page = 1,
-    limit = 10,
-  ): Promise<PaginatedRendezvousResponseDto> {
-    try {
-      const params: RendezvousQueryDto = {
-        page,
-        limit,
-      };
-
-      if (filters.status) {
-        params.status = Array.isArray(filters.status)
-          ? filters.status[0]
-          : filters.status;
-      }
-
-      if (filters.searchTerm) params.search = filters.searchTerm;
-      if (filters.hasProcedure !== undefined)
-        params.hasProcedure = filters.hasProcedure;
-      if (filters.avisAdmin) {
-        params.hasAvis = true;
-      }
-
-      if (filters.dateRange) {
-        params.startDate = filters.dateRange.start;
-        params.endDate = filters.dateRange.end;
-      }
-
-      // Construire l'URL avec les paramètres
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.set(key, String(value));
-        }
-      });
-
-      const url = `${this.baseUrl}/admin/rendezvous/all${searchParams.toString() ? `?${searchParams}` : ""}`;
-      console.log("[RendezvousService] GET", url);
-
-      const response = await apiFetch(url, { method: "GET" });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.message || "Erreur lors de la recherche des rendez-vous";
-        toast.error(errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log("[RendezvousService] ✅ Rendez-vous reçus:", result);
-
-      // Appliquer les champs effectifs
-      result.data = result.data.map((rdv: RendezvousResponseDto) =>
-        this.calculateEffectiveFields(rdv),
-      );
-
-      return result;
-    } catch (error) {
-      toast.error("Erreur lors de la recherche des rendez-vous");
-      throw error;
-    }
-  }
-
-  /**
-   * Export CSV des rendez-vous
+   * Export CSV
    */
   async exportToCSV(filters?: RendezvousFilters): Promise<string> {
-    const result = await this.searchRendezvous(filters || {}, 1, 1000);
+    const params: RendezvousQueryDto = {
+      limit: 1000,
+      ...(filters && {
+        ...(filters.status && { 
+          status: Array.isArray(filters.status) ? filters.status[0] : filters.status 
+        }),
+        ...(filters.dateRange && { 
+          startDate: filters.dateRange.start, 
+          endDate: filters.dateRange.end 
+        }),
+        ...(filters.searchTerm && { search: filters.searchTerm }),
+        ...(filters.avisAdmin && { hasAvis: true }),
+        ...(filters.hasProcedure !== undefined && { hasProcedure: filters.hasProcedure }),
+      })
+    };
+
+    const result = await this.searchRendezvous(params);
 
     const headers = [
       "ID",
@@ -838,137 +350,6 @@ class RendezvousService {
 
     return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
   }
-
-  /**
-   * Vérifie si un utilisateur peut prendre un rendez-vous
-   */
-  async canUserCreateRendezvous(
-    email: string,
-    date: Date | string,
-  ): Promise<boolean> {
-    try {
-      const userRendezvous = await this.getRendezvousByEmail(email);
-      const dateStr = this.formatDate(date);
-
-      // Vérifier s'il a déjà un rendez-vous pour cette date
-      const existingForDate = userRendezvous.some(
-        (rdv) =>
-          rdv.date === dateStr &&
-          (rdv.status === "CONFIRMED" || rdv.status === "PENDING"),
-      );
-
-      return !existingForDate;
-    } catch {
-      return false;
-    }
-  }
-
-  // ==================== MÉTHODES UTILITAIRES POUR VALEURS PERSONNALISÉES (PUBLIQUES) ====================
-
-  /**
-   * Vérifie si une valeur nécessite un champ "Autre"
-   */
-  static requiresAutreField(value: string): boolean {
-    return value?.toLowerCase().trim() === "autre";
-  }
-
-  /**
-   * Formate une valeur pour l'affichage (gère la logique "Autre")
-   */
-  static formatValue(mainValue: string, autreValue?: string | null): string {
-    if (mainValue?.toLowerCase().trim() === "autre" && autreValue) {
-      return autreValue.trim();
-    }
-    return mainValue?.trim() || "";
-  }
-
-  /**
-   * Génère les options suggérées pour un champ
-   */
-  static getSuggestedOptions(
-    type: "destination" | "niveauEtude" | "filiere",
-  ): string[] {
-    switch (type) {
-      case "destination":
-        return [
-          "France",
-          "Russie",
-          "Chypre",
-          "Chine",
-          "Maroc",
-          "Algérie",
-          "Turquie",
-          "Autre",
-        ];
-      case "niveauEtude":
-        return [
-          "Bac",
-          "Bac+1",
-          "Bac+2",
-          "Licence",
-          "Master I",
-          "Master II",
-          "Doctorat",
-          "Autre",
-        ];
-      case "filiere":
-        return [
-          "Informatique",
-          "Médecine",
-          "Droit",
-          "Commerce",
-          "Ingénierie",
-          "Architecture",
-          "Autre",
-        ];
-      default:
-        return [];
-    }
-  }
-
-  /**
-   * Valide une valeur personnalisée
-   */
-  static validateCustomValue(
-    value: string,
-    type: "destination" | "niveauEtude" | "filiere",
-  ): { isValid: boolean; message?: string } {
-    const trimmed = value?.trim() || "";
-
-    if (trimmed.length < 2) {
-      return { isValid: false, message: "Doit contenir au moins 2 caractères" };
-    }
-
-    if (trimmed.length > 100) {
-      return { isValid: false, message: "Ne peut pas dépasser 100 caractères" };
-    }
-
-    // Validation spécifique par type
-    switch (type) {
-      case "destination":
-        // Accepte lettres, espaces, tirets, apostrophes
-        if (!/^[a-zA-Z\s\-']+$/.test(trimmed)) {
-          return { isValid: false, message: "Caractères non valides" };
-        }
-        break;
-      case "niveauEtude":
-        // Accepte lettres, chiffres, espaces, tirets, plus, apostrophes
-        if (!/^[a-zA-Z0-9\s+\-']+$/.test(trimmed)) {
-          return { isValid: false, message: "Caractères non valides" };
-        }
-        break;
-      case "filiere":
-        // Accepte lettres, espaces, tirets, apostrophes
-        if (!/^[a-zA-Z\s\-']+$/.test(trimmed)) {
-          return { isValid: false, message: "Caractères non valides" };
-        }
-        break;
-    }
-
-    return { isValid: true };
-  }
 }
-
-// ==================== EXPORT ====================
 
 export const rendezvousService = new RendezvousService();

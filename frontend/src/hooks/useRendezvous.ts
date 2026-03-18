@@ -1,18 +1,13 @@
 // ============================================================
 // useRendezvous.ts
-// Version COMPLÈTE alignée sur le backend Prisma
+// Version alignée strictement sur le backend
 // ============================================================
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { rendezvousService } from "../services/rendezvous.service";
 import { useAuth } from "./useAuth";
-import { toast } from "react-hot-toast";
-import { apiFetch } from "../context/AuthContext";
-import { API_URL } from "../context/AuthContext";
 import type {
   TimeSlot,
-
-  // DTOs
   CreateRendezvousDto,
   UpdateRendezvousDto,
   CancelRendezvousDto,
@@ -26,18 +21,11 @@ import type {
   RendezvousFilters,
 } from "../types/rendezvous.types";
 
-// ==================== TYPES DU HOOK ====================
-
 interface UseRendezvousOptions {
-  /** Charge automatiquement les données au montage */
   autoLoad?: boolean;
-  /** Paramètres initiaux pour la liste paginée */
   initialParams?: RendezvousQueryDto;
-  /** Date de début pour les dates disponibles */
   initialStartDate?: string;
-  /** Date de fin pour les dates disponibles */
   initialEndDate?: string;
-  /** Rafraîchissement automatique (en ms) */
   refreshInterval?: number;
 }
 
@@ -65,103 +53,48 @@ interface PaginationState {
 }
 
 interface UseRendezvousReturn {
-  // ── État ──────────────────────────────────────────────────────────────────
-  /** Liste des rendez-vous (paginnée) */
+  // État
   rendezvous: RendezvousResponseDto[];
-  /** Rendez-vous sélectionné (détail) */
   selectedRendezvous: RendezvousResponseDto | null;
-  /** Statistiques des rendez-vous (admin) */
   statistics: RendezvousStatisticsDto | null;
-  /** Créneaux disponibles par date */
   availableSlots: AvailableSlotsDto[];
-  /** Dates disponibles */
   availableDates: AvailableDatesResponseDto[];
-  /** État de la pagination */
   pagination: PaginationState;
-  /** États de chargement */
   loading: LoadingState;
-  /** Erreur éventuelle */
   error: string | null;
-  /** Filtres actifs */
   filters: RendezvousFilters;
 
-  // ── Actions utilisateur ────────────────────────────────────────────────────
-  /** Crée un nouveau rendez-vous */
-  createRendezvous: (
-    data: CreateRendezvousDto,
-  ) => Promise<RendezvousResponseDto | null>;
-  /** Récupère les rendez-vous d'un utilisateur par email */
+  // Actions utilisateur
+  createRendezvous: (data: CreateRendezvousDto) => Promise<RendezvousResponseDto | null>;
   getRendezvousByEmail: (email: string) => Promise<RendezvousResponseDto[]>;
-  /** Annule un rendez-vous */
-  cancelRendezvous: (
-    id: string,
-    data: CancelRendezvousDto,
-  ) => Promise<RendezvousResponseDto | null>;
-  /** Vérifie la disponibilité d'un créneau */
-  checkAvailability: (
-    date: string,
-    time: TimeSlot,
-  ) => Promise<AvailabilityCheckDto | null>;
+  cancelRendezvous: (id: string, data: CancelRendezvousDto) => Promise<RendezvousResponseDto | null>;
+  checkAvailability: (date: string, time: TimeSlot) => Promise<AvailabilityCheckDto | null>;
 
-  // ── Actions admin ──────────────────────────────────────────────────────────
-  /** Charge la liste paginée des rendez-vous */
+  // Actions admin
   loadRendezvous: (params?: RendezvousQueryDto) => Promise<void>;
-  /** Charge un rendez-vous par son ID */
   loadRendezvousById: (id: string) => Promise<void>;
-  /** Charge les statistiques */
   loadStatistics: () => Promise<void>;
-  /** Charge les dates disponibles */
   loadAvailableDates: (startDate?: string, endDate?: string) => Promise<void>;
-  /** Récupère les dates disponibles (sans modifier l'état) */
-  getAvailableDates: (
-    startDate?: string,
-    endDate?: string,
-  ) => Promise<AvailableDatesResponseDto[]>;
-  /** Récupère les créneaux pour une date */
+  getAvailableDates: (startDate?: string, endDate?: string) => Promise<AvailableDatesResponseDto[]>;
   getAvailableSlots: (date: string) => Promise<AvailableSlotsDto>;
-  /** Récupère la liste des créneaux (version simplifiée) */
-  getAvailableSlotsList: (date: string) => Promise<TimeSlot[]>;
-  /** Met à jour un rendez-vous */
-  updateRendezvous: (
-    id: string,
-    data: UpdateRendezvousDto,
-  ) => Promise<RendezvousResponseDto | null>;
-  /** Marque un rendez-vous comme terminé */
-  completeRendezvous: (
-    id: string,
-    data: CompleteRendezvousDto,
-  ) => Promise<RendezvousResponseDto | null>;
-  /** Supprime un rendez-vous (soft delete) */
+  updateRendezvous: (id: string, data: UpdateRendezvousDto) => Promise<RendezvousResponseDto | null>;
+  completeRendezvous: (id: string, data: CompleteRendezvousDto) => Promise<RendezvousResponseDto | null>;
   deleteRendezvous: (id: string) => Promise<boolean>;
-  /** Récupère les rendez-vous par date */
   getRendezvousByDate: (date: string) => Promise<RendezvousResponseDto[]>;
-  /** Rafraîchit les rendez-vous du jour */
   refreshTodayRendezvous: () => Promise<void>;
-  /** Récupère les prochains rendez-vous confirmés */
   getUpcomingRendezvous: (limit?: number) => Promise<RendezvousResponseDto[]>;
-  /** Export CSV des rendez-vous */
   exportRendezvous: (filters?: RendezvousFilters) => Promise<string>;
 
-  // ── Utilitaires ────────────────────────────────────────────────────────────
-  /** Efface le rendez-vous sélectionné */
+  // Utilitaires
   clearSelectedRendezvous: () => void;
-  /** Met à jour les paramètres de requête */
   setQueryParams: (params: Partial<RendezvousQueryDto>) => void;
-  /** Met à jour les filtres */
   setFilters: (filters: RendezvousFilters) => void;
-  /** Réinitialise les filtres */
   resetFilters: () => void;
-  /** Passe à la page suivante */
   nextPage: () => void;
-  /** Passe à la page précédente */
   previousPage: () => void;
-  /** Va à une page spécifique */
   goToPage: (page: number) => void;
-  /** Change la limite par page */
   setLimit: (limit: number) => void;
 }
-
-// ==================== HOOK ====================
 
 export const useRendezvous = (
   options: UseRendezvousOptions = {},
@@ -177,23 +110,16 @@ export const useRendezvous = (
   const { user, isAuthenticated } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
-  // Refs pour éviter les dépendances circulaires
   const initialParamsRef = useRef(initialParams);
   const initialStartDateRef = useRef(initialStartDate);
   const initialEndDateRef = useRef(initialEndDate);
 
-  // ── État ──────────────────────────────────────────────────────────────────
-
+  // État
   const [rendezvous, setRendezvous] = useState<RendezvousResponseDto[]>([]);
-  const [selectedRendezvous, setSelectedRendezvous] =
-    useState<RendezvousResponseDto | null>(null);
-  const [statistics, setStatistics] = useState<RendezvousStatisticsDto | null>(
-    null,
-  );
+  const [selectedRendezvous, setSelectedRendezvous] = useState<RendezvousResponseDto | null>(null);
+  const [statistics, setStatistics] = useState<RendezvousStatisticsDto | null>(null);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlotsDto[]>([]);
-  const [availableDates, setAvailableDates] = useState<
-    AvailableDatesResponseDto[]
-  >([]);
+  const [availableDates, setAvailableDates] = useState<AvailableDatesResponseDto[]>([]);
   const [filters, setFiltersState] = useState<RendezvousFilters>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -220,8 +146,6 @@ export const useRendezvous = (
     dates: false,
   });
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
   const setLoadingKey = (key: keyof LoadingState, value: boolean) => {
     setLoading((prev) => ({ ...prev, [key]: value }));
   };
@@ -229,24 +153,13 @@ export const useRendezvous = (
   const handleError = (err: unknown, defaultMessage: string): string => {
     const message = err instanceof Error ? err.message : defaultMessage;
     setError(message);
-    toast.error(message);
     return message;
   };
 
-  // ── Log dev (désactivé pour éviter les logs de données) ─────────────────────────────
-  // ── Actions admin ──────────────────────────────────────────────────────────
-
-  /**
-   * Charge la liste paginée des rendez-vous
-   */
+  // Actions admin
   const loadRendezvous = useCallback(
     async (params: RendezvousQueryDto = {}) => {
-      if (!isAdmin) {
-        console.warn(
-          "[useRendezvous] Tentative d'accès admin par utilisateur non-admin",
-        );
-        return;
-      }
+      if (!isAdmin) return;
 
       setLoadingKey("list", true);
       setError(null);
@@ -264,11 +177,6 @@ export const useRendezvous = (
           hasNext: res.hasNext,
           hasPrevious: res.hasPrevious,
         });
-
-        // Log de succès sans données sensibles
-        console.log(
-          `[useRendezvous] ✅ ${res.data.length} rendez-vous chargés (page ${res.page}/${res.totalPages})`,
-        );
       } catch (err) {
         handleError(err, "Erreur lors du chargement des rendez-vous");
       } finally {
@@ -278,9 +186,6 @@ export const useRendezvous = (
     [isAdmin],
   );
 
-  /**
-   * Charge un rendez-vous par son ID
-   */
   const loadRendezvousById = useCallback(async (id: string) => {
     setLoadingKey("details", true);
     setError(null);
@@ -288,8 +193,6 @@ export const useRendezvous = (
     try {
       const data = await rendezvousService.getRendezvousById(id);
       setSelectedRendezvous(data);
-      // Log de succès sans données sensibles
-      console.log(`[useRendezvous] ✅ Rendez-vous ${id} chargé`);
     } catch (err) {
       handleError(err, "Rendez-vous introuvable");
     } finally {
@@ -297,9 +200,6 @@ export const useRendezvous = (
     }
   }, []);
 
-  /**
-   * Charge les statistiques des rendez-vous
-   */
   const loadStatistics = useCallback(async () => {
     if (!isAdmin) return;
 
@@ -308,18 +208,13 @@ export const useRendezvous = (
     try {
       const stats = await rendezvousService.getStatistics();
       setStatistics(stats);
-      // Log de succès sans données sensibles
-      console.log("[useRendezvous] ✅ Statistiques chargées");
     } catch (err) {
-      console.error("[useRendezvous] Erreur chargement statistiques:", err);
+      console.error("Erreur chargement statistiques:", err);
     } finally {
       setLoadingKey("statistics", false);
     }
   }, [isAdmin]);
 
-  /**
-   * Charge les dates disponibles
-   */
   const loadAvailableDates = useCallback(
     async (startDate?: string, endDate?: string) => {
       setLoadingKey("dates", true);
@@ -330,12 +225,7 @@ export const useRendezvous = (
           endDate,
         );
         setAvailableDates(dates);
-        // Log de succès sans données sensibles
-        console.log(
-          `[useRendezvous] ✅ ${dates.length} dates disponibles chargées`,
-        );
-      } catch (err) {
-        console.error("[useRendezvous] Erreur chargement dates:", err);
+      } catch {
         setAvailableDates([]);
       } finally {
         setLoadingKey("dates", false);
@@ -344,27 +234,17 @@ export const useRendezvous = (
     [],
   );
 
-  /**
-   * Récupère les dates disponibles (sans modifier l'état)
-   */
   const getAvailableDates = useCallback(
-    async (
-      startDate?: string,
-      endDate?: string,
-    ): Promise<AvailableDatesResponseDto[]> => {
+    async (startDate?: string, endDate?: string): Promise<AvailableDatesResponseDto[]> => {
       try {
         return await rendezvousService.getAvailableDates(startDate, endDate);
-      } catch (err) {
-        console.error("[useRendezvous] Erreur récupération dates:", err);
-        throw err;
+      } catch {
+        return [];
       }
     },
     [],
   );
 
-  /**
-   * Récupère les créneaux disponibles pour une date
-   */
   const getAvailableSlots = useCallback(
     async (date: string): Promise<AvailableSlotsDto> => {
       setLoadingKey("slots", true);
@@ -372,7 +252,6 @@ export const useRendezvous = (
       try {
         const slots = await rendezvousService.getAvailableSlots(date);
 
-        // Mettre à jour l'état availableSlots
         setAvailableSlots((prev) => {
           const exists = prev.some((s) => s.date === slots.date);
           if (exists) {
@@ -381,17 +260,8 @@ export const useRendezvous = (
           return [...prev, slots];
         });
 
-        // Log de succès sans données sensibles
-        console.log(
-          `[useRendezvous] ✅ ${slots.availableSlots.length} créneaux pour ${date}`,
-        );
         return slots;
-      } catch (err) {
-        console.error(
-          `[useRendezvous] Erreur chargement créneaux pour ${date}:`,
-          err,
-        );
-
+      } catch {
         const defaultSlots: AvailableSlotsDto = {
           date: new Date().toISOString(),
           available: false,
@@ -407,50 +277,20 @@ export const useRendezvous = (
     [],
   );
 
-  /**
-   * Version simplifiée - retourne seulement la liste des créneaux
-   */
-  const getAvailableSlotsList = useCallback(
-    async (date: string): Promise<TimeSlot[]> => {
-      try {
-        const slots = await getAvailableSlots(date);
-        return slots.availableSlots;
-      } catch {
-        return [];
-      }
-    },
-    [getAvailableSlots],
-  );
-
-  /**
-   * Met à jour un rendez-vous
-   */
   const updateRendezvous = useCallback(
-    async (
-      id: string,
-      data: UpdateRendezvousDto,
-    ): Promise<RendezvousResponseDto | null> => {
-      if (!isAdmin) {
-        toast.error("Action réservée aux administrateurs");
-        return null;
-      }
+    async (id: string, data: UpdateRendezvousDto): Promise<RendezvousResponseDto | null> => {
+      if (!isAdmin) return null;
 
       setLoadingKey("update", true);
 
       try {
         const updated = await rendezvousService.updateRendezvous(id, data);
 
-        // Mettre à jour la liste
-        setRendezvous((prev) =>
-          prev.map((r) => (r.id === updated.id ? updated : r)),
-        );
+        setRendezvous((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
 
-        // Mettre à jour le rendez-vous sélectionné si c'est le même
         if (selectedRendezvous?.id === updated.id) {
           setSelectedRendezvous(updated);
         }
-
-        toast.success("Rendez-vous mis à jour avec succès");
 
         return updated;
       } catch (err) {
@@ -463,75 +303,33 @@ export const useRendezvous = (
     [isAdmin, selectedRendezvous],
   );
 
-  /**
-   * Récupère les rendez-vous par date
-   */
   const getRendezvousByDate = useCallback(
     async (date: string): Promise<RendezvousResponseDto[]> => {
       if (!isAdmin) return [];
 
       try {
-        // Créer une instance temporaire du service pour appeler l'endpoint par date
-        const response = await apiFetch(
-          `${API_URL}/rendezvous/by-date/${date}`,
-          {
-            method: "GET",
-          },
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const errorMessage =
-            errorData.message ||
-            "Erreur lors de la récupération des rendez-vous";
-          toast.error(errorMessage);
-          return [];
-        }
-
-        const data = await response.json();
-        return Array.isArray(data) ? data : [];
-      } catch (err) {
-        console.error(
-          `[useRendezvous] Erreur chargement rendez-vous pour ${date}:`,
-          err,
-        );
+        return await rendezvousService.getRendezvousByDate(date);
+      } catch {
         return [];
       }
     },
     [isAdmin],
   );
 
-  /**
-   * Marque un rendez-vous comme terminé
-   */
   const completeRendezvous = useCallback(
-    async (
-      id: string,
-      data: CompleteRendezvousDto,
-    ): Promise<RendezvousResponseDto | null> => {
-      if (!isAdmin) {
-        toast.error("Action réservée aux administrateurs");
-        return null;
-      }
+    async (id: string, data: CompleteRendezvousDto): Promise<RendezvousResponseDto | null> => {
+      if (!isAdmin) return null;
 
       setLoadingKey("complete", true);
 
       try {
         const completed = await rendezvousService.completeRendezvous(id, data);
 
-        // Mettre à jour la liste
-        setRendezvous((prev) =>
-          prev.map((r) => (r.id === completed.id ? completed : r)),
-        );
+        setRendezvous((prev) => prev.map((r) => (r.id === completed.id ? completed : r)));
 
-        // Mettre à jour le rendez-vous sélectionné si c'est le même
         if (selectedRendezvous?.id === completed.id) {
           setSelectedRendezvous(completed);
         }
-
-        const avisMsg =
-          data.avisAdmin === "FAVORABLE" ? "favorable" : "défavorable";
-        toast.success(`Rendez-vous terminé avec avis ${avisMsg}`);
 
         return completed;
       } catch (err) {
@@ -544,30 +342,20 @@ export const useRendezvous = (
     [isAdmin, selectedRendezvous],
   );
 
-  /**
-   * Supprime un rendez-vous (soft delete)
-   */
   const deleteRendezvous = useCallback(
     async (id: string): Promise<boolean> => {
-      if (!isAdmin) {
-        toast.error("Action réservée aux administrateurs");
-        return false;
-      }
+      if (!isAdmin) return false;
 
       setLoadingKey("delete", true);
 
       try {
         await rendezvousService.deleteRendezvous(id);
 
-        // Retirer de la liste
         setRendezvous((prev) => prev.filter((r) => r.id !== id));
 
-        // Effacer le rendez-vous sélectionné si c'est le même
         if (selectedRendezvous?.id === id) {
           setSelectedRendezvous(null);
         }
-
-        toast.success("Rendez-vous supprimé avec succès");
 
         return true;
       } catch (err) {
@@ -580,91 +368,55 @@ export const useRendezvous = (
     [isAdmin, selectedRendezvous],
   );
 
-  /**
-   * Rafraîchit les rendez-vous du jour
-   */
   const refreshTodayRendezvous = useCallback(async () => {
     if (!isAdmin) return;
 
     const today = new Date().toISOString().split("T")[0];
     const todayRdv = await getRendezvousByDate(today);
 
-    // Mettre à jour la liste en conservant les autres dates
     setRendezvous((prev) => [
       ...prev.filter((r) => r.date !== today),
       ...todayRdv,
     ]);
   }, [isAdmin, getRendezvousByDate]);
 
-  /**
-   * Récupère les prochains rendez-vous confirmés
-   */
   const getUpcomingRendezvous = useCallback(
     async (limit = 10): Promise<RendezvousResponseDto[]> => {
       if (!isAdmin) return [];
 
       try {
-        const upcoming = await rendezvousService.getUpcomingRendezvous(limit);
-
-        return upcoming;
-      } catch (err) {
-        console.error(
-          "[useRendezvous] Erreur chargement prochains rendez-vous:",
-          err,
-        );
+        return await rendezvousService.getUpcomingRendezvous(limit);
+      } catch {
         return [];
       }
     },
     [isAdmin],
   );
 
-  /**
-   * Export CSV des rendez-vous
-   */
   const exportRendezvous = useCallback(
     async (filters?: RendezvousFilters): Promise<string> => {
-      if (!isAdmin) {
-        toast.error("Action réservée aux administrateurs");
-        return "";
-      }
+      if (!isAdmin) return "";
 
       try {
-        const csv = await rendezvousService.exportToCSV(filters);
-        toast.success("Export CSV réussi");
-
-        return csv;
-      } catch (err) {
-        handleError(err, "Erreur lors de l'export CSV");
+        return await rendezvousService.exportToCSV(filters);
+      } catch {
         return "";
       }
     },
     [isAdmin],
   );
 
-  // ── Actions utilisateur ────────────────────────────────────────────────────
-
-  /**
-   * Crée un nouveau rendez-vous
-   * Le service gère la conversion du TimeSlot automatiquement
-   */
+  // Actions utilisateur
   const createRendezvous = useCallback(
-    async (
-      data: CreateRendezvousDto,
-    ): Promise<RendezvousResponseDto | null> => {
-      if (!isAuthenticated) {
-        toast.error("Vous devez être connecté pour prendre un rendez-vous");
-        return null;
-      }
+    async (data: CreateRendezvousDto): Promise<RendezvousResponseDto | null> => {
+      if (!isAuthenticated) return null;
 
       setLoadingKey("create", true);
 
       try {
-        const newRdv = await rendezvousService.createRendezvous(data);
-        toast.success("Rendez-vous confirmé avec succès !");
-
-        return newRdv;
+        return await rendezvousService.createRendezvous(data);
       } catch (err) {
-        handleError(err, "Erreur lors de la création du rendez-vous");
+        handleError(err, "Erreur lors de la création");
         return null;
       } finally {
         setLoadingKey("create", false);
@@ -673,60 +425,35 @@ export const useRendezvous = (
     [isAuthenticated],
   );
 
-  /**
-   * Récupère les rendez-vous d'un utilisateur par email
-   */
   const getRendezvousByEmail = useCallback(
     async (email: string): Promise<RendezvousResponseDto[]> => {
       if (!isAuthenticated) return [];
 
       try {
         const data = await rendezvousService.getRendezvousByEmail(email);
-        // Mettre à jour l'état local
         setRendezvous(data);
         return data;
-      } catch (err) {
-        console.error(
-          `[useRendezvous] Erreur chargement rendez-vous pour ${email}:`,
-          err,
-        );
-        // Afficher seulement l'erreur, pas le succès
-        toast.error("Erreur lors du chargement de vos rendez-vous");
+      } catch {
         return [];
       }
     },
     [isAuthenticated],
   );
 
-  /**
-   * Annule un rendez-vous
-   */
   const cancelRendezvous = useCallback(
-    async (
-      id: string,
-      data: CancelRendezvousDto,
-    ): Promise<RendezvousResponseDto | null> => {
-      if (!isAuthenticated) {
-        toast.error("Vous devez être connecté");
-        return null;
-      }
+    async (id: string, data: CancelRendezvousDto): Promise<RendezvousResponseDto | null> => {
+      if (!isAuthenticated) return null;
 
       setLoadingKey("cancel", true);
 
       try {
         const updated = await rendezvousService.cancelRendezvous(id, data);
 
-        // Mettre à jour la liste
-        setRendezvous((prev) =>
-          prev.map((r) => (r.id === updated.id ? updated : r)),
-        );
+        setRendezvous((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
 
-        // Mettre à jour le rendez-vous sélectionné si c'est le même
         if (selectedRendezvous?.id === updated.id) {
           setSelectedRendezvous(updated);
         }
-
-        toast.success("Rendez-vous annulé avec succès");
 
         return updated;
       } catch (err) {
@@ -739,30 +466,13 @@ export const useRendezvous = (
     [isAuthenticated, selectedRendezvous],
   );
 
-  /**
-   * Vérifie la disponibilité d'un créneau
-   * Convertit le TimeSlot du format frontend vers backend pour l'API
-   */
   const checkAvailability = useCallback(
-    async (
-      date: string,
-      time: TimeSlot,
-    ): Promise<AvailabilityCheckDto | null> => {
+    async (date: string, time: TimeSlot): Promise<AvailabilityCheckDto | null> => {
       setLoadingKey("availability", true);
 
       try {
-        // Convertir le TimeSlot pour le backend si nécessaire
-        const backendTimeSlot = time.includes(":") ? time : time;
-        const result = await rendezvousService.checkAvailability(
-          date,
-          backendTimeSlot,
-        );
-        return result;
-      } catch (err) {
-        console.error(
-          "[useRendezvous] Erreur vérification disponibilité:",
-          err,
-        );
+        return await rendezvousService.checkAvailability(date, time);
+      } catch {
         return null;
       } finally {
         setLoadingKey("availability", false);
@@ -771,11 +481,11 @@ export const useRendezvous = (
     [],
   );
 
-  // ── Utilitaires de pagination ──────────────────────────────────────────────
+  // Utilitaires
+  const clearSelectedRendezvous = useCallback(() => {
+    setSelectedRendezvous(null);
+  }, []);
 
-  /**
-   * Met à jour les paramètres de requête
-   */
   const setQueryParams = useCallback(
     (params: Partial<RendezvousQueryDto>) => {
       loadRendezvous({ ...initialParamsRef.current, ...params });
@@ -783,16 +493,12 @@ export const useRendezvous = (
     [loadRendezvous],
   );
 
-  /**
-   * Met à jour les filtres
-   */
   const setFilters = useCallback(
     (newFilters: RendezvousFilters) => {
       setFiltersState(newFilters);
 
-      // Appliquer les filtres via searchRendezvous
       rendezvousService
-        .searchRendezvous(newFilters, 1, pagination.limit)
+        .searchRendezvous(newFilters as RendezvousQueryDto)
         .then((res) => {
           setRendezvous(res.data);
           setPagination({
@@ -803,22 +509,19 @@ export const useRendezvous = (
             hasNext: res.hasNext,
             hasPrevious: res.hasPrevious,
           });
+        })
+        .catch(() => {
+          // Ignorer
         });
     },
-    [pagination.limit],
+    [],
   );
 
-  /**
-   * Réinitialise les filtres
-   */
   const resetFilters = useCallback(() => {
     setFiltersState({});
     loadRendezvous(initialParamsRef.current);
   }, [loadRendezvous]);
 
-  /**
-   * Passe à la page suivante
-   */
   const nextPage = useCallback(() => {
     if (pagination.hasNext) {
       loadRendezvous({
@@ -828,9 +531,6 @@ export const useRendezvous = (
     }
   }, [pagination.hasNext, pagination.page, loadRendezvous]);
 
-  /**
-   * Passe à la page précédente
-   */
   const previousPage = useCallback(() => {
     if (pagination.hasPrevious) {
       loadRendezvous({
@@ -840,9 +540,6 @@ export const useRendezvous = (
     }
   }, [pagination.hasPrevious, pagination.page, loadRendezvous]);
 
-  /**
-   * Va à une page spécifique
-   */
   const goToPage = useCallback(
     (page: number) => {
       if (page >= 1 && page <= pagination.totalPages) {
@@ -852,9 +549,6 @@ export const useRendezvous = (
     [pagination.totalPages, loadRendezvous],
   );
 
-  /**
-   * Change la limite par page
-   */
   const setLimit = useCallback(
     (limit: number) => {
       loadRendezvous({ ...initialParamsRef.current, limit, page: 1 });
@@ -862,16 +556,7 @@ export const useRendezvous = (
     [loadRendezvous],
   );
 
-  /**
-   * Efface le rendez-vous sélectionné
-   */
-  const clearSelectedRendezvous = useCallback(() => {
-    setSelectedRendezvous(null);
-  }, []);
-
-  // ==================== EFFETS ====================
-
-  // Chargement initial
+  // Effets
   useEffect(() => {
     if (!autoLoad || !isAuthenticated) return;
 
@@ -890,7 +575,6 @@ export const useRendezvous = (
     loadAvailableDates,
   ]);
 
-  // Rafraîchissement automatique (pour admin)
   useEffect(() => {
     if (!refreshInterval || !isAdmin) return;
 
@@ -900,18 +584,9 @@ export const useRendezvous = (
     }, refreshInterval);
 
     return () => clearInterval(intervalId);
-  }, [
-    refreshInterval,
-    isAdmin,
-    refreshTodayRendezvous,
-    loadStatistics,
-    statistics,
-  ]);
-
-  // ==================== RETOUR ====================
+  }, [refreshInterval, isAdmin, refreshTodayRendezvous, loadStatistics, statistics]);
 
   return {
-    // État
     rendezvous,
     selectedRendezvous,
     statistics,
@@ -922,20 +597,17 @@ export const useRendezvous = (
     error,
     filters,
 
-    // Actions utilisateur
     createRendezvous,
     getRendezvousByEmail,
     cancelRendezvous,
     checkAvailability,
 
-    // Actions admin
     loadRendezvous,
     loadRendezvousById,
     loadStatistics,
     loadAvailableDates,
     getAvailableDates,
     getAvailableSlots,
-    getAvailableSlotsList,
     updateRendezvous,
     completeRendezvous,
     deleteRendezvous,
@@ -944,7 +616,6 @@ export const useRendezvous = (
     getUpcomingRendezvous,
     exportRendezvous,
 
-    // Utilitaires
     clearSelectedRendezvous,
     setQueryParams,
     setFilters,

@@ -9,6 +9,27 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      - EMAIL_SERVICE=${EMAIL_SERVICE}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
       - DATABASE_URL=postgresql://postgres:Sangare@host.docker.internal:5432/panameconsultingDb?schema=public
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=0
+      - REDIS_URL=${REDIS_URL}
+    restart: always
+    volumes:
+      - ./logs:/app/backend/logs
+    depends_on:  # ✅ L'APP dépend de redis, pas l'inverse
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: always
+    volumes:
+      - redis-data:/data
+volumes:
+  redis-data:

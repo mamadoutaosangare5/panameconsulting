@@ -5,14 +5,15 @@ import {
   Outlet,
 } from "react-router-dom";
 import { lazy } from "react";
-import ErrorBoundary from "./components/ErrorBoundary";
+import ErrorBoundary from "./components/shared/ui/ErrorBoundary";
 
 // Layouts
-import RootLayout from "./pages/(main)/RootLayout";
-import UserLayout from "./pages/user/UserLayout";
-import GestionnaireLayout from "./pages/gestionnaire/GestionnaireLayout";
-import AuthLayout from "./pages/auth/AuthLayout";
+import RootLayout from "./components/shared/Layouts/RootLayout";
+import UserLayout from "./components/shared/Layouts/UserLayout";
+import GestionnaireLayout from "./components/shared/Layouts/GestionnaireLayout";
+import AuthLayout from "./components/shared/Layouts/AuthLayout";
 import { Toaster } from "react-hot-toast";
+import ScrollToTop from "./components/shared/ui/ScrollToTop";
 
 // Pages publiques
 const Home = lazy(() => import("./pages/(main)/Home"));
@@ -62,6 +63,7 @@ function App() {
   return (
     <>
       <Router>
+        <ScrollToTop />
         <ErrorBoundary>
           <Routes>
             {/* Routes publiques */}
@@ -135,7 +137,6 @@ function App() {
 
             {/* Gestionnaire */}
             <Route path="/gestionnaire" element={<GestionnaireLayout />}>
-              <Route index element={<Statistiques />} />
               <Route path="statistiques" element={<Statistiques />} />
               <Route path="utilisateurs" element={<Utilisateurs />} />
               <Route path="destinations" element={<Destinations />} />

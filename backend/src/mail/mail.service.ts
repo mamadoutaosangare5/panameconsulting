@@ -264,7 +264,7 @@ export class MailService {
 
   async sendContactNotificationEmail(
     email: string,
-    firstName: string,
+    _firstName: string,
     html: string,
     subject: string,
   ): Promise<boolean> {

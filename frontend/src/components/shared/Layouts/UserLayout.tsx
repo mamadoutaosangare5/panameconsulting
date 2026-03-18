@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { Helmet } from "react-helmet-async";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../../hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { UserHeader } from "../../components/shared/user/UserHeader";
-import { usePageConfig } from "../../hooks/UserHeader.hooks";
-import Loader from "../../components/shared/user/Loader";
+import { UserHeader } from "../../../components/shared/user/UserHeader";
+import { usePageConfig } from "../../../hooks/UserHeader.hooks";
+import Loader from "../../../components/shared/user/Loader";
 
 type UserLayoutProps = {
   children: ReactNode;

@@ -91,13 +91,12 @@ export class StepEntity {
 
   // Méthode d'instance: Vérifier si l'étape peut être modifiée
   get canBeModified(): boolean {
-    const finalStatuses: ProcedureStatus[] = [
-      ProcedureStatus.COMPLETED,
-      ProcedureStatus.CANCELLED,
-      ProcedureStatus.REJECTED,
+    const finalStatuses: StepStatus[] = [
+      StepStatus.COMPLETED,
+      StepStatus.CANCELLED,
+      StepStatus.REJECTED,
     ];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    return !finalStatuses.includes(this.statut as any);
+    return !finalStatuses.includes(this.statut);
   }
 
   // Méthode d'instance: Vérifier si l'étape est en retard
@@ -352,6 +351,24 @@ export class ProcedureEntity {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   userId?: string | null;
+
+  @ApiPropertyOptional({
+    description: "Date d'annulation",
+    example: '2024-01-20T09:15:00.000Z',
+  })
+  cancelledAt?: Date | null;
+
+  @ApiPropertyOptional({
+    description: "Raison d'annulation",
+    example: "Annulation par l'utilisateur",
+  })
+  cancelledReason?: string | null;
+
+  @ApiPropertyOptional({
+    description: "ID de l'utilisateur ayant annulé",
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  cancelledBy?: string | null;
 
   // Relations
   steps?: StepEntity[];
@@ -718,10 +735,11 @@ export class ProcedureStatisticsEntity {
   @ApiProperty({
     description: 'Procédures par statut',
     example: {
-      inProgress: 75,
-      completed: 50,
-      rejected: 15,
-      cancelled: 10,
+      PENDING: 10,
+      IN_PROGRESS: 75,
+      COMPLETED: 50,
+      REJECTED: 15,
+      CANCELLED: 10,
     },
   })
   byStatus: Record<ProcedureStatus, number>;
@@ -803,99 +821,4 @@ export class ProcedureStatisticsEntity {
     completionRate: number;
     averageTime: number;
   }[];
-}
-
-/**
- * Entité pour les résultats paginés
- */
-export class PaginatedProcedureEntity {
-  @ApiProperty({
-    description: 'Liste des procédures',
-    type: [ProcedureWithMetaEntity],
-  })
-  data: ProcedureWithMetaEntity[];
-
-  @ApiProperty({
-    description: 'Métadonnées de pagination',
-    example: {
-      total: 150,
-      page: 1,
-      limit: 10,
-      totalPages: 15,
-      hasNext: true,
-      hasPrevious: false,
-    },
-  })
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrevious: boolean;
-  };
-}
-
-/**
- * Entité pour les filtres de recherche
- */
-export class ProcedureFilterEntity {
-  @ApiPropertyOptional({
-    description: 'Statuts à inclure',
-    enum: ProcedureStatus,
-    isArray: true,
-    example: [ProcedureStatus.IN_PROGRESS, ProcedureStatus.COMPLETED],
-  })
-  statut?: ProcedureStatus[];
-
-  @ApiPropertyOptional({
-    description: 'Date de début (YYYY-MM-DD)',
-    example: '2024-01-01',
-  })
-  startDate?: string;
-
-  @ApiPropertyOptional({
-    description: 'Date de fin (YYYY-MM-DD)',
-    example: '2024-12-31',
-  })
-  endDate?: string;
-
-  @ApiPropertyOptional({
-    description: 'Destinations à inclure',
-    example: ['France', 'Canada'],
-    isArray: true,
-  })
-  destinations?: string[];
-
-  @ApiPropertyOptional({
-    description: 'Filières à inclure',
-    example: ['Informatique', 'Médecine'],
-    isArray: true,
-  })
-  filieres?: string[];
-
-  @ApiPropertyOptional({
-    description: 'Terme de recherche',
-    example: 'Dupont',
-  })
-  searchTerm?: string;
-
-  @ApiPropertyOptional({
-    description: 'Inclure les procédures avec rendez-vous',
-    example: true,
-  })
-  hasRendezvous?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'Inclure les procédures supprimées',
-    example: false,
-    default: false,
-  })
-  includeDeleted?: boolean;
-
-  @ApiPropertyOptional({
-    description: "Identifiant de l'utilisateur",
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  userId?: string;
 }

@@ -1,5 +1,3 @@
-// rendezvous.controller.ts
-
 import {
   Controller,
   Get,
@@ -45,6 +43,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
+import { RENDEZVOUS_CONSTANTS } from '../holidays/holidays.service';
 
 @ApiTags('rendezvous')
 @Controller('')
@@ -57,8 +56,6 @@ export class RendezvousController {
     private readonly queueService: QueueService,
     private readonly prisma: PrismaService,
   ) {}
-
-  // ==================== ROUTES PUBLIQUES ====================
 
   @Get('rendezvous/available-slots/:date')
   @Public()
@@ -75,16 +72,9 @@ export class RendezvousController {
     description: 'Créneaux disponibles pour la date spécifiée',
   })
   async getAvailableSlots(@Param('date') date: string) {
-    const step = `GET /api/rendezvous/available-slots/${date}`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     try {
-      // Validation de la date
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(date)) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 400: format de date invalide`,
-        );
         throw new BadRequestException(
           'Format de date invalide. Utilisez YYYY-MM-DD',
         );
@@ -92,19 +82,11 @@ export class RendezvousController {
 
       const availableSlots =
         await this.rendezvousService.getAvailableSlots(date);
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: ${availableSlots.availableSlots?.length || 0} créneaux trouvés`,
-      );
       return availableSlots;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${errorMessage}`,
-      );
       throw new BadRequestException(
         'Erreur lors de la récupération des créneaux disponibles',
       );
@@ -134,26 +116,16 @@ export class RendezvousController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const step = 'GET /api/rendezvous/available-dates';
-    this.logger.log(`[RendezvousController] ${step}`);
-
     try {
-      // Validation des dates si fournies
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
       if (startDate && !dateRegex.test(startDate)) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 400: format startDate invalide`,
-        );
         throw new BadRequestException(
           'Format de startDate invalide. Utilisez YYYY-MM-DD',
         );
       }
 
       if (endDate && !dateRegex.test(endDate)) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 400: format endDate invalide`,
-        );
         throw new BadRequestException(
           'Format de endDate invalide. Utilisez YYYY-MM-DD',
         );
@@ -169,19 +141,11 @@ export class RendezvousController {
         end,
       );
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: ${availableDates.length} dates disponibles`,
-      );
       return availableDates;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${errorMessage}`,
-      );
       throw new BadRequestException(
         'Erreur lors de la récupération des dates disponibles',
       );
@@ -209,27 +173,16 @@ export class RendezvousController {
     @Query('date') date: string,
     @Query('time') time: string,
   ) {
-    const step = `GET /api/rendezvous/check-availability?date=${date}&time=${time}`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     try {
-      // Validation de la date
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(date)) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 400: format de date invalide`,
-        );
         throw new BadRequestException(
           'Format de date invalide. Utilisez YYYY-MM-DD',
         );
       }
 
-      // Validation de l'heure
       const timeRegex = /^\d{2}:\d{2}$/;
       if (!timeRegex.test(time)) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 400: format d'heure invalide`,
-        );
         throw new BadRequestException(
           "Format d'heure invalide. Utilisez HH:MM",
         );
@@ -240,24 +193,16 @@ export class RendezvousController {
         time,
       );
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: ${availability.available ? 'disponible' : 'non disponible'}`,
-      );
       return availability;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
       throw new BadRequestException(
         'Erreur lors de la vérification de disponibilité',
       );
     }
   }
-
-  // ==================== ROUTES PROTÉGÉES ====================
 
   @Post('/rendezvous')
   @UseGuards(JwtAuthGuard)
@@ -275,13 +220,7 @@ export class RendezvousController {
     @Body() createRendezvousDto: CreateRendezvousDto,
     @CurrentUser() user: currentUserInterface.CurrentUser,
   ): Promise<any> {
-    const step = 'POST /api/rendezvous';
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
@@ -291,9 +230,7 @@ export class RendezvousController {
         user,
       );
 
-      // Ajouter l'email de confirmation à la queue
       try {
-        // Créer le contenu HTML directement
         const htmlContent = this.generateConfirmationContent(rendezvous);
 
         await this.queueService.addEmailJob({
@@ -302,21 +239,12 @@ export class RendezvousController {
           html: htmlContent,
           priority: 'high',
         });
-        this.logger.log(
-          `[RendezvousController] ${step} -> email de confirmation ajouté à la queue`,
-        );
       } catch (emailError) {
-        this.logger.error(
-          `[RendezvousController] ${step} -> erreur envoi email: ${
-            emailError instanceof Error ? emailError.message : 'Unknown error'
-          }`,
-        );
-        // Ne pas bloquer la réponse si l'email échoue
+        const errorMessage =
+          emailError instanceof Error ? emailError.message : 'Unknown error';
+        this.logger.error(`Erreur envoi email: ${errorMessage}`);
       }
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 201: rendez-vous créé avec ID: ${rendezvous.id}`,
-      );
       return rendezvous;
     } catch (error) {
       if (
@@ -325,9 +253,6 @@ export class RendezvousController {
       ) {
         throw error;
       }
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
       throw new BadRequestException(
         'Erreur lors de la création du rendez-vous',
       );
@@ -350,13 +275,7 @@ export class RendezvousController {
     @Query() query: RendezvousQueryDto,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ) {
-    const step = 'GET /api/admin/rendezvous/all';
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
@@ -378,14 +297,11 @@ export class RendezvousController {
         sortOrder: query.sortOrder,
       });
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: ${result.data.length} rendez-vous retournés`,
-      );
       return result;
     } catch (error) {
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur liste rendez-vous: ${errorMessage}`);
       throw error;
     }
   }
@@ -399,26 +315,17 @@ export class RendezvousController {
   async getStatistics(
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ): Promise<any> {
-    const step = 'GET /api/admin/rendezvous/statistics';
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
     try {
       const statistics = await this.rendezvousService.getStatistics(user);
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: statistiques calculées`,
-      );
       return statistics;
     } catch (error) {
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur statistiques: ${errorMessage}`);
       throw error;
     }
   }
@@ -432,38 +339,22 @@ export class RendezvousController {
     @Param('email') email: string,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ) {
-    const step = `GET /api/rendezvous/by-email/${this.maskEmail(email)}`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
-    // Pour la recherche par email, on permet aux utilisateurs de voir leurs propres rendez-vous
-    // et aux admins de voir tous les rendez-vous
     if (user.role !== UserRole.ADMIN && user.email !== email) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 403: accès non autorisé`,
-      );
       throw new UnauthorizedException(
         'Vous ne pouvez voir que vos propres rendez-vous',
       );
     }
 
-    // Valider le format de l'email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 400: format d'email invalide`,
-      );
       throw new BadRequestException("Format d'email invalide");
     }
 
     try {
-      // Utiliser Prisma directement pour trouver les rendez-vous par email
       const rawRendezvous = await this.prisma.rendezvous.findMany({
         where: {
           email: email,
@@ -473,53 +364,43 @@ export class RendezvousController {
         },
       });
 
-      // Ajouter les propriétés calculées
       const rendezvous = rawRendezvous.map((rdv) => {
         const now = new Date();
-        const timeString = String(rdv.time); // Prisma stocke TimeSlot comme string
+        const timeString = String(rdv.time);
         const rendezvousDateTime = new Date(`${rdv.date}T${timeString}`);
         const hoursDifference =
           (rendezvousDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
         const minutesDifference =
           (rendezvousDateTime.getTime() - now.getTime()) / (1000 * 60);
 
-        // Vérifier si le créneau est pendant la pause déjeuner (12:30-14h)
-        const [hours] = timeString.split(':').map(Number);
-        const isLunchBreak = hours >= 12.5 && hours < 14;
+        const [hours, minutes] = timeString.split(':').map(Number);
+        const isLunchBreak = (hours === 12 && minutes >= 30) || hours === 13;
 
         return {
           ...rdv,
-          // Propriétés calculées
           fullName: `${rdv.firstName} ${rdv.lastName}`,
           effectiveDestination: rdv.destinationAutre || rdv.destination,
           effectiveNiveauEtude: rdv.niveauEtudeAutre || rdv.niveauEtude,
           effectiveFiliere: rdv.filiereAutre || rdv.filiere,
           dateTime: rendezvousDateTime,
-          // Un utilisateur peut annuler son propre RDV si PENDING ou CONFIRMED (sans contrainte de temps)
           canCancel: rdv.status === 'PENDING' || rdv.status === 'CONFIRMED',
-          // Un utilisateur peut modifier seulement les RDV CONFIRMED prévus dans plus de 24h
           canModify: rdv.status === 'CONFIRMED' && hoursDifference > 24,
           isPast: rendezvousDateTime < now,
           isToday: rendezvousDateTime.toDateString() === now.toDateString(),
           minutesUntilRendezvous: Math.floor(minutesDifference),
-          // Informations sur la pause déjeuner
           lunchBreakInfo: {
-            lunchBreakStart: '12:30',
-            lunchBreakEnd: '14:00',
+            lunchBreakStart: RENDEZVOUS_CONSTANTS.LUNCH_BREAK.START,
+            lunchBreakEnd: RENDEZVOUS_CONSTANTS.LUNCH_BREAK.END,
             isLunchBreak: isLunchBreak,
           },
         };
       });
 
-      // Pas de log ici - le middleware HTTP gère déjà le logging
-      // this.logger.log(
-      //   `[RendezvousController] ${step} -> 200: ${rendezvous.length} rendez-vous trouvés`,
-      // );
       return rendezvous;
     } catch (error) {
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur recherche par email: ${errorMessage}`);
       throw new BadRequestException(
         'Erreur lors de la recherche des rendez-vous par email',
       );
@@ -538,37 +419,22 @@ export class RendezvousController {
     @Param('date') date: string,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ) {
-    const step = `GET /api/rendezvous/by-date/${date}`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
-    // Vérifier que l'utilisateur est un administrateur
     if (user.role !== UserRole.ADMIN) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 403: accès réservé aux admins`,
-      );
       throw new UnauthorizedException('Accès réservé aux administrateurs');
     }
 
-    // Valider le format de la date
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(date)) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 400: format de date invalide`,
-      );
       throw new BadRequestException(
         'Format de date invalide. Utilisez YYYY-MM-DD',
       );
     }
 
     try {
-      // Utiliser Prisma directement pour trouver les rendez-vous par date
       const rendezvous = await this.prisma.rendezvous.findMany({
         where: {
           date: date,
@@ -578,15 +444,11 @@ export class RendezvousController {
         },
       });
 
-      // Pas de log ici - le middleware HTTP gère déjà le logging
-      // this.logger.log(
-      //   `[RendezvousController] ${step} -> 200: ${rendezvous.length} rendez-vous trouvés`,
-      // );
       return rendezvous;
     } catch (error) {
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur recherche par date: ${errorMessage}`);
       throw new BadRequestException(
         'Erreur lors de la recherche des rendez-vous par date',
       );
@@ -607,37 +469,24 @@ export class RendezvousController {
     @Param('id') id: string,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ): Promise<any> {
-    const step = `GET /api/rendezvous/${id}`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
     try {
       const rendezvous = await this.rendezvousService.findById(id, user);
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: rendez-vous trouvé`,
-      );
       return rendezvous;
     } catch (error) {
       if (error instanceof NotFoundException) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 404: rendez-vous non trouvé`,
-        );
+        throw error;
       } else if (error instanceof ForbiddenException) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 403: accès non autorisé`,
-        );
+        throw error;
       } else {
-        this.logger.error(
-          `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Erreur recherche rendez-vous: ${errorMessage}`);
+        throw error;
       }
-      throw error;
     }
   }
 
@@ -655,13 +504,7 @@ export class RendezvousController {
     @Body() updateRendezvousDto: UpdateRendezvousDto,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ): Promise<any> {
-    const step = `PATCH /api/admin/rendezvous/${id}/patch`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
@@ -670,9 +513,6 @@ export class RendezvousController {
         id,
         updateRendezvousDto,
         user,
-      );
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: rendez-vous mis à jour`,
       );
       return updated;
     } catch (error) {
@@ -683,9 +523,9 @@ export class RendezvousController {
       ) {
         throw error;
       }
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur mise à jour: ${errorMessage}`);
       throw new BadRequestException(
         'Erreur lors de la mise à jour du rendez-vous',
       );
@@ -708,21 +548,12 @@ export class RendezvousController {
     @Body() cancelRendezvousDto: CancelRendezvousDto,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ): Promise<any> {
-    const step = `PATCH /api/rendezvous/${id}/cancel`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
     try {
       const cancelled = await this.rendezvousService.cancel(id, user);
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: rendez-vous annulé`,
-      );
       return cancelled;
     } catch (error) {
       if (
@@ -732,9 +563,9 @@ export class RendezvousController {
       ) {
         throw error;
       }
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur annulation: ${errorMessage}`);
       throw new BadRequestException(
         "Erreur lors de l'annulation du rendez-vous",
       );
@@ -758,13 +589,7 @@ export class RendezvousController {
     @Body() completeRendezvousDto: CompleteRendezvousDto,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ): Promise<any> {
-    const step = `PATCH /api/admin/rendezvous/${id}/complete`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
@@ -773,9 +598,6 @@ export class RendezvousController {
         id,
         completeRendezvousDto,
         user,
-      );
-      this.logger.log(
-        `[RendezvousController] ${step} -> 200: rendez-vous complété`,
       );
       return completed;
     } catch (error) {
@@ -786,9 +608,9 @@ export class RendezvousController {
       ) {
         throw error;
       }
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur complétion: ${errorMessage}`);
       throw new BadRequestException(
         'Erreur lors de la complétion du rendez-vous',
       );
@@ -807,34 +629,20 @@ export class RendezvousController {
     @Param('id') id: string,
     @CurrentUser() user: currentUserInterface.CurrentUser | null,
   ) {
-    const step = `DELETE /api/admin/rendezvous/${id}/delete`;
-    this.logger.log(`[RendezvousController] ${step}`);
-
     if (!user) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 401: utilisateur non authentifié`,
-      );
       throw new UnauthorizedException('Utilisateur non authentifié');
     }
 
-    // Vérifier que l'utilisateur est un administrateur
     if (user.role !== UserRole.ADMIN) {
-      this.logger.warn(
-        `[RendezvousController] ${step} -> 403: accès réservé aux admins`,
-      );
       throw new UnauthorizedException('Accès réservé aux administrateurs');
     }
 
     try {
       const rendezvous = await this.rendezvousService.findById(id, user);
       if (!rendezvous) {
-        this.logger.warn(
-          `[RendezvousController] ${step} -> 404: rendez-vous non trouvé`,
-        );
         throw new NotFoundException('Rendez-vous non trouvé');
       }
 
-      // Soft delete via Prisma
       await this.prisma.rendezvous.update({
         where: { id },
         data: {
@@ -843,9 +651,6 @@ export class RendezvousController {
         },
       });
 
-      this.logger.log(
-        `[RendezvousController] ${step} -> 204: rendez-vous supprimé`,
-      );
       return;
     } catch (error) {
       if (
@@ -854,16 +659,14 @@ export class RendezvousController {
       ) {
         throw error;
       }
-      this.logger.error(
-        `[RendezvousController] ${step} -> 500: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Erreur suppression: ${errorMessage}`);
       throw new BadRequestException(
         'Erreur lors de la suppression du rendez-vous',
       );
     }
   }
-
-  // ==================== UTILITAIRES ====================
 
   private generateConfirmationContent(rendezvous: {
     date: string | Date;
@@ -881,27 +684,16 @@ export class RendezvousController {
     );
 
     return `
-      <div style="margin:25px 0;line-height:1.8;">
+      <div>
         <p>Votre rendez-vous a été confirmé avec succès.</p>
-        <div style="background:#f0f9ff;padding:25px;border-radius:8px;border-left:4px solid #0ea5e9;margin:25px 0;">
-          <h3 style="margin-top:0;color:#0ea5e9;">Détails du rendez-vous</h3>
-          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Date :</span> ${dateFormatted}</div>
-          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Heure :</span> ${rendezvous.time}</div>
-          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Lieu :</span> Paname Consulting - Kalaban Coura</div>
-          <div style="margin-bottom:10px;"><span style="font-weight:600;color:#374151;">Statut :</span> <span style="color:#10b981;font-weight:600;">Confirmé</span></div>
+        <div>
+          <h3>Détails du rendez-vous</h3>
+          <div>Date : ${dateFormatted}</div>
+          <div>Heure : ${rendezvous.time}</div>
+          <div>Lieu : Paname Consulting - Kalaban Coura</div>
+          <div>Statut : Confirmé</div>
         </div>
         <p>Nous vous attendons avec impatience.</p>
       </div>`;
-  }
-
-  // ==================== UTILITAIRES DE MASQUAGE ====================
-
-  private maskEmail(email: string): string {
-    if (!email) return '[MASQUÉ]';
-    const [local, domain] = email.split('@');
-    if (!domain) return '[MASQUÉ]';
-    const maskedLocal =
-      local.charAt(0) + '***' + local.charAt(local.length - 1);
-    return `${maskedLocal}@${domain}`;
   }
 }

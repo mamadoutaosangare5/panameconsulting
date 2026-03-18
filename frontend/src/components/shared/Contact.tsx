@@ -310,6 +310,7 @@ const Contact: React.FC = () => {
                   title="Localisation Paname Consulting"
                   style={{ border: 0 }}
                   allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
                 />
               </div>
             </div>

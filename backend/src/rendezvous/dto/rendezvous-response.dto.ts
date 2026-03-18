@@ -7,107 +7,107 @@ import {
 } from '@prisma/client';
 
 class UserInfoDto {
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiProperty()
   id: string;
 
-  @ApiProperty({ example: 'jean.dupont@email.com' })
+  @ApiProperty()
   email: string;
 
-  @ApiProperty({ example: 'Jean' })
+  @ApiProperty()
   firstName: string;
 
-  @ApiProperty({ example: 'Dupont' })
+  @ApiProperty()
   lastName: string;
 
-  @ApiProperty({ example: 'Jean Dupont' })
+  @ApiProperty()
   fullName: string;
 }
 
 class ProcedureInfoDto {
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiProperty()
   id: string;
 
-  @ApiProperty({ example: 'En cours' })
+  @ApiProperty()
   statut: string;
 }
 
 export class RendezvousResponseDto {
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiProperty()
   id: string;
 
-  @ApiProperty({ example: 'Jean' })
+  @ApiProperty()
   firstName: string;
 
-  @ApiProperty({ example: 'Dupont' })
+  @ApiProperty()
   lastName: string;
 
-  @ApiProperty({ example: 'Jean Dupont' })
+  @ApiProperty()
   fullName: string;
 
-  @ApiProperty({ example: 'jean.dupont@email.com' })
+  @ApiProperty()
   email: string;
 
-  @ApiProperty({ example: '+33612345678' })
+  @ApiProperty()
   telephone: string;
 
-  @ApiProperty({ example: 'France' })
+  @ApiProperty()
   destination: string;
 
-  @ApiPropertyOptional({ example: 'Belgique' })
+  @ApiPropertyOptional()
   destinationAutre?: string;
 
-  @ApiProperty({ example: 'France' })
+  @ApiProperty()
   effectiveDestination: string;
 
-  @ApiProperty({ enum: EducationLevel, example: EducationLevel.Master_I })
+  @ApiProperty({ enum: EducationLevel })
   niveauEtude: EducationLevel;
 
-  @ApiPropertyOptional({ example: 'DUT' })
+  @ApiPropertyOptional()
   niveauEtudeAutre?: string;
 
-  @ApiProperty({ example: 'Master I' })
+  @ApiProperty()
   effectiveNiveauEtude: string;
 
-  @ApiProperty({ example: 'Informatique' })
+  @ApiProperty()
   filiere: string;
 
-  @ApiPropertyOptional({ example: 'Data Science' })
+  @ApiPropertyOptional()
   filiereAutre?: string;
 
-  @ApiProperty({ example: 'Informatique' })
+  @ApiProperty()
   effectiveFiliere: string;
 
-  @ApiProperty({ example: '2024-12-25' })
+  @ApiProperty()
   date: string;
 
-  @ApiProperty({ example: '14:30' })
+  @ApiProperty()
   time: string;
 
-  @ApiProperty({ example: '2024-12-25T14:30:00.000Z' })
+  @ApiProperty()
   dateTime: Date;
 
-  @ApiProperty({ enum: RendezvousStatus, example: RendezvousStatus.CONFIRMED })
+  @ApiProperty({ enum: RendezvousStatus })
   status: RendezvousStatus;
 
-  @ApiPropertyOptional({ enum: AdminOpinion, example: AdminOpinion.FAVORABLE })
+  @ApiPropertyOptional({ enum: AdminOpinion })
   avisAdmin?: AdminOpinion;
 
-  @ApiPropertyOptional({ example: '2024-12-20T10:30:00.000Z' })
+  @ApiPropertyOptional()
   cancelledAt?: Date;
 
-  @ApiPropertyOptional({ enum: CancelledBy, example: CancelledBy.USER })
+  @ApiPropertyOptional({ enum: CancelledBy })
   cancelledBy?: CancelledBy;
 
-  @ApiPropertyOptional({ example: 'Empêchement personnel' })
+  @ApiPropertyOptional()
   cancellationReason?: string;
 
-  @ApiProperty({ example: '2024-12-01T08:00:00.000Z' })
+  @ApiProperty()
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-12-20T10:30:00.000Z' })
+  @ApiProperty()
   updatedAt: Date;
 
-  @ApiPropertyOptional({ example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiPropertyOptional()
   userId?: string;
 
   @ApiPropertyOptional({ type: UserInfoDto })
@@ -117,35 +117,32 @@ export class RendezvousResponseDto {
   procedure?: ProcedureInfoDto;
 
   @ApiProperty({
-    example: true,
     description:
       'Un utilisateur peut annuler son propre rendez-vous si le statut est PENDING ou CONFIRMED',
   })
   canCancel: boolean;
 
   @ApiProperty({
-    example: false,
     description:
       'Un utilisateur ne peut modifier que les rendez-vous PENDING ou CONFIRMED prévus dans plus de 24h',
   })
   canModify: boolean;
 
-  @ApiProperty({ example: false })
+  @ApiProperty()
   isPast: boolean;
 
-  @ApiProperty({ example: false })
+  @ApiProperty()
   isToday: boolean;
 
   @ApiProperty({
-    example: 45,
     description: 'Minutes restantes avant le rendez-vous (négatif si passé)',
   })
   minutesUntilRendezvous: number;
 
   @ApiPropertyOptional({
-    description: 'Informations sur la pause déjeuner (12:30-14h)',
+    description: 'Informations sur la pause déjeuner (12:00-14:00)',
     example: {
-      lunchBreakStart: '12:30',
+      lunchBreakStart: '12:00',
       lunchBreakEnd: '14:00',
       isLunchBreak: false,
     },
@@ -161,27 +158,27 @@ export class PaginatedRendezvousResponseDto {
   @ApiProperty({ type: [RendezvousResponseDto] })
   data: RendezvousResponseDto[];
 
-  @ApiProperty({ example: 50 })
+  @ApiProperty()
   total: number;
 
-  @ApiProperty({ example: 1 })
+  @ApiProperty()
   page: number;
 
-  @ApiProperty({ example: 10 })
+  @ApiProperty()
   limit: number;
 
-  @ApiProperty({ example: 5 })
+  @ApiProperty()
   totalPages: number;
 
-  @ApiProperty({ example: true })
+  @ApiProperty()
   hasNext: boolean;
 
-  @ApiProperty({ example: false })
+  @ApiProperty()
   hasPrevious: boolean;
 }
 
 export class RendezvousStatisticsDto {
-  @ApiProperty({ example: 150 })
+  @ApiProperty()
   total: number;
 
   @ApiProperty({
@@ -212,15 +209,15 @@ export class RendezvousStatisticsDto {
   })
   topDestinations: { destination: string; count: number }[];
 
-  @ApiProperty({ example: 30.0 })
+  @ApiProperty()
   completionRate: number;
 
-  @ApiProperty({ example: 10.0 })
+  @ApiProperty()
   cancellationRate: number;
 }
 
 export class AvailableSlotsDto {
-  @ApiProperty({ example: '2024-12-25' })
+  @ApiProperty()
   date: string;
 
   @ApiProperty({
@@ -230,29 +227,34 @@ export class AvailableSlotsDto {
       '10:00',
       '10:30',
       '11:00',
+      '11:30',
+      '12:00',
       '14:00',
       '14:30',
       '15:00',
+      '15:30',
+      '16:00',
+      '16:30',
     ],
     type: [String],
   })
   slots: string[];
 
-  @ApiProperty({ example: 8 })
+  @ApiProperty()
   totalAvailable: number;
 
-  @ApiProperty({ example: 16 })
+  @ApiProperty()
   totalSlots: number;
 }
 
 export class AvailabilityCheckDto {
-  @ApiProperty({ example: true })
+  @ApiProperty()
   available: boolean;
 
-  @ApiProperty({ example: '2024-12-25' })
+  @ApiProperty()
   date: string;
 
-  @ApiProperty({ example: '14:30' })
+  @ApiProperty()
   time: string;
 
   @ApiPropertyOptional({

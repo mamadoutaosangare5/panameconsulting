@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import MinimalLayout from "../../components/shared/MiniLayout";
+import MinimalLayout from "../../components/shared/Layouts/MiniLayout";
 import { Helmet } from "react-helmet-async";
 
 const PDFViewer: React.FC = () => {

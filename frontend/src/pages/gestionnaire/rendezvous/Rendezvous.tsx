@@ -1,27 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Helmet } from "react-helmet-async";
-import { useRendezvous } from "../../../hooks/useRendezvous";
 import { useAuth } from "../../../hooks/useAuth";
 import ConfirmationModal from "../../../components/shared/admin/ConfirMationModal";
-import {
-  RendezvousStatus,
-  AdminOpinion,
-  CancelledBy,
-  DESTINATION_OPTIONS,
-  RendezvousStatusLabels,
-  AdminOpinionLabels,
-  formatTimeSlot,
-  type Rendezvous,
-  type CancelRendezvousData,
-  type CompleteRendezvousData,
-  type UpdateRendezvousData,
-  type RendezvousQueryParams,
-  type TimeSlot,
-  type Destination,
-  type NiveauEtude,
-  type Filiere,
-  TIME_SLOT_OPTIONS,
-} from "../../../types/rendezvous.types";
 import {
   Calendar,
   Search,
@@ -38,10 +18,8 @@ import {
   RefreshCw,
   Clock,
   GraduationCap,
-  Eye,
-  X,
-  ChevronLeft,
   ChevronRight,
+  ChevronLeft,
   Ban,
   ThumbsUp,
   ThumbsDown,
@@ -52,7 +30,28 @@ import {
   CalendarDays,
   Star,
   ArrowUpRight,
+  X,
+  Eye,
+  BookOpen,
 } from "lucide-react";
+import { useRendezvous } from "../../../hooks/useRendezvous";
+import {
+  RendezvousStatus,
+  AdminOpinion,
+  CancelledBy,
+  DESTINATION_OPTIONS,
+  NIVEAU_ETUDE_OPTIONS,
+  FILIERE_OPTIONS,
+  TIME_SLOT_OPTIONS,
+  RendezvousStatusLabels,
+  AdminOpinionLabels,
+  type RendezvousResponseDto,
+  type CancelRendezvousDto,
+  type CompleteRendezvousDto,
+  type UpdateRendezvousDto,
+  type TimeSlot,
+} from "../../../types/rendezvous.types";
+import { timeSlotToDisplay } from "../../../types/rendezvous.types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types locaux
@@ -62,11 +61,11 @@ type ModalType = "detail" | "complete" | "cancel" | "update" | null;
 
 interface ModalState {
   type: ModalType;
-  rdv: Rendezvous | null;
+  rdv: RendezvousResponseDto | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Config statuts (utilise RendezvousStatusLabels du types)
+// Config statuts
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<
@@ -160,7 +159,7 @@ const ModalHeader = ({
   </div>
 );
 
-const PanelRow = ({ rdv, onView }: { rdv: Rendezvous; onView: () => void }) => (
+const PanelRow = ({ rdv, onView }: { rdv: RendezvousResponseDto; onView: () => void }) => (
   <div className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
     <div className="w-9 h-9 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
       {getInitials(rdv.firstName, rdv.lastName)}
@@ -177,7 +176,7 @@ const PanelRow = ({ rdv, onView }: { rdv: Rendezvous; onView: () => void }) => (
       <StatusBadge status={rdv.status} />
       <div className="text-right">
         <p className="text-sm font-medium text-gray-800">{rdv.date}</p>
-        <p className="text-xs text-gray-400">{formatTimeSlot(rdv.time)}</p>
+        <p className="text-xs text-gray-400">{timeSlotToDisplay(rdv.time)}</p>
       </div>
       <button
         onClick={onView}
@@ -216,9 +215,12 @@ const RendezvousAdmin = () => {
     getUpcomingRendezvous,
     exportRendezvous,
     setFilters,
-    setQueryParams,
     resetFilters,
-  } = useRendezvous({ autoLoad: true });
+    goToPage
+  } = useRendezvous({ 
+    autoLoad: true,
+    refreshInterval: 30000
+  });
 
   // ── État local ─────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState("");
@@ -227,28 +229,40 @@ const RendezvousAdmin = () => {
   const [activeTab, setActiveTab] = useState<"list" | "today" | "upcoming">(
     "list",
   );
-  const [todayList, setTodayList] = useState<Rendezvous[]>([]);
-  const [upcomingList, setUpcomingList] = useState<Rendezvous[]>([]);
+  const [todayList, setTodayList] = useState<RendezvousResponseDto[]>([]);
+  const [upcomingList, setUpcomingList] = useState<RendezvousResponseDto[]>([]);
   const [loadingPanel, setLoadingPanel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [completeOpinion, setCompleteOpinion] = useState<AdminOpinion>(
     AdminOpinion.FAVORABLE,
   );
   const [completeComment, setCompleteComment] = useState("");
-  const [editForm, setEditForm] = useState<UpdateRendezvousData>({
-    destination: "" as Destination,
+  
+  // ✅ Formulaire d'édition
+  const [editForm, setEditForm] = useState<UpdateRendezvousDto>({
+    firstName: "",
+    lastName: "",
+    telephone: "",
+    destination: "",
     destinationAutre: "",
-    niveauEtude: "" as NiveauEtude,
+    niveauEtude: "",
     niveauEtudeAutre: "",
-    filiere: "" as Filiere,
+    filiere: "",
     filiereAutre: "",
     date: "",
     time: "" as TimeSlot,
   });
+  
+  // ✅ États pour gérer l'affichage des champs "Autre"
+  const [showOtherDestination, setShowOtherDestination] = useState(false);
+  const [showOtherNiveau, setShowOtherNiveau] = useState(false);
+  const [showOtherFiliere, setShowOtherFiliere] = useState(false);
+  
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     id: string | null;
   }>({ open: false, id: null });
+
   // ── Effet de montage pour charger les statistiques ─────────────────────
   useEffect(() => {
     if (isAdmin) {
@@ -262,26 +276,30 @@ const RendezvousAdmin = () => {
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(async () => {
-      setFilters({
-        ...filters,
-        searchTerm: searchTerm.trim() || undefined,
-      });
-      await loadRendezvous();
+      try {
+        setFilters({
+          ...filters,
+          searchTerm: searchTerm.trim() || undefined,
+        });
+        await loadRendezvous();
+      } catch {
+        // Erreur gérée par le hook
+      }
     }, 350);
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [searchTerm, filters, setFilters, loadRendezvous]);
 
   // ── Panels ────────────────────────────────────────────────────────────────
   const loadTodayPanel = useCallback(async () => {
     setLoadingPanel(true);
     try {
-      // getRendezvousByDate → GET /rendezvous/by-date/:today
       const today = new Date().toISOString().split("T")[0];
       const data = await getRendezvousByDate(today);
       setTodayList(data);
+    } catch {
+      // Erreur gérée par le hook
     } finally {
       setLoadingPanel(false);
     }
@@ -291,9 +309,10 @@ const RendezvousAdmin = () => {
     async (limit = 10) => {
       setLoadingPanel(true);
       try {
-        // getUpcomingRendezvous → statut CONFIRMED + date future
         const data = await getUpcomingRendezvous(limit);
         setUpcomingList(data);
+      } catch {
+        // Erreur gérée par le hook
       } finally {
         setLoadingPanel(false);
       }
@@ -310,17 +329,7 @@ const RendezvousAdmin = () => {
     [loadTodayPanel, loadUpcomingPanel],
   );
 
-  // ── Pagination ─────────────────────────────────────────────────────────────
-  const goToPage = useCallback(
-    (page: number) => {
-      const params: RendezvousQueryParams = { page };
-      setQueryParams(params);
-      loadRendezvous(params);
-    },
-    [setQueryParams, loadRendezvous],
-  );
-
-  // ── Filtre rapide par date → getRendezvousByDate ──────────────────────────
+  // ── Filtre rapide par date ────────────────────────────────────────────────
   const handleDateQuickFilter = useCallback(
     async (date: string) => {
       if (!date) {
@@ -330,9 +339,10 @@ const RendezvousAdmin = () => {
       setActiveTab("today");
       setLoadingPanel(true);
       try {
-        // GET /rendezvous/by-date/:date
         const data = await getRendezvousByDate(date);
         setTodayList(data);
+      } catch {
+        // Erreur gérée par le hook
       } finally {
         setLoadingPanel(false);
       }
@@ -342,70 +352,118 @@ const RendezvousAdmin = () => {
 
   // ── Modal — loadRendezvousById pour données fraîches ─────────────────────
   const openModal = useCallback(
-    async (type: ModalType, rdv: Rendezvous) => {
-      // GET /rendezvous/:id
-      await loadRendezvousById(rdv.id);
-      // Utiliser selectedRendezvous qui a été mis à jour par loadRendezvousById
-      const data = selectedRendezvous ?? rdv;
-      setModal({ type, rdv: data });
-      if (type === "update") {
-        setEditForm({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          telephone: data.telephone,
-          destination: data.destination as Destination,
-          niveauEtude: data.niveauEtude as NiveauEtude,
-          filiere: data.filiere as Filiere,
-          niveauEtudeAutre: data.niveauEtudeAutre || "",
-          filiereAutre: data.filiereAutre || "",
-          destinationAutre: data.destinationAutre || "",
-          date: data.date,
-          time: data.time as TimeSlot,
-        });
-      } else if (type === "complete") {
-        setCompleteOpinion(AdminOpinion.FAVORABLE);
-        setCompleteComment("");
+    async (type: ModalType, rdv: RendezvousResponseDto) => {
+      try {
+        await loadRendezvousById(rdv.id);
+        
+        const data = selectedRendezvous ?? rdv;
+        setModal({ type, rdv: data });
+        
+        if (type === "update") {
+          const isDestAutre = data.destination === "Autre";
+          const isNiveauAutre = data.niveauEtude === "Autre";
+          const isFiliereAutre = data.filiere === "Autre";
+          
+          setShowOtherDestination(isDestAutre);
+          setShowOtherNiveau(isNiveauAutre);
+          setShowOtherFiliere(isFiliereAutre);
+          
+          setEditForm({
+            firstName: data.firstName,
+            lastName: data.lastName,
+            telephone: data.telephone,
+            destination: isDestAutre ? "Autre" : data.destination,
+            destinationAutre: data.destinationAutre || "",
+            niveauEtude: isNiveauAutre ? "Autre" : data.niveauEtude,
+            niveauEtudeAutre: data.niveauEtudeAutre || "",
+            filiere: isFiliereAutre ? "Autre" : data.filiere,
+            filiereAutre: data.filiereAutre || "",
+            date: data.date,
+            time: data.time,
+          });
+        } else if (type === "complete") {
+          setCompleteOpinion(AdminOpinion.FAVORABLE);
+          setCompleteComment("");
+        } else if (type === "cancel") {
+          setCancelReason("");
+        }
+      } catch {
+        // Erreur gérée par le hook
       }
     },
     [loadRendezvousById, selectedRendezvous],
   );
 
-  const closeModal = () => setModal({ type: null, rdv: null });
+  const closeModal = () => {
+    setModal({ type: null, rdv: null });
+    setCancelReason("");
+    setCompleteComment("");
+  };
 
   // ── Mutations — toutes via le hook ─────────────────────────────────────────
   const handleComplete = async () => {
     if (!modal.rdv) return;
-    const data: CompleteRendezvousData = {
-      avisAdmin: completeOpinion,
-      comments: completeComment.trim() || undefined,
-    };
-    // PATCH /admin/rendezvous/:id/complete
-    const result = await completeRendezvous(modal.rdv.id, data);
-    if (result) {
-      closeModal();
-      await loadStatistics();
+    
+    try {
+      const data: CompleteRendezvousDto = {
+        avisAdmin: completeOpinion,
+        comments: completeComment.trim() || undefined,
+      };
+      
+      const result = await completeRendezvous(modal.rdv.id, data);
+      if (result) {
+        closeModal();
+        await loadStatistics();
+        if (activeTab === "today") await loadTodayPanel();
+        if (activeTab === "upcoming") await loadUpcomingPanel();
+      }
+    } catch {
+      // Erreur gérée par le hook
     }
   };
 
   const handleCancel = async () => {
     if (!modal.rdv || !cancelReason.trim()) return;
-    const data: CancelRendezvousData = {
-      reason: cancelReason.trim(),
-      cancelledBy: CancelledBy.ADMIN,
-    };
-    // PATCH /rendezvous/:id/cancel
-    const result = await cancelRendezvous(modal.rdv.id, data);
-    if (result) {
-      closeModal();
-      await loadStatistics();
+    
+    try {
+      const data: CancelRendezvousDto = {
+        reason: cancelReason.trim(),
+        cancelledBy: CancelledBy.ADMIN,
+      };
+      
+      const result = await cancelRendezvous(modal.rdv.id, data);
+      if (result) {
+        closeModal();
+        await loadStatistics();
+        if (activeTab === "today") await loadTodayPanel();
+        if (activeTab === "upcoming") await loadUpcomingPanel();
+      }
+    } catch {
+      // Erreur gérée par le hook
     }
   };
 
   const handleUpdate = async () => {
     if (!modal.rdv) return;
-    // PATCH /admin/rendezvous/:id/patch
-    const result = await updateRendezvous(modal.rdv.id, editForm);
-    if (result) closeModal();
+    
+    try {
+      const cleanData: UpdateRendezvousDto = {
+        ...editForm,
+        destinationAutre: editForm.destination === "Autre" ? editForm.destinationAutre : undefined,
+        niveauEtudeAutre: editForm.niveauEtude === "Autre" ? editForm.niveauEtudeAutre : undefined,
+        filiereAutre: editForm.filiere === "Autre" ? editForm.filiereAutre : undefined,
+      };
+      
+      const result = await updateRendezvous(modal.rdv.id, cleanData);
+      if (result) {
+        closeModal();
+        await loadStatistics();
+        if (activeTab === "today") await loadTodayPanel();
+        if (activeTab === "upcoming") await loadUpcomingPanel();
+      }
+    } catch {
+      // Erreur gérée par le hook
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -414,9 +472,14 @@ const RendezvousAdmin = () => {
 
   const handleConfirmDelete = async () => {
     if (confirmModal.id) {
-      // DELETE /admin/rendezvous/:id/delete
-      await deleteRendezvous(confirmModal.id);
-      await loadStatistics();
+      try {
+        await deleteRendezvous(confirmModal.id);
+        await loadStatistics();
+        if (activeTab === "today") await loadTodayPanel();
+        if (activeTab === "upcoming") await loadUpcomingPanel();
+      } catch {
+        // Erreur gérée par le hook
+      }
     }
     setConfirmModal({ open: false, id: null });
   };
@@ -425,34 +488,44 @@ const RendezvousAdmin = () => {
     setConfirmModal({ open: false, id: null });
   };
 
-  // exportRendezvous via hook — pas de rendezvousService direct
   const handleExport = async () => {
-    const csv = await exportRendezvous(filters);
-    if (!csv) return;
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rendezvous-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const csv = await exportRendezvous(filters);
+      if (!csv) return;
+      
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rendezvous-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Erreur gérée par le hook
+    }
   };
 
   const handleRefresh = async () => {
-    // loadRendezvous → GET /admin/rendezvous/all
-    // loadStatistics → GET /admin/rendezvous/statistics
-    await Promise.all([loadRendezvous(), loadStatistics()]);
+    try {
+      await Promise.all([
+        loadRendezvous(),
+        loadStatistics(),
+        activeTab === "today" ? loadTodayPanel() : Promise.resolve(),
+        activeTab === "upcoming" ? loadUpcomingPanel() : Promise.resolve(),
+      ]);
+    } catch {
+      // Erreur gérée par le hook
+    }
   };
 
   const handleResetFilters = () => {
     setSearchTerm("");
-    // resetFilters → remet filters={} + queryParams={} + recharge
     resetFilters();
   };
 
   const activeFiltersCount = [
     filters.status,
-    filters.destinations,
+    filters.destination,
     filters.dateRange?.start || filters.dateRange?.end,
     filters.searchTerm,
   ].filter(Boolean).length;
@@ -475,15 +548,11 @@ const RendezvousAdmin = () => {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDU
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <Helmet>
         <title>Gestion Des Rendez-vous — Paname Consulting</title>
         <meta name="robots" content="noindex, nofollow" />
-        <meta name="googlebot" content="noindex, nofollow" />
       </Helmet>
 
       <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
@@ -507,11 +576,11 @@ const RendezvousAdmin = () => {
             </button>
             <button
               onClick={handleRefresh}
-              disabled={loading.list || loading.statistics}
+              disabled={loading.list || loading.statistics || loadingPanel}
               className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm transition-colors disabled:opacity-50"
             >
               <RefreshCw
-                className={`w-4 h-4 ${loading.list || loading.statistics ? "animate-spin" : ""}`}
+                className={`w-4 h-4 ${loading.list || loading.statistics || loadingPanel ? "animate-spin" : ""}`}
               />
               <span className="hidden sm:inline">Actualiser</span>
             </button>
@@ -521,7 +590,6 @@ const RendezvousAdmin = () => {
         {/* ── STATISTIQUES ADMIN ── */}
         {isAdmin && statistics && statistics.byStatus && (
           <>
-            {/* Compteurs */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               {[
                 {
@@ -577,7 +645,6 @@ const RendezvousAdmin = () => {
               ))}
             </div>
 
-            {/* Taux + Top destinations + Prévisions */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Taux complétion / annulation */}
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
@@ -683,8 +750,7 @@ const RendezvousAdmin = () => {
               {/* Prévisions */}
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
-                  <CalendarDays className="w-4 h-4 text-indigo-500" />{" "}
-                  Prévisions
+                  <CalendarDays className="w-4 h-4 text-indigo-500" /> Prévisions
                 </h3>
                 <div className="space-y-3">
                   {[
@@ -783,11 +849,9 @@ const RendezvousAdmin = () => {
                 />
               </div>
 
-              {/* Filtre rapide par date → getRendezvousByDate */}
               <input
                 type="date"
                 onChange={(e) => handleDateQuickFilter(e.target.value)}
-                title="Filtrer par date (getRendezvousByDate)"
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
               />
 
@@ -823,18 +887,17 @@ const RendezvousAdmin = () => {
                 {/* Statut */}
                 <div className="relative">
                   <select
-                    value={
-                      (filters.status as RendezvousStatus[] | undefined)?.[0] ??
-                      ""
-                    }
+                    value={filters.status ? (Array.isArray(filters.status) ? filters.status[0] : filters.status) ?? "" : ""}
                     onChange={async (e) => {
-                      setFilters({
-                        ...filters,
-                        status: e.target.value
-                          ? [e.target.value as RendezvousStatus]
-                          : undefined,
-                      });
-                      await loadRendezvous();
+                      try {
+                        setFilters({
+                          ...filters,
+                          status: e.target.value ? e.target.value as RendezvousStatus : undefined,
+                        });
+                        await loadRendezvous();
+                      } catch {
+                        // Erreur gérée par le hook
+                      }
                     }}
                     className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
                   >
@@ -848,18 +911,20 @@ const RendezvousAdmin = () => {
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
                 </div>
 
-                {/* Destination — DESTINATION_OPTIONS depuis les types */}
+                {/* Destination */}
                 <div className="relative">
                   <select
-                    value={filters.destinations?.[0] ?? ""}
+                    value={filters.destination ?? ""}
                     onChange={async (e) => {
-                      setFilters({
-                        ...filters,
-                        destinations: e.target.value
-                          ? [e.target.value]
-                          : undefined,
-                      });
-                      await loadRendezvous();
+                      try {
+                        setFilters({
+                          ...filters,
+                          destination: e.target.value || undefined,
+                        });
+                        await loadRendezvous();
+                      } catch {
+                        // Erreur gérée par le hook
+                      }
                     }}
                     className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
                   >
@@ -877,14 +942,18 @@ const RendezvousAdmin = () => {
                   type="date"
                   value={filters.dateRange?.start ?? ""}
                   onChange={async (e) => {
-                    setFilters({
-                      ...filters,
-                      dateRange: {
-                        start: e.target.value,
-                        end: filters.dateRange?.end ?? "",
-                      },
-                    });
-                    await loadRendezvous();
+                    try {
+                      setFilters({
+                        ...filters,
+                        dateRange: {
+                          start: e.target.value,
+                          end: filters.dateRange?.end ?? "",
+                        },
+                      });
+                      await loadRendezvous();
+                    } catch {
+                      // Erreur gérée par le hook
+                    }
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                 />
@@ -893,14 +962,18 @@ const RendezvousAdmin = () => {
                   type="date"
                   value={filters.dateRange?.end ?? ""}
                   onChange={async (e) => {
-                    setFilters({
-                      ...filters,
-                      dateRange: {
-                        start: filters.dateRange?.start ?? "",
-                        end: e.target.value,
-                      },
-                    });
-                    await loadRendezvous();
+                    try {
+                      setFilters({
+                        ...filters,
+                        dateRange: {
+                          start: filters.dateRange?.start ?? "",
+                          end: e.target.value,
+                        },
+                      });
+                      await loadRendezvous();
+                    } catch {
+                      // Erreur gérée par le hook
+                    }
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                 />
@@ -914,8 +987,7 @@ const RendezvousAdmin = () => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-sky-500" /> Rendez-vous du
-                jour
+                <CalendarDays className="w-4 h-4 text-sky-500" /> Rendez-vous du jour
               </h2>
               <button
                 onClick={loadTodayPanel}
@@ -955,8 +1027,7 @@ const RendezvousAdmin = () => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-indigo-500" /> Prochains
-                rendez-vous
+                <TrendingUp className="w-4 h-4 text-indigo-500" /> Prochains rendez-vous
               </h2>
               <button
                 onClick={() => loadUpcomingPanel(20)}
@@ -1014,13 +1085,11 @@ const RendezvousAdmin = () => {
                   >
                     <div className="p-4 sm:p-5">
                       <div className="flex items-start gap-3">
-                        {/* Avatar */}
                         <div className="w-10 h-10 bg-linear-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
                           {getInitials(rdv.firstName, rdv.lastName)}
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          {/* Nom + badges */}
                           <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                             <div>
                               <p className="font-semibold text-gray-900">
@@ -1058,7 +1127,6 @@ const RendezvousAdmin = () => {
                             </div>
                           </div>
 
-                          {/* Infos */}
                           <div className="flex flex-wrap gap-3 text-sm text-gray-600 mb-3">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3.5 h-3.5 text-gray-400" />
@@ -1066,8 +1134,7 @@ const RendezvousAdmin = () => {
                             </span>
                             <span className="flex items-center gap-1">
                               <GraduationCap className="w-3.5 h-3.5 text-gray-400" />
-                              {rdv.effectiveNiveauEtude} ·{" "}
-                              {rdv.effectiveFiliere}
+                              {rdv.effectiveNiveauEtude} · {rdv.effectiveFiliere}
                             </span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5 text-gray-400" />
@@ -1075,7 +1142,7 @@ const RendezvousAdmin = () => {
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5 text-gray-400" />
-                              {formatTimeSlot(rdv.time)}
+                              {timeSlotToDisplay(rdv.time)}
                             </span>
                           </div>
 
@@ -1085,7 +1152,6 @@ const RendezvousAdmin = () => {
                             </p>
                           )}
 
-                          {/* Actions — loading.update/cancel/complete/delete/details */}
                           <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100">
                             <button
                               onClick={() => openModal("detail", rdv)}
@@ -1228,13 +1294,11 @@ const RendezvousAdmin = () => {
         )}
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════
-          MODAUX
-      ══════════════════════════════════════════════════════════════ */}
+      {/* MODAUX */}
       {modal.type && modal.rdv && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            {/* ── DÉTAIL ── */}
+            {/* DÉTAIL */}
             {modal.type === "detail" && (
               <>
                 <ModalHeader
@@ -1290,7 +1354,7 @@ const RendezvousAdmin = () => {
                             value: modal.rdv.effectiveNiveauEtude,
                           },
                           {
-                            Icon: GraduationCap,
+                            Icon: BookOpen,
                             label: "Filière",
                             value: modal.rdv.effectiveFiliere,
                           },
@@ -1302,7 +1366,7 @@ const RendezvousAdmin = () => {
                           {
                             Icon: Clock,
                             label: "Heure",
-                            value: formatTimeSlot(modal.rdv.time),
+                            value: timeSlotToDisplay(modal.rdv.time),
                           },
                         ].map(({ Icon, label, value }) => (
                           <div
@@ -1328,8 +1392,7 @@ const RendezvousAdmin = () => {
                             }`}
                           >
                             <div className="flex items-center gap-2 text-gray-400 mb-1">
-                              {modal.rdv.avisAdmin ===
-                              AdminOpinion.FAVORABLE ? (
+                              {modal.rdv.avisAdmin === AdminOpinion.FAVORABLE ? (
                                 <ThumbsUp className="w-3.5 h-3.5 text-emerald-500" />
                               ) : (
                                 <ThumbsDown className="w-3.5 h-3.5 text-red-500" />
@@ -1415,7 +1478,7 @@ const RendezvousAdmin = () => {
               </>
             )}
 
-            {/* ── TERMINER ── */}
+            {/* TERMINER */}
             {modal.type === "complete" && (
               <>
                 <ModalHeader
@@ -1428,7 +1491,7 @@ const RendezvousAdmin = () => {
                       {modal.rdv.fullName}
                     </span>
                     <span className="mx-2 text-gray-400">·</span>
-                    {modal.rdv.date} à {formatTimeSlot(modal.rdv.time)}
+                    {modal.rdv.date} à {timeSlotToDisplay(modal.rdv.time)}
                   </div>
 
                   <div>
@@ -1507,7 +1570,7 @@ const RendezvousAdmin = () => {
               </>
             )}
 
-            {/* ── ANNULER ── */}
+            {/* ANNULER */}
             {modal.type === "cancel" && (
               <>
                 <ModalHeader
@@ -1560,7 +1623,7 @@ const RendezvousAdmin = () => {
               </>
             )}
 
-            {/* ── MODIFIER ── */}
+            {/* MODIFIER */}
             {modal.type === "update" && (
               <>
                 <ModalHeader
@@ -1580,7 +1643,7 @@ const RendezvousAdmin = () => {
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              [field]: e.target.value as string,
+                              [field]: e.target.value,
                             })
                           }
                           className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
@@ -1621,7 +1684,6 @@ const RendezvousAdmin = () => {
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                         Heure
                       </label>
-                      {/* TimeSlot — valeurs depuis le const TimeSlot des types */}
                       <select
                         value={editForm.time ?? ""}
                         onChange={(e) =>
@@ -1630,7 +1692,7 @@ const RendezvousAdmin = () => {
                             time: e.target.value as TimeSlot,
                           })
                         }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                       >
                         <option value="">Sélectionner</option>
                         {TIME_SLOT_OPTIONS.map((t) => (
@@ -1649,60 +1711,84 @@ const RendezvousAdmin = () => {
                       </label>
                       <select
                         value={editForm.niveauEtude ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setShowOtherNiveau(value === "Autre");
                           setEditForm({
                             ...editForm,
-                            niveauEtude: e.target.value as NiveauEtude,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
+                            niveauEtude: value,
+                            niveauEtudeAutre: value !== "Autre" ? "" : editForm.niveauEtudeAutre,
+                          });
+                        }}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                       >
                         <option value="">Sélectionner</option>
-                        {[
-                          "Bac",
-                          "Bac+1",
-                          "Bac+2",
-                          "Licence",
-                          "Master I",
-                          "Master II",
-                          "Doctorat",
-                          "Autre",
-                        ].map((n) => (
+                        {NIVEAU_ETUDE_OPTIONS.map((n) => (
                           <option key={n} value={n}>
                             {n}
                           </option>
                         ))}
                       </select>
+                      
+                      {showOtherNiveau && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            value={editForm.niveauEtudeAutre || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                niveauEtudeAutre: e.target.value,
+                              })
+                            }
+                            placeholder="Précisez votre niveau"
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                          />
+                        </div>
+                      )}
                     </div>
+                    
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                         Filière
                       </label>
                       <select
                         value={editForm.filiere ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setShowOtherFiliere(value === "Autre");
                           setEditForm({
                             ...editForm,
-                            filiere: e.target.value as Filiere,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
+                            filiere: value,
+                            filiereAutre: value !== "Autre" ? "" : editForm.filiereAutre,
+                          });
+                        }}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                       >
                         <option value="">Sélectionner</option>
-                        {[
-                          "Informatique",
-                          "Médecine",
-                          "Droit",
-                          "Commerce",
-                          "Ingénierie",
-                          "Architecture",
-                          "Autre",
-                        ].map((f) => (
+                        {FILIERE_OPTIONS.map((f) => (
                           <option key={f} value={f}>
                             {f}
                           </option>
                         ))}
                       </select>
+                      
+                      {showOtherFiliere && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            value={editForm.filiereAutre || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                filiereAutre: e.target.value,
+                              })
+                            }
+                            placeholder="Précisez votre filière"
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1713,13 +1799,16 @@ const RendezvousAdmin = () => {
                     <div className="relative">
                       <select
                         value={editForm.destination ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setShowOtherDestination(value === "Autre");
                           setEditForm({
                             ...editForm,
-                            destination: e.target.value as Destination,
-                          })
-                        }
-                        className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
+                            destination: value,
+                            destinationAutre: value !== "Autre" ? "" : editForm.destinationAutre,
+                          });
+                        }}
+                        className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
                       >
                         <option value="">Sélectionner</option>
                         {DESTINATION_OPTIONS.map((d) => (
@@ -1730,6 +1819,23 @@ const RendezvousAdmin = () => {
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
                     </div>
+                    
+                    {showOtherDestination && (
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          value={editForm.destinationAutre || ""}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              destinationAutre: e.target.value,
+                            })
+                          }
+                          placeholder="Précisez votre destination"
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -1759,7 +1865,6 @@ const RendezvousAdmin = () => {
         </div>
       )}
 
-      {/* Confirmation Modal for Delete */}
       <ConfirmationModal
         title="Supprimer le rendez-vous"
         content="Êtes-vous sûr de vouloir supprimer ce rendez-vous définitivement ? Cette action est irréversible."

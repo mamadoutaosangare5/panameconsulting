@@ -4,7 +4,6 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { createRedisInstance } from '../config/redis.config';
 
@@ -14,7 +13,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly defaultTTL = 1800; // 1 heure
   private redis: Redis;
 
-  constructor(private configService: ConfigService) {
+  constructor() {
     this.logger.log('Configuration Redis initialisée');
 
     // Utilisation de la configuration centralisée

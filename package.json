@@ -1,0 +1,36 @@
+{
+  "name": "panameconsulting",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "install:all": "pnpm install",
+    "build:frontend": "pnpm --filter frontend run build",
+    "build:backend": "pnpm --filter backend run build",
+    "build": "pnpm run build:frontend && pnpm run build:backend",
+    "start:backend": "pnpm --filter backend run start",
+    "start": "pnpm run build && pnpm run start:backend"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "18.2.0",
+      "react-dom": "18.2.0",
+      "vite": "^8.0.0-beta.13"
+    },
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/engines",
+      "@scarf/scarf",
+      "backend",
+      "bcrypt",
+      "core-js",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "unrs-resolver"
+    ]
+  }
+}

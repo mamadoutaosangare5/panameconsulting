@@ -157,10 +157,10 @@ const DestinationForm: React.FC<DestinationFormProps> = ({
     <>
       {/* Backdrop cliquable */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-60 z-[9998]"
+        className="fixed inset-0 bg-black bg-opacity-60 z-9998"
         onClick={onCancel}
       />
-      <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 pointer-events-none">
+      <div className="fixed inset-0 flex items-center justify-center z-9999 p-4 pointer-events-none">
         <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">

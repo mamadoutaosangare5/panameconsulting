@@ -4,7 +4,6 @@ import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as serveStatic from 'serve-static';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import * as compression from 'compression';
 import * as helmet from 'helmet';
@@ -22,13 +21,6 @@ const corsOrigins =
     ? ['https://panameconsulting.com', 'https://www.panameconsulting.com']
     : ['http://localhost:5173', 'http://localhost:10000'];
 
-// ─────────────────────────────────────────────────────────────────────────────
-function resolveFrontendDist(): string {
-  const cwd = process.cwd();
-  // Railway & dev local : lancé depuis backend/
-  return path.join(cwd, '../frontend', 'dist/');
-}
-
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: process.env.NODE_ENV === 'production',
@@ -36,19 +28,13 @@ async function bootstrap() {
     abortOnError: false,
   });
 
-  if (!app) {
-    throw new Error("L'application n'a pas pu être créée");
-  }
-
   const configService = app.get(ConfigService);
   const prismaService = app.get(PrismaService);
   const logger = new Logger('Bootstrap');
   app.useLogger(logger);
 
   // ==================== SÉCURITÉ ====================
-
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
-
   app.use(
     helmet.default({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -100,14 +86,12 @@ async function bootstrap() {
   app.use(cookieParser(configService.get('COOKIE_SECRET')));
 
   // ==================== LOGGING ====================
-
   const loggingMiddleware = new LoggingMiddleware(configService);
   app.use((req: Request, res: Response, next: NextFunction) => {
     loggingMiddleware.use(req, res, next);
   });
 
   // ==================== PRÉFIXE GLOBAL ====================
-
   app.setGlobalPrefix('api', {
     exclude: [
       '/',
@@ -118,8 +102,6 @@ async function bootstrap() {
       '/uploads/destinations/*path',
       '/uploads/profiles',
       '/uploads/profiles/*path',
-      '/docs',
-      '/swagger',
       '/version',
       '/debug/headers',
       '/health',
@@ -127,7 +109,6 @@ async function bootstrap() {
   });
 
   // ==================== PIPES ====================
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -147,7 +128,6 @@ async function bootstrap() {
   );
 
   // ==================== FILTRES ====================
-
   app.useGlobalFilters(
     new JsonExceptionFilter(),
     new PrismaExceptionFilter(),
@@ -155,68 +135,17 @@ async function bootstrap() {
   );
 
   // ==================== UPLOADS STATIQUES ====================
-
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads',
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
+  // ==================== MIDDLEWARE AUTH SIMPLIFIÉ ====================
+  app.use('/api/secret', (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+    next();
   });
-
-  app.useStaticAssets(join(__dirname, '..', 'uploads', 'destinations'), {
-    prefix: '/uploads/destinations',
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
-  });
-
-  app.useStaticAssets(join(__dirname, '..', 'uploads', 'profiles'), {
-    prefix: '/uploads/profiles',
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
-  });
-
-  // ==================== SWAGGER (dev uniquement) ====================
-
-  if (process.env.NODE_ENV !== 'production') {
-    const config = new DocumentBuilder()
-      .setTitle('Paname Consulting API')
-      .setDescription("API de gestion des procédures d'études à l'étranger")
-      .setVersion('1.0')
-      .addTag('auth', 'Authentification')
-      .addTag('users', 'Gestion des utilisateurs')
-      .addTag('rendezvous', 'Gestion des rendez-vous')
-      .addTag('procedures', 'Gestion des procédures')
-      .addTag('destinations', 'Gestion des pays de destination')
-      .addTag('contacts', 'Messages de contact')
-      .addTag('files', 'Gestion des fichiers')
-      .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          name: 'JWT',
-          description: 'Entrez votre token JWT',
-          in: 'header',
-        },
-        'JWT-auth',
-      )
-      .addCookieAuth('refresh_token')
-      .addServer(
-        `http://localhost:${configService.get('PORT', 10000)}`,
-        'Développement',
-      )
-      .addServer('https://panameconsulting.com', 'Production')
-      .build();
-
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document, {
-      swaggerOptions: {
-        persistAuthorization: true,
-        tagsSorter: 'alpha',
-        operationsSorter: 'alpha',
-      },
-      customSiteTitle: 'Paname Consulting API Documentation',
-    });
-  }
 
   // ==================== GRACEFUL SHUTDOWN ====================
-
   async function gracefulShutdown() {
     try {
       logger.log('Début de la fermeture graceful...');
@@ -229,23 +158,18 @@ async function bootstrap() {
     }
   }
 
-  process.on('SIGTERM', () => {
-    logger.log('Signal SIGTERM reçu - Fermeture graceful en cours...');
-    void gracefulShutdown().then(() => process.exit(0));
-  });
-
-  process.on('SIGINT', () => {
-    logger.log('Signal SIGINT reçu - Fermeture graceful en cours...');
-    void gracefulShutdown().then(() => process.exit(0));
-  });
-
+  process.on(
+    'SIGTERM',
+    () => void gracefulShutdown().then(() => process.exit(0)),
+  );
+  process.on(
+    'SIGINT',
+    () => void gracefulShutdown().then(() => process.exit(0)),
+  );
   prismaService.enableShutdownHooks();
 
-  // ==================== FRONTEND REACT (avant listen) ====================
-
-  const FRONTEND_DIST = resolveFrontendDist();
-
-  // Assets React — cache long (les fichiers JS/CSS ont un hash dans leur nom)
+  // ==================== FRONTEND REACT ====================
+  const FRONTEND_DIST = path.join(process.cwd(), '../frontend', 'dist');
   app.use(
     serveStatic(FRONTEND_DIST, {
       maxAge: process.env.NODE_ENV === 'production' ? '1y' : '1h',
@@ -278,41 +202,25 @@ async function bootstrap() {
     }),
   );
 
-  // Catch-all React Router — toutes les routes non-API/non-uploads/non-fichiers → index.html
+  // Catch-all React Router
   app.use((req: Request, res: Response, next: NextFunction) => {
-    // Ne pas intercepter les routes API et uploads
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }
-
-    // Ne pas intercepter les fichiers statiques (servis par serveStatic au-dessus)
-    if (req.path.includes('.')) {
-      return next();
-    }
-
-    // Servir index.html pour toutes les autres routes
     res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
   });
 
   // ==================== DÉMARRAGE ====================
-
   const port = configService.get<number>('PORT', 10000);
-
-  // ⚠️ listen() APRÈS le bloc frontend
-  // 0.0.0.0 requis sur Railway (localhost bloquerait les requêtes entrantes)
   await app.listen(port, '0.0.0.0');
 
-  // ==================== LOGS ====================
-
   logger.log(`🚀 Serveur démarré sur : http://localhost:${port}`);
-  logger.log('📁 Uploads destinations : uploads/destinations');
-  logger.log(`📖 Swagger : http://localhost:${port}/docs`);
-  logger.log(`🌍 Environnement : ${process.env.NODE_ENV ?? 'development'}`);
+  logger.log(`Environnement : ${process.env.NODE_ENV ?? 'development'}`);
   logger.log(`📂 Frontend dist résolu : ${FRONTEND_DIST}`);
 }
 
 bootstrap().catch((error) => {
-  console.error('❌ Erreur fatale au démarrage:', error);
+  console.error('Erreur fatale au démarrage:', error);
   process.exit(1);
 });

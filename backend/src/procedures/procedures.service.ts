@@ -24,6 +24,7 @@ import {
   Procedure,
   User,
   Rendezvous,
+  Step,
 } from '@prisma/client';
 import { MailService } from '../mail/mail.service';
 import { QueueService } from '../queue/queue.service';
@@ -135,8 +136,22 @@ export class ProceduresService {
       priority: 'high',
     });
 
-    // Pas de log de données sensibles
-    return this.toResponseDto(procedure);
+    // Récupérer la procédure complète avec ses relations
+    const procedureWithRelations = await this.proceduresRepository.findById(
+      procedure.id,
+      {
+        steps: true,
+        rendezVouses: true,
+        user: true,
+      },
+    );
+
+    if (!procedureWithRelations) {
+      throw new NotFoundException('Procédure créée non trouvée');
+    }
+
+    this.logger.log(`Procédure ${procedure.id} créée avec succès`);
+    return this.toResponseDto(procedureWithRelations);
   }
 
   async findAll(
@@ -197,7 +212,7 @@ export class ProceduresService {
         take: limit,
         where: where,
         orderBy: { [sortBy]: sortOrder },
-        include: { steps: true, rendezVouses: true },
+        include: { steps: true, rendezVouses: true, user: true },
       }),
       this.proceduresRepository.count(where),
     ]);
@@ -252,6 +267,7 @@ export class ProceduresService {
       {
         steps: true,
         rendezVouses: true,
+        user: true,
       },
     );
 
@@ -286,6 +302,7 @@ export class ProceduresService {
     const procedures = await this.proceduresRepository.findByUserEmail(email, {
       steps: true,
       rendezVouses: true,
+      user: true,
     });
 
     return procedures.map((proc) => this.toResponseDto(proc));
@@ -296,7 +313,11 @@ export class ProceduresService {
     updateProcedureDto: UpdateProcedureDto,
     currentUser: CurrentUser,
   ): Promise<ProcedureResponseDto> {
-    const procedure = await this.proceduresRepository.findById(id);
+    const procedure = await this.proceduresRepository.findById(id, {
+      steps: true,
+      rendezVouses: true,
+      user: true,
+    });
 
     if (!procedure) {
       throw new NotFoundException(`Procédure avec l'ID ${id} non trouvée`);
@@ -329,13 +350,34 @@ export class ProceduresService {
       updateProcedureDto.filiereAutre = undefined;
     }
 
-    const updatedProcedure = await this.proceduresRepository.update(
+    if (
+      updateProcedureDto.niveauEtude === 'Autre' &&
+      updateProcedureDto.niveauEtudeAutre
+    ) {
+      updateProcedureDto.niveauEtude = updateProcedureDto.niveauEtudeAutre;
+      updateProcedureDto.niveauEtudeAutre = undefined;
+    }
+
+    await this.proceduresRepository.update(id, updateProcedureDto);
+
+    // Récupérer la procédure complète avec ses relations
+    const procedureWithRelations = await this.proceduresRepository.findById(
       id,
-      updateProcedureDto,
+      {
+        steps: true,
+        rendezVouses: true,
+        user: true,
+      },
     );
 
+    if (!procedureWithRelations) {
+      throw new NotFoundException(
+        `Procédure avec l'ID ${id} non trouvée après mise à jour`,
+      );
+    }
+
     this.logger.log(`Procédure ${id} mise à jour`);
-    return this.toResponseDto(updatedProcedure);
+    return this.toResponseDto(procedureWithRelations);
   }
 
   async updateStep(
@@ -378,6 +420,7 @@ export class ProceduresService {
           statut: StepStatus.REJECTED,
           raisonRefus: updateStepDto.raisonRefus,
           dateCompletion: new Date(),
+          dateMaj: new Date(),
         });
       }
     }
@@ -397,6 +440,22 @@ export class ProceduresService {
     const updatedProcedure =
       await this.proceduresRepository.updateGlobalStatus(id);
 
+    // Récupérer la procédure complète avec ses relations
+    const procedureWithRelations = await this.proceduresRepository.findById(
+      id,
+      {
+        steps: true,
+        rendezVouses: true,
+        user: true,
+      },
+    );
+
+    if (!procedureWithRelations) {
+      throw new NotFoundException(
+        `Procédure avec l'ID ${id} non trouvée après mise à jour`,
+      );
+    }
+
     // Envoyer une notification si le statut a changé
     if (updatedProcedure.statut !== procedure.statut) {
       await this.queueService.addEmailJob({
@@ -408,7 +467,7 @@ export class ProceduresService {
     }
 
     this.logger.log(`Étape ${stepName} mise à jour pour procédure ${id}`);
-    return this.toResponseDto(updatedProcedure);
+    return this.toResponseDto(procedureWithRelations);
   }
 
   /**
@@ -431,6 +490,8 @@ export class ProceduresService {
 
     for (const stepName of requiredSteps) {
       if (!existingStepNames.includes(stepName)) {
+        // Créer l'étape avec la relation procedure via le repository
+        // Le repository s'occupe de connecter la procédure
         await this.proceduresRepository.addStep(procedureId, {
           nom: stepName,
           statut:
@@ -439,7 +500,11 @@ export class ProceduresService {
               : StepStatus.PENDING,
           dateCreation: new Date(),
           dateMaj: new Date(),
-          procedure: { connect: { id: procedureId } },
+          procedure: {
+            connect: {
+              id: procedureId,
+            },
+          },
         });
       }
     }
@@ -470,14 +535,40 @@ export class ProceduresService {
       throw new ConflictException(`L'étape ${stepName} existe déjà`);
     }
 
-    // Créer l'étape directement
+    // Créer l'étape via le repository (qui gère la relation)
+    await this.proceduresRepository.addStep(id, {
+      nom: stepName,
+      statut: StepStatus.PENDING,
+      dateCreation: new Date(),
+      dateMaj: new Date(),
+      procedure: {
+        connect: {
+          id,
+        },
+      },
+    });
 
     // Mettre à jour le statut global
-    const updatedProcedure =
-      await this.proceduresRepository.updateGlobalStatus(id);
+    await this.proceduresRepository.updateGlobalStatus(id);
+
+    // Récupérer la procédure complète avec ses relations
+    const procedureWithRelations = await this.proceduresRepository.findById(
+      id,
+      {
+        steps: true,
+        rendezVouses: true,
+        user: true,
+      },
+    );
+
+    if (!procedureWithRelations) {
+      throw new NotFoundException(
+        `Procédure avec l'ID ${id} non trouvée après ajout d'étape`,
+      );
+    }
 
     this.logger.log(`Étape ${stepName} ajoutée à procédure ${id}`);
-    return this.toResponseDto(updatedProcedure);
+    return this.toResponseDto(procedureWithRelations);
   }
 
   async softDelete(
@@ -522,6 +613,8 @@ export class ProceduresService {
       html: this.generateProcedureDeletedContent(procedure, reason),
       priority: 'high',
     });
+
+    this.logger.log(`Procédure ${id} supprimée (soft delete)`);
   }
 
   async cancel(
@@ -529,7 +622,9 @@ export class ProceduresService {
     reason: string,
     currentUser: CurrentUser,
   ): Promise<ProcedureResponseDto> {
-    const procedure = await this.proceduresRepository.findById(id);
+    const procedure = await this.proceduresRepository.findById(id, {
+      steps: true,
+    });
 
     if (!procedure) {
       throw new NotFoundException(`Procédure avec l'ID ${id} non trouvée`);
@@ -552,23 +647,13 @@ export class ProceduresService {
       );
     }
 
-    // Mettre à jour la procédure
-    const updateData: Prisma.ProcedureUpdateInput = {
+    // Mettre à jour la procédure avec les champs d'annulation
+    await this.proceduresRepository.update(id, {
       statut: ProcedureStatus.CANCELLED,
-    };
-
-    // Ajouter les champs d'annulation (temporairement jusqu'à ce que les types soient régénérés)
-    const extendedUpdateData = {
-      ...updateData,
       cancelledAt: new Date(),
       cancelledReason: reason,
       cancelledBy: currentUser.id,
-    };
-
-    await this.proceduresRepository.update(
-      id,
-      extendedUpdateData as Prisma.ProcedureUpdateInput,
-    );
+    });
 
     // Cascade: annuler toutes les étapes en cours ou en attente
     await this.prisma.step.updateMany({
@@ -588,8 +673,16 @@ export class ProceduresService {
     this.logger.log(
       `Procédure ${id} annulée par l'utilisateur ${currentUser.id}`,
     );
-    // Recharger la procédure complète avec ses relations pour le DTO
-    const procedureWithRelations = await this.proceduresRepository.findById(id);
+
+    // Récupérer la procédure complète avec ses relations pour le DTO
+    const procedureWithRelations = await this.proceduresRepository.findById(
+      id,
+      {
+        steps: true,
+        rendezVouses: true,
+        user: true,
+      },
+    );
 
     if (!procedureWithRelations) {
       throw new NotFoundException(
@@ -599,7 +692,7 @@ export class ProceduresService {
 
     // Notifier l'administrateur
     await this.queueService.addEmailJob({
-      to: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER || 'admin@panameconsulting.com',
       subject: 'Annulation de procédure - Paname Consulting',
       html: this.generateProcedureCancelledContent(
         this.toResponseDto(procedureWithRelations),
@@ -666,6 +759,9 @@ export class ProceduresService {
     const topDestinations =
       await this.proceduresRepository.getTopDestinations(5);
 
+    // TODO: Implémenter les statistiques par filière
+    const topFilieres: { filiere: string; count: number }[] = [];
+
     return {
       total: totalProcedures,
       byStatus: {
@@ -686,7 +782,7 @@ export class ProceduresService {
         thisMonth: proceduresThisMonth,
       },
       topDestinations,
-      topFilieres: [], // TODO: implémenter les statistiques par filière
+      topFilieres,
     };
   }
 
@@ -695,104 +791,15 @@ export class ProceduresService {
    */
   private toResponseDto(
     procedure: Procedure & {
-      steps?: Array<{
-        id: string;
-        nom: StepName;
-        statut: StepStatus;
-        raisonRefus: string | null;
-        dateCreation: Date;
-        dateMaj: Date;
-        dateCompletion: Date | null;
-        order: number | null;
-      }>;
-      rendezVouses?: Rendezvous[];
+      steps?: Step[];
+      rendezVouses?: Rendezvous | Rendezvous[] | null;
       user?: User | null;
     },
   ): ProcedureResponseDto {
-    // Créer une instance de ProcedureEntity pour utiliser les méthodes d'instance
-    const procedureEntity = {
-      ...procedure,
-      // Utiliser les méthodes d'instance
-      getEffectiveDestination: () => {
-        return procedure.destination === 'Autre' && procedure.destinationAutre
-          ? procedure.destinationAutre
-          : procedure.destination;
-      },
-      getEffectiveFiliere: () => {
-        return procedure.filiere === 'Autre' && procedure.filiereAutre
-          ? procedure.filiereAutre
-          : procedure.filiere;
-      },
-      getProgress: () => {
-        if (!procedure.steps || procedure.steps.length === 0) return 0;
-        const completed = procedure.steps.filter(
-          (s) => s.statut === StepStatus.COMPLETED,
-        ).length;
-        return Math.round((completed / procedure.steps.length) * 100);
-      },
-      getActiveStep: () => {
-        if (!procedure.steps) return null;
-        const activeStep = procedure.steps.find(
-          (s) => s.statut === StepStatus.IN_PROGRESS,
-        );
-        return activeStep || null;
-      },
-      canBeModified: () => {
-        const finalStatuses: ProcedureStatus[] = [
-          ProcedureStatus.COMPLETED,
-          ProcedureStatus.CANCELLED,
-          ProcedureStatus.REJECTED,
-        ];
-        return !finalStatuses.includes(procedure.statut);
-      },
-      getDaysSinceCreation: () => {
-        const diff = Date.now() - new Date(procedure.createdAt).getTime();
-        return Math.floor(diff / (1000 * 60 * 60 * 24));
-      },
-      getStatusLabel: () => {
-        const labels: Record<ProcedureStatus, string> = {
-          [ProcedureStatus.PENDING]: 'En attente',
-          [ProcedureStatus.IN_PROGRESS]: 'En cours',
-          [ProcedureStatus.COMPLETED]: 'Terminée',
-          [ProcedureStatus.REJECTED]: 'Refusée',
-          [ProcedureStatus.CANCELLED]: 'Annulée',
-        };
-        return labels[procedure.statut] || procedure.statut;
-      },
-      getStatusColor: () => {
-        const colors: Record<ProcedureStatus, string> = {
-          [ProcedureStatus.PENDING]: 'yellow',
-          [ProcedureStatus.IN_PROGRESS]: 'blue',
-          [ProcedureStatus.COMPLETED]: 'green',
-          [ProcedureStatus.REJECTED]: 'red',
-          [ProcedureStatus.CANCELLED]: 'gray',
-        };
-        return colors[procedure.statut] || 'blue';
-      },
-      isOverdue: () => {
-        if (procedure.statut === ProcedureStatus.COMPLETED) return false;
-        const activeStep = procedure.steps?.find(
-          (s) => s.statut === StepStatus.IN_PROGRESS,
-        );
-        if (!activeStep) return false;
-        const stepDuration =
-          (Date.now() - new Date(activeStep.dateCreation).getTime()) /
-          (1000 * 60 * 60 * 24);
-        return stepDuration > 14;
-      },
-      getNextStep: () => {
-        if (!procedure.steps) return undefined;
-        const sortedSteps = [...procedure.steps].sort(
-          (a, b) => (a.order || 0) - (b.order || 0),
-        );
-        for (const step of sortedSteps) {
-          if (step.statut === StepStatus.PENDING) {
-            return step.nom;
-          }
-        }
-        return undefined;
-      },
-    };
+    // Gérer le cas où rendezVouses pourrait être un tableau (selon votre schéma Prisma)
+    const rendezvous = Array.isArray(procedure.rendezVouses)
+      ? procedure.rendezVouses[0]
+      : procedure.rendezVouses;
 
     // Mapper les étapes avec leurs virtuals
     const stepsWithVirtuals =
@@ -805,7 +812,11 @@ export class ProceduresService {
         dateMaj: step.dateMaj,
         dateCompletion: step.dateCompletion || undefined,
         // Virtuals pour Step
-        canBeModified: step.statut === StepStatus.PENDING,
+        canBeModified: ![
+          StepStatus.COMPLETED as StepStatus,
+          StepStatus.REJECTED as StepStatus,
+          StepStatus.CANCELLED as StepStatus,
+        ].includes(step.statut),
         duration: step.dateCompletion
           ? (new Date(step.dateCompletion).getTime() -
               new Date(step.dateCreation).getTime()) /
@@ -816,26 +827,25 @@ export class ProceduresService {
           (Date.now() - new Date(step.dateCreation).getTime()) /
             (1000 * 60 * 60 * 24) >
             7,
-        statusLabel: {
-          [StepStatus.PENDING]: 'En attente',
-          [StepStatus.IN_PROGRESS]: 'En cours',
-          [StepStatus.COMPLETED]: 'Terminée',
-          [StepStatus.REJECTED]: 'Refusée',
-          [StepStatus.CANCELLED]: 'Annulée',
-        }[step.statut],
-        statusColor: {
-          [StepStatus.PENDING]: 'yellow',
-          [StepStatus.IN_PROGRESS]: 'blue',
-          [StepStatus.COMPLETED]: 'green',
-          [StepStatus.REJECTED]: 'red',
-          [StepStatus.CANCELLED]: 'gray',
-        }[step.statut],
+        statusLabel: this.getStepStatusLabel(step.statut),
+        statusColor: this.getStepStatusColor(step.statut),
       })) || [];
 
     const totalSteps = procedure.steps?.length || 0;
     const completedSteps =
       procedure.steps?.filter((s) => s.statut === StepStatus.COMPLETED)
         .length || 0;
+
+    const activeStep = procedure.steps?.find(
+      (s) => s.statut === StepStatus.IN_PROGRESS,
+    );
+
+    const daysSinceCreation = Math.floor(
+      (Date.now() - new Date(procedure.createdAt).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
+    const isOverdue = this.calculateIsOverdue(procedure);
 
     return {
       id: procedure.id,
@@ -847,7 +857,10 @@ export class ProceduresService {
       telephone: procedure.telephone,
       destination: procedure.destination,
       destinationAutre: procedure.destinationAutre || undefined,
-      effectiveDestination: procedureEntity.getEffectiveDestination(),
+      effectiveDestination: this.getRealDestination(
+        procedure.destination,
+        procedure.destinationAutre || undefined,
+      ),
       filiere: procedure.filiere,
       filiereAutre: procedure.filiereAutre || undefined,
       effectiveFiliere: this.getRealFiliere(
@@ -871,18 +884,108 @@ export class ProceduresService {
       updatedAt: procedure.updatedAt,
       userId: procedure.userId,
       steps: stepsWithVirtuals,
-      progress: procedureEntity.getProgress(),
+      progress: this.calculateProgress(procedure.steps),
       completedSteps,
       totalSteps,
-      activeStep: procedureEntity.getActiveStep()?.nom,
-      canBeModified: procedureEntity.canBeModified(),
-      daysSinceCreation: procedureEntity.getDaysSinceCreation(),
+      activeStep: activeStep?.nom,
+      canBeModified: this.canProcedureBeModified(procedure.statut),
+      daysSinceCreation,
       estimatedCompletionDate: this.estimateCompletionDate(procedure.steps),
-      statusLabel: procedureEntity.getStatusLabel(),
-      statusColor: procedureEntity.getStatusColor(),
-      isOverdue: procedureEntity.isOverdue(),
-      nextStep: procedureEntity.getNextStep(),
+      statusLabel: this.getProcedureStatusLabel(procedure.statut),
+      statusColor: this.getProcedureStatusColor(procedure.statut),
+      isOverdue,
+      nextStep: this.getNextStep(procedure.steps),
+      rendezvousStatus: rendezvous?.status,
+      rendezvousDate: rendezvous?.date,
     };
+  }
+
+  private calculateProgress(steps?: Step[]): number {
+    if (!steps || steps.length === 0) return 0;
+    const completed = steps.filter(
+      (s) => s.statut === StepStatus.COMPLETED,
+    ).length;
+    return Math.round((completed / steps.length) * 100);
+  }
+
+  private canProcedureBeModified(status: ProcedureStatus): boolean {
+    const finalStatuses: ProcedureStatus[] = [
+      ProcedureStatus.COMPLETED,
+      ProcedureStatus.CANCELLED,
+      ProcedureStatus.REJECTED,
+    ];
+    return !finalStatuses.includes(status);
+  }
+
+  private calculateIsOverdue(
+    procedure: Procedure & { steps?: Step[] },
+  ): boolean {
+    if (procedure.statut === ProcedureStatus.COMPLETED) return false;
+    const activeStep = procedure.steps?.find(
+      (s) => s.statut === StepStatus.IN_PROGRESS,
+    );
+    if (!activeStep) return false;
+    const stepDuration =
+      (Date.now() - new Date(activeStep.dateCreation).getTime()) /
+      (1000 * 60 * 60 * 24);
+    return stepDuration > 14;
+  }
+
+  private getStepStatusLabel(status: StepStatus): string {
+    const labels: Record<StepStatus, string> = {
+      [StepStatus.PENDING]: 'En attente',
+      [StepStatus.IN_PROGRESS]: 'En cours',
+      [StepStatus.COMPLETED]: 'Terminée',
+      [StepStatus.REJECTED]: 'Refusée',
+      [StepStatus.CANCELLED]: 'Annulée',
+    };
+    return labels[status] || status;
+  }
+
+  private getStepStatusColor(status: StepStatus): string {
+    const colors: Record<StepStatus, string> = {
+      [StepStatus.PENDING]: 'gray',
+      [StepStatus.IN_PROGRESS]: 'blue',
+      [StepStatus.COMPLETED]: 'green',
+      [StepStatus.REJECTED]: 'red',
+      [StepStatus.CANCELLED]: 'orange',
+    };
+    return colors[status] || 'gray';
+  }
+
+  private getProcedureStatusLabel(status: ProcedureStatus): string {
+    const labels: Record<ProcedureStatus, string> = {
+      [ProcedureStatus.PENDING]: 'En attente',
+      [ProcedureStatus.IN_PROGRESS]: 'En cours',
+      [ProcedureStatus.COMPLETED]: 'Terminée',
+      [ProcedureStatus.REJECTED]: 'Refusée',
+      [ProcedureStatus.CANCELLED]: 'Annulée',
+    };
+    return labels[status] || status;
+  }
+
+  private getProcedureStatusColor(status: ProcedureStatus): string {
+    const colors: Record<ProcedureStatus, string> = {
+      [ProcedureStatus.PENDING]: 'yellow',
+      [ProcedureStatus.IN_PROGRESS]: 'blue',
+      [ProcedureStatus.COMPLETED]: 'green',
+      [ProcedureStatus.REJECTED]: 'red',
+      [ProcedureStatus.CANCELLED]: 'gray',
+    };
+    return colors[status] || 'blue';
+  }
+
+  private getNextStep(steps?: Step[]): StepName | undefined {
+    if (!steps) return undefined;
+    const sortedSteps = [...steps].sort(
+      (a, b) => (a.order || 0) - (b.order || 0),
+    );
+    for (const step of sortedSteps) {
+      if (step.statut === StepStatus.PENDING) {
+        return step.nom;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -921,13 +1024,7 @@ export class ProceduresService {
   /**
    * Estimer la date de complétion basée sur les étapes complétées
    */
-  private estimateCompletionDate(
-    steps?: Array<{
-      statut: StepStatus;
-      dateCompletion: Date | null;
-      dateCreation: Date;
-    }>,
-  ): Date | undefined {
+  private estimateCompletionDate(steps?: Step[]): Date | undefined {
     if (!steps || steps.length === 0) return undefined;
 
     const completedSteps = steps.filter(

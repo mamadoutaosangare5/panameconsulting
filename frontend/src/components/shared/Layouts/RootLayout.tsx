@@ -1,8 +1,8 @@
 import { Outlet } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import Footer from "../../components/shared/ui/Footer";
-import Header from "../../components/shared/ui/Header";
-import Loader from "../../components/accueil/Loader";
+import Footer from "../../../components/shared/ui/Footer";
+import Header from "../../../components/shared/ui/Header";
+import Loader from "../../../components/accueil/Loader";
 import { useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 

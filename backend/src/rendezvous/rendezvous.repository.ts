@@ -149,19 +149,17 @@ export class RendezvousRepository {
     });
 
     if (existing) {
-      return false; // Créneau déjà pris
+      return false;
     }
 
-    // Vérifier si le créneau est pendant la pause déjeuner (12:30-14h)
     const timeStr = String(time);
-    const [hours] = timeStr.split(':').map(Number);
-    const isLunchBreak = hours >= 12.5 && hours < 14;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const isLunchBreak = (hours === 12 && minutes >= 30) || hours === 13;
 
     if (isLunchBreak) {
-      return false; // Créneau pendant la pause déjeuner
+      return false;
     }
 
-    // Vérifier si c'est un week-end ou jour férié
     const dateObj = new Date(date);
     const isWeekend = this.holidaysService.isWeekend(dateObj);
     const isHoliday = this.holidaysService.isHoliday(date);

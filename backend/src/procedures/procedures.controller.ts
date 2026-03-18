@@ -82,7 +82,7 @@ export class ProceduresController {
     return this.proceduresService.findAll(query, currentUser);
   }
 
-  @Get('procedures/:email')
+  @Get('procedures/by-email/:email')
   @ApiOperation({ summary: 'Trouver les procédures par email' })
   @ApiResponse({ status: 200, description: 'Procédures trouvées' })
   async findByUserEmail(
@@ -92,7 +92,7 @@ export class ProceduresController {
     return this.proceduresService.findByUserEmail(email, currentUser);
   }
 
-  @Get('procedures/:rendezVousId')
+  @Get('procedures/by-rendezvous/:rendezVousId')
   @ApiOperation({ summary: 'Trouver une procédure par ID de rendez-vous' })
   @ApiResponse({ status: 200, description: 'Procédure trouvée' })
   @ApiResponse({ status: 404, description: 'Procédure non trouvée' })

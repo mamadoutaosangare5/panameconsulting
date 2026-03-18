@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText,
   Calendar,
@@ -79,13 +79,9 @@ const STATUS_CONFIG: Record<
 
 const STEP_LABELS: Record<StepName, string> = {
   DEMANDE_ADMISSION: "Demande d'admission",
-  PREPARATION_DOSSIERS: "Préparation dossiers",
-  SOUMISSION_DOSSIERS: "Soumission dossiers",
-  ATTENTE_DECISION: "Attente décision",
+  ENTRETIEN_MOTIVATION: "Entretien de motivation",
   DEMANDE_VISA: "Demande de visa",
   PREPARATIF_VOYAGE: "Préparatifs voyage",
-  ARRIVEE_PAYS: "Arrivée au pays",
-  INSCRIPTION_ETABLISSEMENT: "Inscription établissement",
 };
 
 function formatDate(d: Date | string | undefined): string {
@@ -143,13 +139,9 @@ function StepTimeline({ steps }: { steps: StepResponseDto[] }) {
   const sorted = [...steps].sort((a, b) => {
     const order: Record<string, number> = {
       DEMANDE_ADMISSION: 0,
-      PREPARATION_DOSSIERS: 1,
-      SOUMISSION_DOSSIERS: 2,
-      ATTENTE_DECISION: 3,
-      DEMANDE_VISA: 4,
-      PREPARATIF_VOYAGE: 5,
-      ARRIVEE_PAYS: 6,
-      INSCRIPTION_ETABLISSEMENT: 7,
+      ENTRETIEN_MOTIVATION: 1,
+      DEMANDE_VISA: 2,
+      PREPARATIF_VOYAGE: 3,
     };
     return (order[a.nom] ?? 99) - (order[b.nom] ?? 99);
   });
@@ -199,7 +191,7 @@ function StepTimeline({ steps }: { steps: StepResponseDto[] }) {
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0
                   ${isDone ? "bg-emerald-100 text-emerald-700" : isActive ? "bg-sky-100 text-sky-700" : isRejected ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-400"}`}
                 >
-                  {step.statusLabel ?? step.statut}
+                  {step.statusLabel}
                 </span>
               </div>
               {step.raisonRefus && (
@@ -310,12 +302,26 @@ function ProcedureDetailModal({
                 value={formatDate(procedure.dateCompletion)}
               />
             )}
+            {procedure.cancelledAt && (
+              <InfoCard
+                label="Annulée le"
+                value={formatDate(procedure.cancelledAt)}
+              />
+            )}
             {procedure.raisonRejet && (
               <div className="col-span-2 bg-red-50 border border-red-100 rounded-xl p-3">
                 <p className="text-xs text-red-500 font-medium mb-0.5">
                   Motif de rejet
                 </p>
                 <p className="text-sm text-red-700">{procedure.raisonRejet}</p>
+              </div>
+            )}
+            {procedure.cancelledReason && (
+              <div className="col-span-2 bg-orange-50 border border-orange-100 rounded-xl p-3">
+                <p className="text-xs text-orange-500 font-medium mb-0.5">
+                  Raison d'annulation
+                </p>
+                <p className="text-sm text-orange-700">{procedure.cancelledReason}</p>
               </div>
             )}
           </div>
@@ -571,73 +577,96 @@ function FilterSheet({
 export default function MaProcedures() {
   const { user } = useAuth();
 
-  const { procedures, loading, error, cancelProcedure, findByEmail } =
-    useProcedures({ autoLoad: false });
+  const { 
+    procedures, 
+    error, 
+    cancelProcedure, 
+    findByEmail,
+    refresh,
+    loading: { list: isLoading },
+    overdue
+  } = useProcedures({ 
+    autoLoad: false,
+    refreshInterval: 30000
+  });
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ProcedureStatus | "ALL">(
-    "ALL",
-  );
-  const [selectedProcedure, setSelectedProcedure] =
-    useState<ProcedureResponseDto | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ProcedureStatus | "ALL">("ALL");
+  const [selectedProcedure, setSelectedProcedure] = useState<ProcedureResponseDto | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
   // Charger les procédures de l'utilisateur connecté
   useEffect(() => {
     if (user?.email) {
-      findByEmail(user.email);
+      findByEmail(user.email).catch((err) => {
+        console.error("Erreur chargement procédures:", err);
+      });
     }
-  }, [user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.email, findByEmail]);
 
-  // Filtrage local
+  // Filtrage local uniquement pour l'affichage UI
   const filtered = useMemo(() => {
     let list = [...procedures];
+    
     if (statusFilter !== "ALL") {
       list = list.filter((p) => p.statut === statusFilter);
     }
+    
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
         (p) =>
           p.effectiveDestination.toLowerCase().includes(q) ||
           p.effectiveFiliere.toLowerCase().includes(q) ||
-          p.effectiveNiveauEtude.toLowerCase().includes(q),
+          p.effectiveNiveauEtude.toLowerCase().includes(q) ||
+          p.fullName.toLowerCase().includes(q),
       );
     }
+    
     return list;
   }, [procedures, statusFilter, search]);
 
-  const hasFilters = statusFilter !== "ALL" || search.trim().length > 0;
-
-  // Compteurs par statut pour les chips
+  // Compteurs pour les statistiques
   const counts = useMemo(() => {
-    const c: Record<string, number> = { ALL: procedures.length };
+    const c: Partial<Record<ProcedureStatus | "ALL", number>> = { 
+      ALL: procedures.length 
+    };
     for (const p of procedures) {
       c[p.statut] = (c[p.statut] ?? 0) + 1;
     }
     return c;
   }, [procedures]);
 
+  const hasFilters = statusFilter !== "ALL" || search.trim().length > 0;
+
   const handleCancel = useCallback(
     async (id: string) => {
       setCancelling(true);
-      const result = await cancelProcedure(id, "Annulation par l'utilisateur");
-      setCancelling(false);
-      if (result) {
-        setSelectedProcedure(result);
+      try {
+        const result = await cancelProcedure(id, "Annulation par l'utilisateur");
+        if (result) {
+          setSelectedProcedure(result);
+        }
+      } catch (err) {
+        console.error("Erreur annulation procédure:", err);
+      } finally {
+        setCancelling(false);
       }
     },
     [cancelProcedure],
   );
 
-  const handleRefresh = useCallback(() => {
-    if (user?.email) findByEmail(user.email);
-  }, [user, findByEmail]);
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refresh();
+    } catch (err) {
+      console.error("Erreur rafraîchissement:", err);
+    }
+  }, [refresh]);
 
   const pageConfig = pageConfigs["/mes-procedures"];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       <Helmet>
@@ -647,9 +676,8 @@ export default function MaProcedures() {
       </Helmet>
 
       <div className="min-h-screen bg-slate-50 pb-20 mt-35">
-        {/* ── Page hero ── */}
+        {/* Page hero */}
         <div className="bg-linear-to-br from-sky-500 via-sky-600 to-blue-700 px-5 pt-8 pb-6">
-          {/* greeting */}
           <div className="mb-4">
             <p className="text-sky-200 text-xs font-medium uppercase tracking-widest">
               Tableau de bord
@@ -664,7 +692,7 @@ export default function MaProcedures() {
             )}
           </div>
 
-          {/* stats strip */}
+          {/* Statistiques */}
           <div className="grid grid-cols-3 gap-2">
             <StatPill
               label="Total"
@@ -673,19 +701,36 @@ export default function MaProcedures() {
             />
             <StatPill
               label="En cours"
-              value={counts["IN_PROGRESS"] ?? 0}
+              value={counts.IN_PROGRESS ?? 0}
               accent="bg-white/20"
             />
             <StatPill
               label="Terminées"
-              value={counts["COMPLETED"] ?? 0}
+              value={counts.COMPLETED ?? 0}
               accent="bg-white/20"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <StatPill
+              label="En retard"
+              value={overdue?.length ?? 0}
+              accent="bg-amber-500/20"
+            />
+            <StatPill
+              label="En attente"
+              value={counts.PENDING ?? 0}
+              accent="bg-yellow-500/20"
+            />
+            <StatPill
+              label="Annulées"
+              value={counts.CANCELLED ?? 0}
+              accent="bg-red-500/20"
             />
           </div>
         </div>
 
         <div className="px-4 -mt-3">
-          {/* ── Search + filter bar ── */}
+          {/* Barre de recherche et filtres */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex gap-2 mb-4">
             <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5">
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
@@ -717,16 +762,16 @@ export default function MaProcedures() {
             </button>
             <button
               onClick={handleRefresh}
-              disabled={loading.list}
+              disabled={isLoading}
               className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition-colors shrink-0 disabled:opacity-50"
             >
               <RefreshCw
-                className={`w-4 h-4 ${loading.list ? "animate-spin" : ""}`}
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
               />
             </button>
           </div>
 
-          {/* ── Status chips (horizontal scroll) ── */}
+          {/* Chips de statut */}
           <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide -mx-4 px-4">
             {STATUS_OPTIONS.map((opt) => {
               const count = counts[opt.value] ?? 0;
@@ -751,8 +796,8 @@ export default function MaProcedures() {
             })}
           </div>
 
-          {/* ── Content ── */}
-          {loading.list ? (
+          {/* Contenu */}
+          {isLoading ? (
             <div className="flex justify-center py-16">
               <Loader />
             </div>
@@ -783,18 +828,22 @@ export default function MaProcedures() {
                 ))}
               </div>
 
-              {/* result count */}
-              <p className="text-center text-xs text-slate-400 mt-4 pb-2">
-                {filtered.length} procédure{filtered.length > 1 ? "s" : ""}
-                {hasFilters ? " trouvée" : ""}
-                {filtered.length > 1 && hasFilters ? "s" : ""}
-              </p>
+              {/* Compteur de résultats */}
+              <div className="flex items-center justify-between text-xs text-slate-400 mt-4 pb-2">
+                <span>{filtered.length} procédure{filtered.length > 1 ? "s" : ""}</span>
+                {hasFilters && <span> trouvée{filtered.length > 1 ? "s" : ""}</span>}
+                {filtered.length > 0 && (
+                  <span>
+                    • {Math.round((filtered.filter(p => p.statut === "COMPLETED").length / filtered.length) * 100)}% terminées
+                  </span>
+                )}
+              </div>
             </>
           )}
         </div>
       </div>
 
-      {/* ── Detail modal ── */}
+      {/* Modal de détail */}
       {selectedProcedure && (
         <ProcedureDetailModal
           procedure={selectedProcedure}
@@ -804,7 +853,7 @@ export default function MaProcedures() {
         />
       )}
 
-      {/* ── Filter sheet ── */}
+      {/* Filtre sheet */}
       <FilterSheet
         open={filterOpen}
         selectedStatus={statusFilter}

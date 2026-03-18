@@ -251,7 +251,7 @@ export default function AdminSidebar({
                   {/* Informations utilisateur en dessous */}
                   <div className="text-start">
                     <div className="flex flex-col items-start gap-1 mt-1">
-                      <span className="text-[10px] text-sky-600 truncate max-w-[200px]">
+                      <span className="text-[10px] text-sky-600 truncate max-w-40">
                         {user.email}
                       </span>
                       <span className="text-[9px] font-medium text-sky-500 uppercase tracking-wider">
@@ -407,7 +407,7 @@ export default function AdminSidebar({
                               initial="hidden"
                               animate="visible"
                               variants={badgeVariants}
-                              className={`absolute -top-2 -right-2 min-w-[18px] h-[18px] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm ${
+                              className={`absolute -top-2 -right-2 min-w-4.5 h-4.5 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm ${
                                 item.showLoadingBadge
                                   ? "bg-gray-400 animate-pulse"
                                   : "bg-rose-500 shadow-rose-500/30"
