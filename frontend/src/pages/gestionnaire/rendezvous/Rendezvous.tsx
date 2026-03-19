@@ -281,24 +281,23 @@ const RendezvousAdmin = () => {
     if (isAdmin) {
       loadStatistics();
     }
-  }, [isAdmin, loadStatistics]);
+  }, [isAdmin, loadStatistics]); // ✅ Retirer loadStatistics pour éviter boucle
 
   // Debounce recherche
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     
     searchTimer.current = setTimeout(() => {
-      const newFilters = {
+      setFilters({
         ...filters,
         searchTerm: searchTerm.trim() || undefined,
-      };
-      setFilters(newFilters);
+      });
     }, 350);
     
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-  }, [searchTerm, filters, setFilters]);
+  }, [searchTerm]); // ✅ Garder seulement searchTerm
 
   // Panels
   const loadTodayPanel = useCallback(async () => {

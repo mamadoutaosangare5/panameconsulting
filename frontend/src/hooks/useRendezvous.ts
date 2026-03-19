@@ -499,26 +499,20 @@ export const useRendezvous = (
   const setFilters = useCallback(
     (newFilters: RendezvousFilters) => {
       setFiltersState(newFilters);
-
-      rendezvousService
-        .searchRendezvous(newFilters as RendezvousQueryDto)
-        .then((res) => {
-          setRendezvous(res.data);
-          setPagination({
-            total: res.total,
-            page: res.page,
-            limit: res.limit,
-            totalPages: res.totalPages,
-            hasNext: res.hasNext,
-            hasPrevious: res.hasPrevious,
-          });
-        })
-        .catch(() => {
-          // Ignorer
-        });
     },
     [],
   );
+
+  // Effet pour charger les rendez-vous quand les filtres changent
+  useEffect(() => {
+    if (!autoLoad || !isAuthenticated || !isAdmin) return;
+
+    const timeoutId = setTimeout(() => {
+      loadRendezvous(filters as RendezvousQueryDto);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [filters, autoLoad, isAuthenticated, isAdmin, loadRendezvous]);
 
   const resetFilters = useCallback(() => {
     setFiltersState({});
