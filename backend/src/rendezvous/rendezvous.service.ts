@@ -156,6 +156,16 @@ export class RendezvousService {
       },
     };
 
+    // Vérification explicite de disponibilité avant création
+    const isAvailable = await this.rendezvousRepository.checkAvailability(
+      createRendezvousDto.date,
+      this.convertTimeStringToTimeSlot(createRendezvousDto.time),
+    );
+
+    if (!isAvailable) {
+      throw new BadRequestException("Ce créneau n'est plus disponible");
+    }
+
     try {
       const rendezvous = await this.rendezvousRepository.create(data);
       return rendezvous;

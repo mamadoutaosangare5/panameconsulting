@@ -516,8 +516,7 @@ model Rendezvous {
   reminders  RendezvousReminder[]
   files      File[]
 
-  @@unique([date, time])
-  @@index([email, status])
+    @@index([email, status])
   @@index([status, date])
   @@index([email, date])
   @@index([date, status, time])

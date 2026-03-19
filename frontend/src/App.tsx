@@ -54,6 +54,9 @@ const Profil = lazy(() => import("./pages/gestionnaire/profil/Profil"));
 const Procedures = lazy(
   () => import("./pages/gestionnaire/procedures/Procedures"),
 );
+const ProcedureDetail = lazy(
+  () => import("./pages/gestionnaire/procedures/[id]"),
+);
 
 // NotFound
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -142,6 +145,7 @@ function App() {
               <Route path="destinations" element={<Destinations />} />
               <Route path="rendezvous" element={<AdminRendezvous />} />
               <Route path="procedures" element={<Procedures />} />
+              <Route path="procedures/:id" element={<ProcedureDetail />} />
               <Route path="messages" element={<Messages />} />
               <Route path="profil" element={<Profil />} />
             </Route>

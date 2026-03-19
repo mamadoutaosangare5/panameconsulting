@@ -56,7 +56,10 @@ async function handleResponse<T>(res: Response): Promise<T> {
   }
 
   // Le backend retourne directement la structure attendue
-  return responseBody as T;
+  // Si la réponse a une propriété 'data', on l'utilise, sinon on utilise le corps directement
+  const responseBodyObj = responseBody as Record<string, unknown>;
+  const result = responseBodyObj.data !== undefined ? responseBodyObj.data as T : responseBody as T;
+  return result;
 }
 
 // ─── Fetch authentifié ────────────────────────────────────────────────────────
@@ -69,15 +72,15 @@ const API = {
   ADMIN_CREATE: "/admin/procedures/create",
   ADMIN_ALL: "/admin/procedures/all",
   ADMIN_STATISTICS: "/admin/procedures/statistics",
-  ADMIN_STEP: (id: string, stepName: StepName) =>
-    `/admin/procedures/${id}/steps/${stepName}`,
+  ADMIN_STEP: (id: string, stepName: StepName) => `/admin/procedures/${id}/steps/${stepName}`,
   ADMIN_DELETE: (id: string) => `/admin/procedures/${id}/delete`,
+  ADMIN_COMPLETE: (id: string) => `/admin/procedures/${id}/complete`,
   ADMIN_EXPORT: "/admin/procedures/export",
-
-
-  // Routes mixtes
-  PROCEDURE_BY_EMAIL: (email: string) =>
-    `/procedures/by-email/${encodeURIComponent(email)}`,
+  
+  // Routes utilisateur
+  PROCEDURE_CREATE: "/procedures/create",
+  PROCEDURE_ALL: "/procedures",
+  PROCEDURE_BY_EMAIL: (email: string) => `/procedures/by-email/${email}`,
   PROCEDURE_BY_RENDEZVOUS: (rendezVousId: string) =>
     `/procedures/by-rendezvous/${rendezVousId}`,
   PROCEDURE_DETAILS: (id: string) => `/procedures/${id}/details`,
@@ -212,6 +215,24 @@ export const ProceduresService = {
       return await handleResponse<ProcedureStatisticsDto>(res);
     } catch (error) {
       toast.error("Erreur lors du chargement des statistiques");
+      throw error;
+    }
+  },
+
+  /**
+   * PATCH /admin/procedures/:id/complete
+   * @see ProceduresController.completeProcedure()
+   */
+  async completeProcedure(id: string): Promise<ProcedureResponseDto> {
+    try {
+      const res = await apiFetch(`${BASE_URL}${API.ADMIN_COMPLETE(id)}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({}),
+      });
+      return await handleResponse<ProcedureResponseDto>(res);
+    } catch (error) {
+      toast.error("Erreur lors de la complétion de la procédure");
       throw error;
     }
   },

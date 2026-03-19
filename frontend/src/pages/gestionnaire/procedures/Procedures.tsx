@@ -147,8 +147,13 @@ const Procedures = () => {
       limit: 10,
       page: 1,
       includeDeleted: false, // Par défaut, on exclut les supprimés
-    }
+    },
   });
+
+  // Debug pour voir les statistiques
+  console.log('Statistics:', statistics);
+  console.log('Is Admin:', isAdmin);
+  console.log('Loading Stats:', loadingStats);
 
   // ─── Données pour les filtres (depuis les stats du backend) ────────────
   const destinations = useMemo(() => {
@@ -223,7 +228,7 @@ const Procedures = () => {
   }, [navigate]);
 
   const handleEdit = useCallback((id: string) => {
-    navigate(`/gestionnaire/procedures/${id}/edit`);
+    navigate(`/gestionnaire/procedures/${id}`);
   }, [navigate]);
 
   const handleDelete = useCallback((id: string) => {
@@ -412,7 +417,7 @@ const Procedures = () => {
                 <div>
                   <p className="text-sm text-gray-600">Taux complétion</p>
                   <p className="text-2xl font-bold text-emerald-600">
-                    {Math.round(statistics.completionRate)}%
+                    {!isAdmin ? "N/A" : loadingStats ? "..." : statistics ? Math.round(statistics.completionRate) : 0}%
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
@@ -657,7 +662,7 @@ const Procedures = () => {
                             {procedure.email}
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
-                            ID: {procedure.id.slice(0, 8)}...
+                            ID: {procedure.id ? procedure.id.slice(0, 8) : 'N/A'}...
                           </div>
                           {procedure.isDeleted && (
                             <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">

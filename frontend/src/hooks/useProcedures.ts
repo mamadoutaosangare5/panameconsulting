@@ -75,6 +75,7 @@ export interface UseProceduresActions {
     stepName: StepName,
   ) => Promise<ProcedureResponseDto | null>;
   remove: (id: string, reason?: string) => Promise<boolean>;
+  completeProcedure: (id: string) => Promise<ProcedureResponseDto | null>;
 
   // Actions utilisateur
   cancelProcedure: (
@@ -562,7 +563,6 @@ export function useProcedures(
     [],
   );
 
-  // ─────────────────────────────────────────────────────────────────────────
   // Validation (utilise ProcedureValidation)
   // ─────────────────────────────────────────────────────────────────────────
   const validate = useCallback(
@@ -573,6 +573,35 @@ export function useProcedures(
   const isValid = useCallback(
     (data: Partial<CreateProcedureDto>) => ProcedureValidation.isValid(data),
     [],
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Terminer une procédure complète (toutes les étapes)
+  // ─────────────────────────────────────────────────────────────────────────
+  const completeProcedure = useCallback(
+    async (id: string): Promise<ProcedureResponseDto | null> => {
+      if (user?.role !== "ADMIN") return null;
+
+      setLoad("update", true);
+      setError(null);
+      try {
+        // Le backend va automatiquement déterminer le statut final
+        const updated = await ProceduresService.completeProcedure(id);
+        setProcedures((prev: ProcedureResponseDto[]) =>
+          prev.map((p) => (p.id === id ? updated : p))
+        );
+        if (selectedProcedure?.id === id) setSelectedProcedure(updated);
+        return updated;
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "Erreur lors de la complétion de la procédure",
+        );
+        return null;
+      } finally {
+        setLoad("update", false);
+      }
+    },
+    [user?.role, setLoad, selectedProcedure, setProcedures, setSelectedProcedure],
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -674,6 +703,7 @@ export function useProcedures(
     updateStep,
     addStep,
     remove,
+    completeProcedure,
 
     // Actions utilisateur
     cancelProcedure,

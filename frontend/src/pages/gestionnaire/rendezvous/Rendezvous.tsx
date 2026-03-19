@@ -114,7 +114,6 @@ const STATUS_CFG: Record<
 // Helper pour afficher la valeur effective ou "Non renseigné"
   const displayEffectiveValue = (value: string, fallback: string = "Non renseigné") => {
     if (!value || value.trim() === "") return fallback;
-    if (value.toLowerCase() === "autre") return fallback;
     return value;
   };
 const getInitials = (firstName?: string | null, lastName?: string | null) => {
