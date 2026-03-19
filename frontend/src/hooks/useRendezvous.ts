@@ -251,19 +251,22 @@ export const useRendezvous = (
 
       try {
         const slots = await rendezvousService.getAvailableSlots(date);
+        
+        // Normaliser la date pour la comparaison (YYYY-MM-DD)
+        const normalizedDate = slots.date.split('T')[0];
 
         setAvailableSlots((prev) => {
-          const exists = prev.some((s) => s.date === slots.date);
+          const exists = prev.some((s) => s.date === normalizedDate);
           if (exists) {
-            return prev.map((s) => (s.date === slots.date ? slots : s));
+            return prev.map((s) => (s.date === normalizedDate ? { ...slots, date: normalizedDate } : s));
           }
-          return [...prev, slots];
+          return [...prev, { ...slots, date: normalizedDate }];
         });
 
         return slots;
       } catch {
         const defaultSlots: AvailableSlotsDto = {
-          date: new Date().toISOString(),
+          date: new Date().toISOString().split('T')[0],
           available: false,
           availableSlots: [],
           totalSlots: 16,

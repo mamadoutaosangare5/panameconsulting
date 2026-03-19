@@ -241,7 +241,7 @@ export interface AvailableSlotsDto {
   date: string;
   available: boolean;
   reason?: string;
-  availableSlots: TimeSlotWithMeta[];
+  availableSlots: string[]; // Tableau de strings comme dans le backend
   totalSlots: number;
   occupiedSlots: number;
 }

@@ -27,18 +27,14 @@ import {
   GraduationCap,
   Book,
   Dock,
-  AlertTriangle,
 } from "lucide-react";
 import { useRendezvous } from "../../../hooks/useRendezvous";
 import {
-  type CreateRendezvousDto,
-  type TimeSlot,
-  type TimeSlotWithMeta,
-  type RendezvousResponseDto,
   DESTINATION_OPTIONS,
   NIVEAU_ETUDE_OPTIONS,
   FILIERE_OPTIONS,
-  displayToTimeSlot,
+  type TimeSlot,
+  type CreateRendezvousDto,
   timeSlotToDisplay,
 } from "../../../types/rendezvous.types";
 
@@ -163,7 +159,7 @@ const SelectField: React.FC<SelectFieldProps> = ({
 
 const RendezVous = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const { isAuthenticated, user, isLoading: authLoading } = useAuth();
 
   // ✅ DÉLÉGATION COMPLÈTE AU HOOK
   const {
@@ -172,21 +168,24 @@ const RendezVous = () => {
     loading,
     createRendezvous,
     checkAvailability,
-    getAvailableSlots, // ✅ AJOUTÉ: fonction pour charger les créneaux
+    getAvailableSlots,
+    loadAvailableDates,
     error: hookError,
   } = useRendezvous({
-    autoLoad: true,
+    autoLoad: false,
   });
 
-  const isAuthChecked = useMemo(() => isAuthenticated, [isAuthenticated]);
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoadingDates, setIsLoadingDates] = useState(false);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // État du formulaire
   const [formData, setFormData] = useState<FormData>(() => ({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    email: user?.email || "",
-    telephone: user?.telephone || "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    telephone: "",
     destination: "",
     destinationAutre: "",
     niveauEtude: "",
@@ -202,40 +201,54 @@ const RendezVous = () => {
   const [showOtherFiliere, setShowOtherFiliere] = useState(false);
   const [success, setSuccess] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [createdRendezvous, setCreatedRendezvous] = useState<RendezvousResponseDto | null>(null);
 
-  // ✅ Utiliser les erreurs du hook
-  const error = localError || hookError;
+  // ✅ Utiliser les erreurs
+  const error = localError || hookError || loadError;
 
-  // ✅ Utiliser les données du hook avec optimisation
-  const availableDates = useMemo(
-    () => hookAvailableDates.map((d) => d.date),
-    [hookAvailableDates],
-  );
+  // ✅ Transformer les dates disponibles
+  const availableDates = useMemo(() => {
+    console.log("[RendezVous] Dates reçues du hook:", hookAvailableDates);
+    return hookAvailableDates.map((d) => d.date);
+  }, [hookAvailableDates]);
 
-  const availableSlots = useMemo(
-    () => {
-      if (!formData.date) return [];
-      const slots = hookAvailableSlots.find(
-        (slot) => slot.date === formData.date
-      );
-      return slots?.availableSlots || [];
-    },
-    [hookAvailableSlots, formData.date],
-  );
-
-  // ✅ Ajouter des statistiques sur les créneaux
-  const slotStats = useMemo(() => {
-    if (!formData.date) return { total: 0, available: 0, occupied: 0 };
-    const slots = hookAvailableSlots.find(
+  // ✅ Transformer les créneaux disponibles
+  const availableSlotsForSelectedDate = useMemo(() => {
+    console.log("[RendezVous] Créneaux reçus du hook:", hookAvailableSlots);
+    console.log("[RendezVous] Date sélectionnée:", formData.date);
+    
+    if (!formData.date) return [];
+    
+    // hookAvailableSlots est un tableau de AvailableSlotsDto, je cherche celui pour la date
+    const slotData = hookAvailableSlots.find(
       (slot) => slot.date === formData.date
     );
-    return {
-      total: slots?.totalSlots || 0,
-      available: slots?.availableSlots?.length || 0,
-      occupied: slots?.occupiedSlots || 0,
-    };
+    
+    console.log("[RendezVous] Créneaux pour la date:", slotData);
+    
+    if (!slotData || !slotData.availableSlots) return [];
+    
+    // availableSlots est un tableau de strings (TimeSlot), je le transforme en objets
+    return slotData.availableSlots.map((timeSlot) => ({
+      time: timeSlot,
+      displayTime: timeSlotToDisplay(timeSlot as TimeSlot),
+      available: true,
+      isPast: false, // TODO: calculer si le créneau est passé
+      isLunchBreak: false, // TODO: calculer si c'est la pause déjeuner
+    }));
   }, [hookAvailableSlots, formData.date]);
+
+  // Initialiser le formulaire avec les données utilisateur
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        telephone: user.telephone || "",
+      }));
+    }
+  }, [user]);
 
   // Initialisation AOS
   useEffect(() => {
@@ -248,24 +261,73 @@ const RendezVous = () => {
 
   // Redirection si non authentifié
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && isAuthChecked) {
+    if (!authLoading && !isAuthenticated) {
       navigate("/connexion");
     }
-  }, [isLoading, isAuthenticated, isAuthChecked, navigate]);
+  }, [authLoading, isAuthenticated, navigate]);
 
-  // ✅ CORRIGÉ: Charger les créneaux quand la date change avec getAvailableSlots (fonction)
+  // ✅ Charger les dates disponibles
   useEffect(() => {
-    if (formData.date) {
-      const loadSlots = async () => {
-        try {
-          await getAvailableSlots(formData.date); // ✅ Utilisation de la fonction, pas de l'état
-        } catch {
-          setLocalError("Impossible de charger les créneaux pour cette date");
-        }
-      };
-      loadSlots();
-    }
-  }, [formData.date, getAvailableSlots]);
+    const loadDates = async () => {
+      if (!isAuthenticated) {
+        console.log("[RendezVous] Utilisateur non authentifié, pas de chargement");
+        return;
+      }
+
+      console.log("[RendezVous] Début chargement des dates...");
+      setIsLoadingDates(true);
+      setLoadError(null);
+      
+      try {
+        // Charger les dates pour les 3 prochains mois
+        const today = new Date();
+        const threeMonthsLater = new Date();
+        threeMonthsLater.setMonth(today.getMonth() + 3);
+        
+        const todayStr = today.toISOString().split('T')[0];
+        const threeMonthsStr = threeMonthsLater.toISOString().split('T')[0];
+        
+        console.log("[RendezVous] Appel getAvailableDates avec:", todayStr, threeMonthsStr);
+        
+        await loadAvailableDates(todayStr, threeMonthsStr);
+        
+        console.log("[RendezVous] Dates chargées avec succès");
+      } catch (err) {
+        console.error("[RendezVous] Erreur détaillée chargement dates:", err);
+        setLoadError(err instanceof Error ? err.message : "Erreur inconnue");
+      } finally {
+        setIsLoadingDates(false);
+      }
+    };
+
+    loadDates();
+  }, [isAuthenticated, loadAvailableDates]);
+
+  // ✅ Charger les créneaux quand la date change
+  useEffect(() => {
+    const loadSlots = async () => {
+      if (!formData.date || !isAuthenticated) {
+        console.log("[RendezVous] Pas de date sélectionnée ou non authentifié");
+        return;
+      }
+
+      console.log("[RendezVous] Chargement des créneaux pour:", formData.date);
+      setIsLoadingSlots(true);
+      setLoadError(null);
+      
+      try {
+        await getAvailableSlots(formData.date);
+        console.log("[RendezVous] Créneaux chargés avec succès");
+      } catch (err) {
+        console.error("[RendezVous] Erreur détaillée chargement créneaux:", err);
+        setLoadError(err instanceof Error ? err.message : "Erreur inconnue");
+      } finally {
+        setIsLoadingSlots(false);
+      }
+    };
+
+    loadSlots();
+  }, [formData.date, isAuthenticated, getAvailableSlots]);
 
   // Gestion des changements de formulaire
   const handleInputChange = (
@@ -299,7 +361,13 @@ const RendezVous = () => {
       }
     }
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Si on change la date, réinitialiser l'heure sélectionnée
+    if (name === "date") {
+      setFormData((prev) => ({ ...prev, [name]: value, time: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    
     setLocalError(null);
   };
 
@@ -322,22 +390,6 @@ const RendezVous = () => {
     selectedTime.setHours(hours, minutes, 0, 0);
 
     return selectedTime < today;
-  }, []);
-
-  // Convertir TimeSlotWithMeta vers TimeSlot
-  const convertToTimeSlot = useCallback((slot: TimeSlotWithMeta): TimeSlot => {
-    const validTimeSlots: TimeSlot[] = [
-      "SLOT_0900", "SLOT_0930", "SLOT_1000", "SLOT_1030", 
-      "SLOT_1100", "SLOT_1130", "SLOT_1200",
-      "SLOT_1400", "SLOT_1430", "SLOT_1500", 
-      "SLOT_1530", "SLOT_1600", "SLOT_1630"
-    ];
-    
-    const timeSlot = displayToTimeSlot(slot.time);
-    if (validTimeSlots.includes(timeSlot)) {
-      return timeSlot;
-    }
-    return "SLOT_0900";
   }, []);
 
   // Validation de chaque étape
@@ -449,51 +501,42 @@ const RendezVous = () => {
     setTimeout(() => AOS.refreshHard(), 50);
   }, []);
 
-  // ✅ CORRIGÉ: Validation finale avec vérification de disponibilité
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
 
-    if (!isStepValid(3)) return;
+    if (!isStepValid(3) || !formData.time) return;
 
-    setLocalError(null);
-    
     try {
       const availabilityCheck = await checkAvailability(
         formData.date,
         formData.time as TimeSlot,
       );
 
-      if (!availabilityCheck) {
-        setLocalError("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
-        await getAvailableSlots(formData.date); // ✅ CORRIGÉ: utilisation de getAvailableSlots
+      if (availabilityCheck && !availabilityCheck.available) {
+        await getAvailableSlots(formData.date);
         setFormData((prev) => ({ ...prev, time: "" }));
+        setLocalError(
+          "Ce créneau n'est plus disponible. Veuillez en choisir un autre.",
+        );
         return;
       }
 
-      if (!availabilityCheck.available) {
-        setLocalError("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
-        await getAvailableSlots(formData.date); // ✅ CORRIGÉ: utilisation de getAvailableSlots
-        setFormData((prev) => ({ ...prev, time: "" }));
-        return;
-      }
-
-      // Structure conforme à CreateRendezvousDto
       const submitData: CreateRendezvousDto = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
         telephone: formData.telephone.trim(),
-        destination: formData.destination.trim(),
+        destination: formData.destination,
         destinationAutre:
           formData.destination === "Autre"
             ? formData.destinationAutre?.trim()
             : undefined,
-        niveauEtude: formData.niveauEtude.trim(),
+        niveauEtude: formData.niveauEtude,
         niveauEtudeAutre:
           formData.niveauEtude === "Autre"
             ? formData.niveauEtudeAutre?.trim()
             : undefined,
-        filiere: formData.filiere.trim(),
+        filiere: formData.filiere,
         filiereAutre:
           formData.filiere === "Autre" ? formData.filiereAutre?.trim() : undefined,
         date: formData.date,
@@ -502,189 +545,17 @@ const RendezVous = () => {
 
       const result = await createRendezvous(submitData);
       if (result) {
-        setCreatedRendezvous(result);
         setSuccess(true);
         setTimeout(() => {
           navigate("/user/mes-rendezvous");
         }, 2000);
       }
-    } catch {
-      // L'erreur est déjà gérée par le hook
+    } catch (err) {
+      console.error("Erreur création rendez-vous:", err);
     }
   };
 
   // Rendu des étapes
-  const renderStep1 = () => (
-    <div data-aos="fade-up" className="space-y-3">
-      <h2 className="text-md font-semibold text-sky-600">
-        <span className="flex items-center gap-2">
-          <User className="text-sky-500 h-4 w-4" />
-          Informations personnelles
-        </span>
-      </h2>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <InputField
-          label="Prénom"
-          name="firstName"
-          value={formData.firstName}
-          onChange={handleInputChange}
-          placeholder="Votre prénom"
-          required
-          icon={<Dock className="text-sky-500 h-3 w-3" />}
-          minLength={2}
-          maxLength={50}
-        />
-
-        <InputField
-          label="Nom"
-          name="lastName"
-          value={formData.lastName}
-          onChange={handleInputChange}
-          placeholder="Votre nom"
-          required
-          icon={<Book className="text-sky-500 h-3 w-3" />}
-          minLength={2}
-          maxLength={50}
-        />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <InputField
-          label="Email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleInputChange}
-          placeholder="exemple@email.com"
-          required
-          icon={<Mail className="text-sky-500 h-3 w-3" />}
-          maxLength={100}
-        />
-
-        <InputField
-          label="Téléphone"
-          name="telephone"
-          type="tel"
-          value={formData.telephone}
-          onChange={handleInputChange}
-          placeholder="+22812345678"
-          required
-          icon={<Phone className="text-sky-500 h-3 w-3" />}
-          error={
-            formData.telephone && !validatePhone(formData.telephone)
-              ? "Format: +22812345678 (8-15 chiffres)"
-              : undefined
-          }
-          maxLength={20}
-        />
-      </div>
-    </div>
-  );
-
-  const renderStep2 = () => (
-    <div data-aos="fade-up" className="space-y-3">
-      <h2 className="text-md font-semibold text-sky-600">
-        <span className="flex items-center gap-2">
-          <GraduationCap className="text-sky-500 h-4 w-4" />
-          Projet d'études
-        </span>
-      </h2>
-
-      <div>
-        <SelectField
-          label="Destination"
-          name="destination"
-          value={formData.destination}
-          onChange={handleInputChange}
-          options={DESTINATION_OPTIONS}
-          required
-          icon={<Globe className="text-sky-500 h-3 w-3" />}
-        />
-
-        {showOtherDestination && (
-          <div className="mt-3">
-            <InputField
-              label="Précisez votre destination"
-              name="destinationAutre"
-              value={formData.destinationAutre || ""}
-              onChange={handleInputChange}
-              placeholder="Ex: Suisse, Allemagne, Japon..."
-              required
-              icon={<Target className="text-sky-500 h-3 w-3" />}
-              maxLength={100}
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Obligatoire quand "Autre" est sélectionné
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <SelectField
-            label="Niveau d'étude"
-            name="niveauEtude"
-            value={formData.niveauEtude}
-            onChange={handleInputChange}
-            options={NIVEAU_ETUDE_OPTIONS}
-            required
-            icon={<Award className="text-sky-500 h-3 w-3" />}
-          />
-
-          {showOtherNiveau && (
-            <div className="mt-3">
-              <InputField
-                label="Précisez votre niveau"
-                name="niveauEtudeAutre"
-                value={formData.niveauEtudeAutre || ""}
-                onChange={handleInputChange}
-                placeholder="Ex: BTS, DUT, Formation professionnelle..."
-                required
-                icon={<Target className="text-sky-500 h-3 w-3" />}
-                maxLength={100}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Obligatoire quand "Autre" est sélectionné
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <SelectField
-            label="Filière"
-            name="filiere"
-            value={formData.filiere}
-            onChange={handleInputChange}
-            options={FILIERE_OPTIONS}
-            required
-            icon={<BookOpen className="text-sky-500 h-3 w-3" />}
-          />
-
-          {showOtherFiliere && (
-            <div className="mt-3">
-              <InputField
-                label="Précisez votre filière"
-                name="filiereAutre"
-                value={formData.filiereAutre || ""}
-                onChange={handleInputChange}
-                placeholder="Ex: Architecture, Psychologie..."
-                required
-                icon={<Target className="text-sky-500 h-3 w-3" />}
-                maxLength={100}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Obligatoire quand "Autre" est sélectionné
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
   const renderStep3 = () => (
     <div data-aos="fade-up" className="space-y-3">
       <h2 className="text-md font-semibold text-sky-600">
@@ -701,7 +572,11 @@ const RendezVous = () => {
             Date *
           </span>
         </label>
-        {availableDates.length > 0 ? (
+        {isLoadingDates ? (
+          <div className="rounded border border-gray-300 bg-gray-50 px-3 py-2">
+            <p className="text-xs text-gray-600">Chargement des dates disponibles...</p>
+          </div>
+        ) : availableDates.length > 0 ? (
           <select
             name="date"
             value={formData.date}
@@ -710,30 +585,21 @@ const RendezVous = () => {
             required
           >
             <option value="">Sélectionnez une date</option>
-            {availableDates.map((date) => {
-              const dateObj = new Date(date);
-              const isToday = dateObj.toDateString() === new Date().toDateString();
-              const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-              
-              return (
-                <option key={date} value={date}>
-                  {dateObj.toLocaleDateString("fr-FR", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                  })}
-                  {isToday && " (Aujourd'hui)"}
-                  {isWeekend && " (Week-end)"}
-                </option>
-              );
-            })}
+            {availableDates.map((date) => (
+              <option key={date} value={date}>
+                {new Date(date).toLocaleDateString("fr-FR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </option>
+            ))}
           </select>
         ) : (
           <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2">
             <p className="text-xs text-amber-700">
-              {loading.dates
-                ? "Chargement des dates..."
-                : "Aucune date disponible"}
+              {loadError || "Aucune date disponible pour le moment"}
             </p>
           </div>
         )}
@@ -747,52 +613,34 @@ const RendezVous = () => {
               Horaire *
             </span>
           </label>
-          
-          {/* Statistiques des créneaux */}
-          {slotStats.total > 0 && (
-            <div className="mb-2 rounded border border-gray-200 bg-gray-50 p-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Disponibles:</span>
-                <span className="font-medium text-sky-600">
-                  {slotStats.available}/{slotStats.total}
-                </span>
-              </div>
+          {isLoadingSlots ? (
+            <div className="rounded border border-gray-300 bg-gray-50 px-3 py-2">
+              <p className="text-xs text-gray-600">Chargement des créneaux disponibles...</p>
             </div>
-          )}
-          
-          {availableSlots.length > 0 ? (
+          ) : availableSlotsForSelectedDate.length > 0 ? (
             <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
-              {availableSlots.map((slot) => {
-                const timeSlot = convertToTimeSlot(slot);
-                const isSelected = formData.time === timeSlot;
-                const isPassed = isTimePassed(slot.time, formData.date);
-                const displayTime = timeSlotToDisplay(timeSlot);
+              {availableSlotsForSelectedDate.map((slot) => {
+                const isSelected = formData.time === slot.time;
+                const isPassed = isTimePassed(slot.displayTime, formData.date);
 
                 return (
                   <button
                     key={slot.time}
                     type="button"
                     onClick={() =>
-                      !isPassed && !slot.isLunchBreak &&
-                      setFormData((prev) => ({ ...prev, time: timeSlot }))
+                      !isPassed &&
+                      setFormData((prev) => ({ ...prev, time: slot.time as TimeSlot }))
                     }
-                    disabled={isPassed || slot.isLunchBreak || loading.slots}
+                    disabled={isPassed || isLoadingSlots}
                     className={`rounded px-2 py-1.5 text-xs transition-all duration-150 focus:outline-none focus:ring-none ${
                       isSelected
                         ? "bg-sky-600 text-white"
-                        : slot.isLunchBreak
-                          ? "cursor-not-allowed bg-orange-100 text-orange-400 border border-orange-200"
-                          : isPassed
-                            ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                            : "border border-gray-300 bg-white text-gray-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700"
+                        : isPassed
+                          ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                          : "border border-gray-300 bg-white text-gray-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700"
                     }`}
                   >
-                    <span className="block">{displayTime}</span>
-                    {slot.isLunchBreak && (
-                      <span className="inline-flex items-center justify-center">
-                        <AlertTriangle className="h-3 w-3 text-orange-600" />
-                      </span>
-                    )}
+                    {slot.displayTime}
                   </button>
                 );
               })}
@@ -800,45 +648,23 @@ const RendezVous = () => {
           ) : (
             <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2">
               <p className="text-xs text-amber-700">
-                {loading.slots
-                  ? "Chargement des créneaux..."
-                  : "Aucun créneau disponible pour cette date"}
+                {loadError || "Aucun créneau disponible pour cette date"}
               </p>
             </div>
           )}
 
-          {/* Informations sur le créneau sélectionné */}
           {formData.time && (
-            <div className="mt-3 space-y-2">
-              <div className="rounded bg-sky-50 p-3">
-                <p className="text-xs text-sky-700">
-                  <span className="font-medium">Créneau sélectionné :</span>{" "}
-                  {new Date(formData.date).toLocaleDateString("fr-FR", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                  })}{" "}
-                  à {timeSlotToDisplay(formData.time as TimeSlot)}
-                </p>
-              </div>
-              
-              {/* Avertissement si le créneau est très proche */}
-              {(() => {
-                const now = new Date();
-                const rdvTime = new Date(`${formData.date}T${timeSlotToDisplay(formData.time as TimeSlot)}:00`);
-                const timeDiff = rdvTime.getTime() - now.getTime();
-                const hoursUntil = Math.floor(timeDiff / (1000 * 60 * 60));
-                
-                if (hoursUntil < 2 && hoursUntil > 0) {
-                  return (
-                    <div className="rounded bg-amber-50 border border-amber-200 p-2">
-                      <p className="text-xs text-amber-700">
-                        ⚠️ Ce créneau est très proche (dans {hoursUntil} heure{hoursUntil > 1 ? "s" : ""})
-                      </p>
-                    </div>
-                  );
-                }
-              })()}
+            <div className="mt-3 rounded bg-sky-50 p-3">
+              <p className="text-xs text-sky-700">
+                <span className="font-medium">Créneau sélectionné :</span>{" "}
+                {new Date(formData.date).toLocaleDateString("fr-FR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}{" "}
+                à {timeSlotToDisplay(formData.time as TimeSlot)}
+              </p>
             </div>
           )}
         </div>
@@ -846,73 +672,7 @@ const RendezVous = () => {
     </div>
   );
 
-  const renderProgressSteps = () => (
-    <div className="mb-6">
-      <div className="flex items-center justify-between">
-        {[1, 2, 3].map((step) => (
-          <div key={step} className="flex flex-col items-center">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-150 ${
-                currentStep >= step
-                  ? "bg-sky-600 text-white"
-                  : "bg-gray-200 text-gray-400"
-              }`}
-            >
-              {step}
-            </div>
-            <span
-              className={`mt-1 text-xs font-medium ${
-                currentStep >= step ? "text-sky-600" : "text-gray-400"
-              }`}
-            >
-              {step === 1 ? "Personnel" : step === 2 ? "Projet" : "Créneau"}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="relative -mt-4">
-        <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 bg-gray-200">
-          <div
-            className="h-full bg-sky-600 transition-all duration-150"
-            style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderSuccessMessage = () => (
-    <div data-aos="zoom-in" className="text-center">
-      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-        <CheckCircle className="h-8 w-8 text-emerald-600" />
-      </div>
-      <h2 className="mb-3 text-lg font-bold text-gray-800">
-        Rendez-vous confirmé !
-      </h2>
-      <p className="mb-6 text-sm text-gray-600">
-        Votre rendez-vous a été créé et confirmé avec succès.
-        <br />
-        Vous allez être redirigé vers vos rendez-vous.
-      </p>
-      {createdRendezvous && (
-        <div className="mb-4 rounded bg-sky-50 p-3 text-left">
-          <p className="text-xs text-sky-700">
-            <span className="font-medium">Résumé :</span><br />
-            {createdRendezvous.fullName}<br />
-            {new Date(createdRendezvous.date).toLocaleDateString("fr-FR")} à {timeSlotToDisplay(createdRendezvous.time)}
-          </p>
-        </div>
-      )}
-      <div className="animate-pulse">
-        <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-500" />
-          <span className="text-xs text-emerald-700">
-            Redirection en cours...
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+  // ... (le reste des fonctions de rendu reste identique)
 
   return (
     <>
@@ -922,11 +682,6 @@ const RendezVous = () => {
           name="description"
           content="Prenez rendez-vous avec un conseiller Paname Consulting"
         />
-        <link
-          rel="canonical"
-          href="https://panameconsulting.vercel.app/rendez-vous"
-        />
-        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
       <div className="min-h-screen py-6">
@@ -946,10 +701,13 @@ const RendezVous = () => {
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <div className="h-4 w-4 rounded-full bg-red-500" />
                 <p className="text-sm font-medium text-red-800">{error}</p>
                 <button
-                  onClick={() => setLocalError(null)}
+                  onClick={() => {
+                    setLocalError(null);
+                    setLoadError(null);
+                  }}
                   className="ml-auto text-red-500 hover:text-red-700"
                 >
                   ×
@@ -963,7 +721,27 @@ const RendezVous = () => {
               data-aos="zoom-in"
               className="overflow-hidden rounded-lg bg-white p-8 shadow-lg"
             >
-              {renderSuccessMessage()}
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                  <CheckCircle className="h-8 w-8 text-emerald-600" />
+                </div>
+                <h2 className="mb-3 text-lg font-bold text-gray-800">
+                  Rendez-vous confirmé !
+                </h2>
+                <p className="mb-6 text-sm text-gray-600">
+                  Votre rendez-vous a été créé avec succès.
+                  <br />
+                  Vous allez être redirigé vers vos rendez-vous.
+                </p>
+                <div className="animate-pulse">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="text-xs text-emerald-700">
+                      Redirection en cours...
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <form
@@ -981,11 +759,192 @@ const RendezVous = () => {
               </div>
 
               <div className="px-4 py-6 sm:px-6 sm:py-8">
-                {renderProgressSteps()}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between">
+                    {[1, 2, 3].map((step) => (
+                      <div key={step} className="flex flex-col items-center">
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-150 ${
+                            currentStep >= step
+                              ? "bg-sky-600 text-white"
+                              : "bg-gray-200 text-gray-400"
+                          }`}
+                        >
+                          {step}
+                        </div>
+                        <span
+                          className={`mt-1 text-xs font-medium ${
+                            currentStep >= step ? "text-sky-600" : "text-gray-400"
+                          }`}
+                        >
+                          {step === 1 ? "Personnel" : step === 2 ? "Projet" : "Créneau"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative -mt-4">
+                    <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 bg-gray-200">
+                      <div
+                        className="h-full bg-sky-600 transition-all duration-150"
+                        style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 <div className="space-y-6">
-                  {currentStep === 1 && renderStep1()}
-                  {currentStep === 2 && renderStep2()}
+                  {currentStep === 1 && (
+                    <div data-aos="fade-up" className="space-y-3">
+                      <h2 className="text-md font-semibold text-sky-600">
+                        <span className="flex items-center gap-2">
+                          <User className="text-sky-500 h-4 w-4" />
+                          Informations personnelles
+                        </span>
+                      </h2>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <InputField
+                          label="Prénom"
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleInputChange}
+                          placeholder="Votre prénom"
+                          required
+                          icon={<Dock className="text-sky-500 h-3 w-3" />}
+                          minLength={2}
+                          maxLength={50}
+                        />
+                        <InputField
+                          label="Nom"
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleInputChange}
+                          placeholder="Votre nom"
+                          required
+                          icon={<Book className="text-sky-500 h-3 w-3" />}
+                          minLength={2}
+                          maxLength={50}
+                        />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <InputField
+                          label="Email"
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          placeholder="exemple@email.com"
+                          required
+                          icon={<Mail className="text-sky-500 h-3 w-3" />}
+                          maxLength={100}
+                        />
+                        <InputField
+                          label="Téléphone"
+                          name="telephone"
+                          type="tel"
+                          value={formData.telephone}
+                          onChange={handleInputChange}
+                          placeholder="+22812345678"
+                          required
+                          icon={<Phone className="text-sky-500 h-3 w-3" />}
+                          error={
+                            formData.telephone && !validatePhone(formData.telephone)
+                              ? "Format: +22812345678 (8-15 chiffres)"
+                              : undefined
+                          }
+                          maxLength={20}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {currentStep === 2 && (
+                    <div data-aos="fade-up" className="space-y-3">
+                      <h2 className="text-md font-semibold text-sky-600">
+                        <span className="flex items-center gap-2">
+                          <GraduationCap className="text-sky-500 h-4 w-4" />
+                          Projet d'études
+                        </span>
+                      </h2>
+                      <div>
+                        <SelectField
+                          label="Destination"
+                          name="destination"
+                          value={formData.destination}
+                          onChange={handleInputChange}
+                          options={DESTINATION_OPTIONS}
+                          required
+                          icon={<Globe className="text-sky-500 h-3 w-3" />}
+                        />
+                        {showOtherDestination && (
+                          <div className="mt-3">
+                            <InputField
+                              label="Précisez votre destination"
+                              name="destinationAutre"
+                              value={formData.destinationAutre || ""}
+                              onChange={handleInputChange}
+                              placeholder="Ex: Suisse, Allemagne, Japon..."
+                              required
+                              icon={<Target className="text-sky-500 h-3 w-3" />}
+                              maxLength={100}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <SelectField
+                            label="Niveau d'étude"
+                            name="niveauEtude"
+                            value={formData.niveauEtude}
+                            onChange={handleInputChange}
+                            options={NIVEAU_ETUDE_OPTIONS}
+                            required
+                            icon={<Award className="text-sky-500 h-3 w-3" />}
+                          />
+                          {showOtherNiveau && (
+                            <div className="mt-3">
+                              <InputField
+                                label="Précisez votre niveau"
+                                name="niveauEtudeAutre"
+                                value={formData.niveauEtudeAutre || ""}
+                                onChange={handleInputChange}
+                                placeholder="Ex: BTS, DUT, Formation professionnelle..."
+                                required
+                                icon={<Target className="text-sky-500 h-3 w-3" />}
+                                maxLength={100}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <SelectField
+                            label="Filière"
+                            name="filiere"
+                            value={formData.filiere}
+                            onChange={handleInputChange}
+                            options={FILIERE_OPTIONS}
+                            required
+                            icon={<BookOpen className="text-sky-500 h-3 w-3" />}
+                          />
+                          {showOtherFiliere && (
+                            <div className="mt-3">
+                              <InputField
+                                label="Précisez votre filière"
+                                name="filiereAutre"
+                                value={formData.filiereAutre || ""}
+                                onChange={handleInputChange}
+                                placeholder="Ex: Architecture, Psychologie..."
+                                required
+                                icon={<Target className="text-sky-500 h-3 w-3" />}
+                                maxLength={100}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {currentStep === 3 && renderStep3()}
                 </div>
 
