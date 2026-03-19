@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { MailService } from '../mail/mail.service';
 import { RendezvousService } from './rendezvous.service';
+import { Rendezvous } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateRendezvousDto,
@@ -435,16 +436,17 @@ export class RendezvousController {
     }
 
     try {
-      const rendezvous = await this.prisma.rendezvous.findMany({
-        where: {
-          date: date,
-        },
-        orderBy: {
-          time: 'asc',
-        },
+      // Utiliser le service pour appliquer la logique par défaut (PENDING + CONFIRMED)
+      const result = await this.rendezvousService.findAll(user, {
+        date: new Date(date),
       });
 
-      return rendezvous;
+      // Enrichir les résultats avec les champs effective*
+      const enrichedRendezvous = result.data.map((rdv) =>
+        this.rendezvousService.addEffectiveFields(rdv as Rendezvous),
+      );
+
+      return enrichedRendezvous;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

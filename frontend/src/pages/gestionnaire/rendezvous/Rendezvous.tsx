@@ -34,6 +34,7 @@ import {
   Eye,
   BookOpen,
   Plus,
+  Lock,
 } from "lucide-react";
 import { useRendezvous } from "../../../hooks/useRendezvous";
 import { useDestinations } from "../../../hooks/useDestinations";
@@ -538,6 +539,28 @@ const RendezvousAdmin = () => {
     setConfirmModal({ open: false, id: null });
   };
 
+  const handleSetPending = async (id: string) => {
+    try {
+      await updateRendezvous(id, { status: RendezvousStatus.PENDING });
+      await loadStatistics();
+      if (activeTab === "today") await loadTodayPanel();
+      if (activeTab === "upcoming") await loadUpcomingPanel();
+    } catch (error) {
+      console.error("Erreur mise en attente:", error);
+    }
+  };
+
+  const handleConfirm = async (id: string) => {
+    try {
+      await updateRendezvous(id, { status: RendezvousStatus.CONFIRMED });
+      await loadStatistics();
+      if (activeTab === "today") await loadTodayPanel();
+      if (activeTab === "upcoming") await loadUpcomingPanel();
+    } catch (error) {
+      console.error("Erreur confirmation:", error);
+    }
+  };
+
   const handleExport = async () => {
     try {
       const csv = await exportRendezvous(filters || {});
@@ -1032,9 +1055,9 @@ const RendezvousAdmin = () => {
                   <select
                     value={filters?.status as string || ""}
                     onChange={handleStatusFilter}
-                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
+                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-none focus:outline-none focus:border-sky-500"
                   >
-                    <option value="">Tous les statuts</option>
+                    <option value="">Rendez-vous actifs</option>
                     {Object.entries(STATUS_CFG).map(([val, cfg]) => (
                       <option key={val} value={val}>
                         {cfg.label}
@@ -1042,6 +1065,9 @@ const RendezvousAdmin = () => {
                     ))}
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                  <div className="absolute -top-6 left-0 text-xs text-gray-500">
+                    Par défaut: PENDING + CONFIRMED
+                  </div>
                 </div>
 
                 {/* Destination */}
@@ -1049,7 +1075,7 @@ const RendezvousAdmin = () => {
                   <select
                     value={filters?.destination ?? ""}
                     onChange={handleDestinationFilter}
-                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
+                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-none focus:outline-none focus:border-sky-500"
                   >
                     <option value="">Toutes destinations</option>
                     {DESTINATION_OPTIONS.map((d) => (
@@ -1065,14 +1091,14 @@ const RendezvousAdmin = () => {
                   type="date"
                   value={filters?.dateRange?.start ?? ""}
                   onChange={handleStartDateFilter}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-none focus:outiline-none focus:border-sky-500"
                 />
 
                 <input
                   type="date"
                   value={filters?.dateRange?.end ?? ""}
                   onChange={handleEndDateFilter}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-none focus:border-sky-500"
                 />
               </div>
             )}
@@ -1172,14 +1198,6 @@ const RendezvousAdmin = () => {
                     ? "Essayez d'autres critères"
                     : "Aucune donnée disponible"}
                 </p>
-                {/* Debug info */}
-                <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left">
-                  <p>Debug info:</p>
-                  <p>rendezvous: {JSON.stringify(rendezvous)}</p>
-                  <p>loading.list: {loading.list}</p>
-                  <p>pagination: {JSON.stringify(pagination)}</p>
-                  <p>error: {error}</p>
-                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1213,6 +1231,13 @@ const RendezvousAdmin = () => {
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <StatusBadge status={rdv.status} />
+                              {(rdv.status === RendezvousStatus.CANCELLED || 
+                                rdv.status === RendezvousStatus.COMPLETED) && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border bg-gray-100 text-gray-600 border-gray-300">
+                                  <Lock className="w-3 h-3" />
+                                  Immutable
+                                </span>
+                              )}
                               {rdv.avisAdmin && (
                                 <span
                                   className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${
@@ -1271,7 +1296,7 @@ const RendezvousAdmin = () => {
                               Détails
                             </button>
 
-                            {rdv.canModify && (
+                            {rdv.canModify && rdv.status !== RendezvousStatus.CANCELLED && rdv.status !== RendezvousStatus.COMPLETED && (
                               <button
                                 onClick={() => openModal("update", rdv)}
                                 disabled={loading.update}
@@ -1301,7 +1326,37 @@ const RendezvousAdmin = () => {
                               </button>
                             )}
 
-                            {rdv.canCancel && (
+                            {rdv.status === RendezvousStatus.CONFIRMED && (
+                              <button
+                                onClick={() => handleSetPending(rdv.id)}
+                                disabled={loading.update}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 transition-colors disabled:opacity-50"
+                              >
+                                {loading.update ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Clock className="w-3.5 h-3.5" />
+                                )}
+                                Mettre en attente
+                              </button>
+                            )}
+
+                            {rdv.status === RendezvousStatus.PENDING && (
+                              <button
+                                onClick={() => handleConfirm(rdv.id)}
+                                disabled={loading.update}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-sky-300 text-sky-700 rounded-lg hover:bg-sky-50 transition-colors disabled:opacity-50"
+                              >
+                                {loading.update ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                )}
+                                Confirmer
+                              </button>
+                            )}
+
+                            {rdv.canCancel && rdv.status !== RendezvousStatus.COMPLETED && (
                               <button
                                 onClick={() => openModal("cancel", rdv)}
                                 disabled={loading.cancel}
@@ -1316,18 +1371,20 @@ const RendezvousAdmin = () => {
                               </button>
                             )}
 
-                            <button
-                              onClick={() => handleDelete(rdv.id)}
-                              disabled={loading.delete}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors ml-auto disabled:opacity-50"
-                            >
-                              {loading.delete ? (
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
-                              Supprimer
-                            </button>
+                            {rdv.status !== RendezvousStatus.CANCELLED && rdv.status !== RendezvousStatus.COMPLETED && (
+                              <button
+                                onClick={() => handleDelete(rdv.id)}
+                                disabled={loading.delete}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors ml-auto disabled:opacity-50"
+                              >
+                                {loading.delete ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                                Supprimer
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

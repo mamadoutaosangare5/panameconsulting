@@ -310,6 +310,13 @@ export class RendezvousService {
       where.email = currentUser.email;
     }
 
+    // Par défaut, ne retourner que les rendez-vous PENDING et CONFIRMED (actifs)
+    if (!filters?.status) {
+      where.status = {
+        in: [RendezvousStatus.PENDING, RendezvousStatus.CONFIRMED],
+      };
+    }
+
     if (filters?.status) where.status = filters.status;
     if (filters?.date) where.date = filters.date.toISOString().split('T')[0];
     if (filters?.email && currentUser.role === UserRole.ADMIN) {
@@ -373,14 +380,28 @@ export class RendezvousService {
       take: limit,
     });
 
+    // Ajouter les champs effective* pour chaque rendez-vous
+    const enrichedData = data.map((rdv) => this.addEffectiveFields(rdv));
+
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data,
+      data: enrichedData,
       total,
       page,
       limit,
       totalPages,
+    };
+  }
+
+  addEffectiveFields(rendezvous: Rendezvous) {
+    return {
+      ...rendezvous,
+      effectiveDestination:
+        rendezvous.destinationAutre || rendezvous.destination,
+      effectiveNiveauEtude:
+        rendezvous.niveauEtudeAutre || rendezvous.niveauEtude,
+      effectiveFiliere: rendezvous.filiereAutre || rendezvous.filiere,
     };
   }
 
@@ -398,7 +419,7 @@ export class RendezvousService {
       throw new ForbiddenException('Accès non autorisé à ce rendez-vous');
     }
 
-    return rendezvous;
+    return this.addEffectiveFields(rendezvous);
   }
 
   async update(
@@ -407,6 +428,18 @@ export class RendezvousService {
     currentUser: CurrentUser,
   ) {
     const existing = await this.findById(id, currentUser);
+
+    // Les rendez-vous annulés et terminés sont immuables
+    if (
+      existing.status === RendezvousStatus.CANCELLED ||
+      existing.status === RendezvousStatus.COMPLETED
+    ) {
+      throw new BadRequestException(
+        `Impossible de modifier un rendez-vous ${
+          existing.status === RendezvousStatus.CANCELLED ? 'annulé' : 'terminé'
+        }`,
+      );
+    }
 
     if (updateRendezvousDto.destination) {
       if (updateRendezvousDto.destination?.toLowerCase().trim() === 'autre') {
@@ -554,9 +587,10 @@ export class RendezvousService {
       [RendezvousStatus.CONFIRMED]: [
         RendezvousStatus.COMPLETED,
         RendezvousStatus.CANCELLED,
+        RendezvousStatus.PENDING, // Possibilité de remettre en attente
       ],
-      [RendezvousStatus.COMPLETED]: [],
-      [RendezvousStatus.CANCELLED]: [],
+      [RendezvousStatus.COMPLETED]: [], // Statut final
+      [RendezvousStatus.CANCELLED]: [], // Plus de réactivation possible
     };
 
     const validTransitions = allowedTransitions[currentStatus];
@@ -916,6 +950,13 @@ export class RendezvousService {
       throw new BadRequestException('Ce rendez-vous est déjà annulé');
     }
 
+    // Les rendez-vous terminés ne peuvent pas être annulés
+    if (existing.status === RendezvousStatus.COMPLETED) {
+      throw new BadRequestException(
+        "Impossible d'annuler un rendez-vous terminé",
+      );
+    }
+
     if (currentUser.role !== UserRole.ADMIN) {
       if (existing.email !== currentUser.email) {
         throw new ForbiddenException(
@@ -948,6 +989,11 @@ export class RendezvousService {
     currentUser: CurrentUser,
   ) {
     const existing = await this.findById(id, currentUser);
+
+    // Les rendez-vous déjà terminés ne peuvent pas être modifiés
+    if (existing.status === RendezvousStatus.COMPLETED) {
+      throw new BadRequestException('Ce rendez-vous est déjà terminé');
+    }
 
     if (existing.status !== RendezvousStatus.CONFIRMED) {
       throw new BadRequestException(
