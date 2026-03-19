@@ -85,8 +85,9 @@ class RendezvousService {
     const data = await response.json();
 
     // Si la réponse a une structure enveloppée (data), l'extraire
-    // Sinon, retourner les données directement
-    if (data && typeof data === "object" && "data" in data) {
+    // SAUF si c'est déjà une réponse paginée (qui a déjà une propriété 'data')
+    if (data && typeof data === "object" && "data" in data && 
+        !("total" in data) && !("page" in data) && !("limit" in data)) {
       return data.data as T;
     }
 

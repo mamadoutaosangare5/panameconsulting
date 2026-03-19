@@ -1163,7 +1163,7 @@ const RendezvousAdmin = () => {
               <div className="flex justify-center py-16">
                 <RefreshCw className="w-8 h-8 text-sky-500 animate-spin" />
               </div>
-            ) : rendezvous.length === 0 ? (
+            ) : (rendezvous || []).length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 font-medium">Aucun rendez-vous</p>
@@ -1172,10 +1172,18 @@ const RendezvousAdmin = () => {
                     ? "Essayez d'autres critères"
                     : "Aucune donnée disponible"}
                 </p>
+                {/* Debug info */}
+                <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left">
+                  <p>Debug info:</p>
+                  <p>rendezvous: {JSON.stringify(rendezvous)}</p>
+                  <p>loading.list: {loading.list}</p>
+                  <p>pagination: {JSON.stringify(pagination)}</p>
+                  <p>error: {error}</p>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
-                {rendezvous.map((rdv) => (
+                {(rendezvous || []).map((rdv) => (
                   <div
                     key={rdv.id}
                     className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"

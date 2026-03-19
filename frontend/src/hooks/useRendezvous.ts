@@ -159,25 +159,36 @@ export const useRendezvous = (
   // Actions admin
   const loadRendezvous = useCallback(
     async (params: RendezvousQueryDto = {}) => {
-      if (!isAdmin) return;
+      console.log("[useRendezvous] loadRendezvous called with params:", params);
+      if (!isAdmin) {
+        console.log("[useRendezvous] isAdmin=false, exiting");
+        return;
+      }
 
       setLoadingKey("list", true);
       setError(null);
 
       try {
         const mergedParams = { ...initialParamsRef.current, ...params };
+        console.log("[useRendezvous] calling searchRendezvous with:", mergedParams);
         const res = await rendezvousService.searchRendezvous(mergedParams);
+        console.log("[useRendezvous] searchRendezvous response:", res);
+        console.log("[useRendezvous] response type:", typeof res);
+        console.log("[useRendezvous] is array:", Array.isArray(res));
+        console.log("[useRendezvous] response keys:", Object.keys(res || {}));
 
-        setRendezvous(res.data);
+        setRendezvous(res.data || res);
         setPagination({
-          total: res.total,
-          page: res.page,
-          limit: res.limit,
-          totalPages: res.totalPages,
-          hasNext: res.hasNext,
-          hasPrevious: res.hasPrevious,
+          total: res.total || (Array.isArray(res) ? res.length : 0),
+          page: res.page || 1,
+          limit: res.limit || 10,
+          totalPages: res.totalPages || 1,
+          hasNext: res.hasNext || false,
+          hasPrevious: res.hasPrevious || false,
         });
+        console.log("[useRendezvous] state updated successfully");
       } catch (err) {
+        console.error("[useRendezvous] error:", err);
         handleError(err, "Erreur lors du chargement des rendez-vous");
       } finally {
         setLoadingKey("list", false);
@@ -567,8 +578,6 @@ export const useRendezvous = (
     autoLoad,
     isAuthenticated,
     isAdmin,
-    loadRendezvous,
-    loadStatistics,
     loadAvailableDates,
   ]);
 
