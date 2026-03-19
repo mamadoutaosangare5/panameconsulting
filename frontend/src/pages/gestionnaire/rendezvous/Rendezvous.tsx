@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "../../../hooks/useAuth";
 import ConfirmationModal from "../../../components/shared/admin/ConfirMationModal";
@@ -56,10 +56,7 @@ import {
 } from "../../../types/rendezvous.types";
 import { timeSlotToDisplay } from "../../../types/rendezvous.types";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Types locaux
-// ─────────────────────────────────────────────────────────────────────────────
-
 type ModalType = "detail" | "complete" | "cancel" | "update" | "create" | null;
 
 interface ModalState {
@@ -67,10 +64,7 @@ interface ModalState {
   rdv: RendezvousResponseDto | null;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Config statuts
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Configuration des statuts
 const STATUS_CFG: Record<
   RendezvousStatus,
   {
@@ -116,10 +110,7 @@ const STATUS_CFG: Record<
   },
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 const getInitials = (firstName?: string | null, lastName?: string | null) => {
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
   return (fullName || "??")
@@ -191,16 +182,13 @@ const PanelRow = ({ rdv, onView }: { rdv: RendezvousResponseDto; onView: () => v
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Composant principal
-// ─────────────────────────────────────────────────────────────────────────────
-
 const RendezvousAdmin = () => {
   const { isAdmin } = useAuth();
 
-  // ── Tout depuis le hook — aucun service appelé directement ────────────────
+  // Hooks avec options explicites
   const {
-    rendezvous,
+    rendezvous = [],
     selectedRendezvous,
     statistics,
     pagination,
@@ -226,29 +214,24 @@ const RendezvousAdmin = () => {
     refreshInterval: 30000
   });
 
-  // Destinations dynamiques
   const { 
-    destinations, 
-    loading: loadingDestinations
+    destinations = [], 
+    loading: loadingDestinations 
   } = useDestinations();
 
-  // ── État local ─────────────────────────────────────────────────────────────
+  // État local
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [modal, setModal] = useState<ModalState>({ type: null, rdv: null });
-  const [activeTab, setActiveTab] = useState<"list" | "today" | "upcoming">(
-    "list",
-  );
+  const [activeTab, setActiveTab] = useState<"list" | "today" | "upcoming">("list");
   const [todayList, setTodayList] = useState<RendezvousResponseDto[]>([]);
   const [upcomingList, setUpcomingList] = useState<RendezvousResponseDto[]>([]);
   const [loadingPanel, setLoadingPanel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-  const [completeOpinion, setCompleteOpinion] = useState<AdminOpinion>(
-    AdminOpinion.FAVORABLE,
-  );
+  const [completeOpinion, setCompleteOpinion] = useState<AdminOpinion>(AdminOpinion.FAVORABLE);
   const [completeComment, setCompleteComment] = useState("");
   
-  // ✅ Formulaire d'édition
+  // Formulaire d'édition
   const [editForm, setEditForm] = useState<UpdateRendezvousDto>({
     firstName: "",
     lastName: "",
@@ -263,12 +246,10 @@ const RendezvousAdmin = () => {
     time: "" as TimeSlot,
   });
   
-  // ✅ États pour gérer l'affichage des champs "Autre"
   const [showOtherDestination, setShowOtherDestination] = useState(false);
   const [showOtherNiveau, setShowOtherNiveau] = useState(false);
   const [showOtherFiliere, setShowOtherFiliere] = useState(false);
   
-  // ✅ États pour le formulaire de création
   const [createForm, setCreateForm] = useState<CreateRendezvousDto>({
     firstName: "",
     lastName: "",
@@ -284,7 +265,6 @@ const RendezvousAdmin = () => {
     time: "" as TimeSlot,
   });
   
-  // ✅ États pour gérer l'affichage des champs "Autre" dans le formulaire de création
   const [showOtherDestinationCreate, setShowOtherDestinationCreate] = useState(false);
   const [showOtherNiveauCreate, setShowOtherNiveauCreate] = useState(false);
   const [showOtherFiliereCreate, setShowOtherFiliereCreate] = useState(false);
@@ -294,136 +274,137 @@ const RendezvousAdmin = () => {
     id: string | null;
   }>({ open: false, id: null });
 
-  // ── Effet de montage pour charger les statistiques ─────────────────────
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Charger les statistiques au montage
   useEffect(() => {
     if (isAdmin) {
       loadStatistics();
     }
   }, [isAdmin, loadStatistics]);
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Debounce recherche → loadRendezvous ─────────────────────────────────────
+  // Debounce recherche
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(async () => {
-      try {
-        setFilters({
-          ...filters,
-          searchTerm: searchTerm.trim() || undefined,
-        });
-        await loadRendezvous();
-      } catch {
-        // Erreur gérée par le hook
-      }
+    
+    searchTimer.current = setTimeout(() => {
+      const newFilters = {
+        ...filters,
+        searchTerm: searchTerm.trim() || undefined,
+      };
+      setFilters(newFilters);
     }, 350);
+    
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-  }, [searchTerm, filters, setFilters, loadRendezvous]);
+  }, [searchTerm, filters, setFilters]);
 
-  // ── Panels ────────────────────────────────────────────────────────────────
+  // Panels
   const loadTodayPanel = useCallback(async () => {
     setLoadingPanel(true);
     try {
       const today = new Date().toISOString().split("T")[0];
       const data = await getRendezvousByDate(today);
-      setTodayList(data);
-    } catch {
-      // Erreur gérée par le hook
+      setTodayList(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erreur chargement aujourd'hui:", error);
+      setTodayList([]);
     } finally {
       setLoadingPanel(false);
     }
   }, [getRendezvousByDate]);
 
-  const loadUpcomingPanel = useCallback(
-    async (limit = 10) => {
-      setLoadingPanel(true);
-      try {
-        const data = await getUpcomingRendezvous(limit);
-        setUpcomingList(data);
-      } catch {
-        // Erreur gérée par le hook
-      } finally {
-        setLoadingPanel(false);
-      }
-    },
-    [getUpcomingRendezvous],
-  );
+  const loadUpcomingPanel = useCallback(async (limit = 10) => {
+    setLoadingPanel(true);
+    try {
+      const data = await getUpcomingRendezvous(limit);
+      setUpcomingList(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erreur chargement à venir:", error);
+      setUpcomingList([]);
+    } finally {
+      setLoadingPanel(false);
+    }
+  }, [getUpcomingRendezvous]);
 
-  const switchTab = useCallback(
-    (tab: "list" | "today" | "upcoming") => {
-      setActiveTab(tab);
-      if (tab === "today") loadTodayPanel();
-      if (tab === "upcoming") loadUpcomingPanel();
-    },
-    [loadTodayPanel, loadUpcomingPanel],
-  );
+  // Switch d'onglet
+  const switchTab = useCallback((tab: "list" | "today" | "upcoming") => {
+    setActiveTab(tab);
+  }, []);
 
-  // ── Filtre rapide par date ────────────────────────────────────────────────
-  const handleDateQuickFilter = useCallback(
-    async (date: string) => {
-      if (!date) {
-        await loadRendezvous();
-        return;
-      }
-      setActiveTab("today");
-      setLoadingPanel(true);
-      try {
-        const data = await getRendezvousByDate(date);
-        setTodayList(data);
-      } catch {
-        // Erreur gérée par le hook
-      } finally {
-        setLoadingPanel(false);
-      }
-    },
-    [getRendezvousByDate, loadRendezvous],
-  );
+  // Effet pour charger les panels quand l'onglet change
+  useEffect(() => {
+    if (activeTab === "today") {
+      loadTodayPanel();
+    } else if (activeTab === "upcoming") {
+      loadUpcomingPanel();
+    }
+  }, [activeTab, loadTodayPanel, loadUpcomingPanel]);
 
-  // ── Modal — loadRendezvousById pour données fraîches ─────────────────────
-  const openModal = useCallback(
-    async (type: ModalType, rdv: RendezvousResponseDto) => {
-      try {
+  // Filtre rapide par date
+  const handleDateQuickFilter = useCallback(async (date: string) => {
+    if (!date) {
+      await loadRendezvous();
+      return;
+    }
+    setActiveTab("today");
+    setLoadingPanel(true);
+    try {
+      const data = await getRendezvousByDate(date);
+      setTodayList(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erreur filtre par date:", error);
+      setTodayList([]);
+    } finally {
+      setLoadingPanel(false);
+    }
+  }, [getRendezvousByDate, loadRendezvous]);
+
+  // Ouvrir modal
+  const openModal = useCallback(async (type: ModalType, rdv: RendezvousResponseDto) => {
+    try {
+      if (type !== "create" && rdv?.id) {
         await loadRendezvousById(rdv.id);
-        
-        const data = selectedRendezvous ?? rdv;
-        setModal({ type, rdv: data });
-        
-        if (type === "update") {
-          const isDestAutre = data.destination === "Autre";
-          const isNiveauAutre = data.niveauEtude === "Autre";
-          const isFiliereAutre = data.filiere === "Autre";
-          
-          setShowOtherDestination(isDestAutre);
-          setShowOtherNiveau(isNiveauAutre);
-          setShowOtherFiliere(isFiliereAutre);
-          
-          setEditForm({
-            firstName: data.firstName,
-            lastName: data.lastName,
-            telephone: data.telephone,
-            destination: isDestAutre ? "Autre" : data.destination,
-            destinationAutre: data.destinationAutre || "",
-            niveauEtude: isNiveauAutre ? "Autre" : data.niveauEtude,
-            niveauEtudeAutre: data.niveauEtudeAutre || "",
-            filiere: isFiliereAutre ? "Autre" : data.filiere,
-            filiereAutre: data.filiereAutre || "",
-            date: data.date,
-            time: data.time,
-          });
-        } else if (type === "complete") {
-          setCompleteOpinion(AdminOpinion.FAVORABLE);
-          setCompleteComment("");
-        } else if (type === "cancel") {
-          setCancelReason("");
-        }
-      } catch {
-        // Erreur gérée par le hook
       }
-    },
-    [loadRendezvousById, selectedRendezvous],
-  );
+      
+      const data = selectedRendezvous ?? rdv;
+      if (!data) return;
+      
+      setModal({ type, rdv: data });
+      
+      if (type === "update") {
+        const isDestAutre = data.destination === "Autre";
+        const isNiveauAutre = data.niveauEtude === "Autre";
+        const isFiliereAutre = data.filiere === "Autre";
+        
+        setShowOtherDestination(isDestAutre);
+        setShowOtherNiveau(isNiveauAutre);
+        setShowOtherFiliere(isFiliereAutre);
+        
+        setEditForm({
+          firstName: data.firstName || "",
+          lastName: data.lastName || "",
+          telephone: data.telephone || "",
+          destination: isDestAutre ? "Autre" : data.destination || "",
+          destinationAutre: data.destinationAutre || "",
+          niveauEtude: isNiveauAutre ? "Autre" : data.niveauEtude || "",
+          niveauEtudeAutre: data.niveauEtudeAutre || "",
+          filiere: isFiliereAutre ? "Autre" : data.filiere || "",
+          filiereAutre: data.filiereAutre || "",
+          date: data.date || "",
+          time: data.time,
+        });
+      } else if (type === "complete") {
+        setCompleteOpinion(AdminOpinion.FAVORABLE);
+        setCompleteComment("");
+      } else if (type === "cancel") {
+        setCancelReason("");
+      }
+    } catch (error) {
+      console.error("Erreur ouverture modal:", error);
+    }
+  }, [loadRendezvousById, selectedRendezvous]);
 
   const closeModal = () => {
     setModal({ type: null, rdv: null });
@@ -431,9 +412,9 @@ const RendezvousAdmin = () => {
     setCompleteComment("");
   };
 
-  // ── Mutations — toutes via le hook ─────────────────────────────────────────
+  // Mutations
   const handleComplete = async () => {
-    if (!modal.rdv) return;
+    if (!modal.rdv?.id) return;
     
     try {
       const data: CompleteRendezvousDto = {
@@ -448,13 +429,13 @@ const RendezvousAdmin = () => {
         if (activeTab === "today") await loadTodayPanel();
         if (activeTab === "upcoming") await loadUpcomingPanel();
       }
-    } catch {
-      // Erreur gérée par le hook
+    } catch (error) {
+      console.error("Erreur complétion:", error);
     }
   };
 
   const handleCancel = async () => {
-    if (!modal.rdv || !cancelReason.trim()) return;
+    if (!modal.rdv?.id || !cancelReason.trim()) return;
     
     try {
       const data: CancelRendezvousDto = {
@@ -469,13 +450,13 @@ const RendezvousAdmin = () => {
         if (activeTab === "today") await loadTodayPanel();
         if (activeTab === "upcoming") await loadUpcomingPanel();
       }
-    } catch {
-      // Erreur gérée par le hook
+    } catch (error) {
+      console.error("Erreur annulation:", error);
     }
   };
 
   const handleUpdate = async () => {
-    if (!modal.rdv) return;
+    if (!modal.rdv?.id) return;
     
     try {
       const cleanData: UpdateRendezvousDto = {
@@ -492,8 +473,8 @@ const RendezvousAdmin = () => {
         if (activeTab === "today") await loadTodayPanel();
         if (activeTab === "upcoming") await loadUpcomingPanel();
       }
-    } catch {
-      // Erreur gérée par le hook
+    } catch (error) {
+      console.error("Erreur mise à jour:", error);
     }
   };
 
@@ -513,7 +494,6 @@ const RendezvousAdmin = () => {
         if (activeTab === "today") await loadTodayPanel();
         if (activeTab === "upcoming") await loadUpcomingPanel();
         
-        // Réinitialiser le formulaire
         setCreateForm({
           firstName: "",
           lastName: "",
@@ -532,8 +512,8 @@ const RendezvousAdmin = () => {
         setShowOtherNiveauCreate(false);
         setShowOtherFiliereCreate(false);
       }
-    } catch {
-      // Erreur gérée par le hook
+    } catch (error) {
+      console.error("Erreur création:", error);
     }
   };
 
@@ -548,8 +528,8 @@ const RendezvousAdmin = () => {
         await loadStatistics();
         if (activeTab === "today") await loadTodayPanel();
         if (activeTab === "upcoming") await loadUpcomingPanel();
-      } catch {
-        // Erreur gérée par le hook
+      } catch (error) {
+        console.error("Erreur suppression:", error);
       }
     }
     setConfirmModal({ open: false, id: null });
@@ -561,7 +541,7 @@ const RendezvousAdmin = () => {
 
   const handleExport = async () => {
     try {
-      const csv = await exportRendezvous(filters);
+      const csv = await exportRendezvous(filters || {});
       if (!csv) return;
       
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -571,21 +551,19 @@ const RendezvousAdmin = () => {
       a.download = `rendezvous-${new Date().toISOString().split("T")[0]}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      // Erreur gérée par le hook
+    } catch (error) {
+      console.error("Erreur export:", error);
     }
   };
 
   const handleRefresh = async () => {
     try {
-      await Promise.all([
-        loadRendezvous(),
-        loadStatistics(),
-        activeTab === "today" ? loadTodayPanel() : Promise.resolve(),
-        activeTab === "upcoming" ? loadUpcomingPanel() : Promise.resolve(),
-      ]);
-    } catch {
-      // Erreur gérée par le hook
+      await loadRendezvous();
+      await loadStatistics();
+      if (activeTab === "today") await loadTodayPanel();
+      if (activeTab === "upcoming") await loadUpcomingPanel();
+    } catch (error) {
+      console.error("Erreur rafraîchissement:", error);
     }
   };
 
@@ -594,14 +572,312 @@ const RendezvousAdmin = () => {
     resetFilters();
   };
 
-  const activeFiltersCount = [
-    filters.status,
-    filters.destination,
-    filters.dateRange?.start && filters.dateRange?.end ? `${filters.dateRange.start}-${filters.dateRange?.end}` : null,
-    filters.searchTerm,
-  ].filter(Boolean).length;
+  // Gestionnaires pour les filtres
+  const handleStatusFilter = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFilters({
+      ...filters,
+      status: value ? value as RendezvousStatus : undefined,
+    });
+  };
 
-  // ── Rendu erreur ───────────────────────────────────────────────────────────
+  const handleDestinationFilter = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFilters({
+      ...filters,
+      destination: value || undefined,
+    });
+  };
+
+  const handleStartDateFilter = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFilters({
+      ...filters,
+      dateRange: {
+        start: value,
+        end: filters?.dateRange?.end || "",
+      },
+    });
+  };
+
+  const handleEndDateFilter = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFilters({
+      ...filters,
+      dateRange: {
+        start: filters?.dateRange?.start || "",
+        end: value,
+      },
+    });
+  };
+
+  // Calcul du nombre de filtres actifs
+  const activeFiltersCount = useMemo(() => {
+    return [
+      filters?.status,
+      filters?.destination,
+      filters?.dateRange?.start && filters?.dateRange?.end,
+      filters?.searchTerm,
+    ].filter(Boolean).length;
+  }, [filters]);
+
+  // Statistiques sécurisées avec valeurs par défaut
+  const safeStatistics = useMemo(() => {
+    if (!statistics) return null;
+    
+    return {
+      total: statistics.total ?? 0,
+      byStatus: {
+        pending: statistics.byStatus?.pending ?? 0,
+        confirmed: statistics.byStatus?.confirmed ?? 0,
+        completed: statistics.byStatus?.completed ?? 0,
+        cancelled: statistics.byStatus?.cancelled ?? 0,
+      },
+      completionRate: statistics.completionRate ?? 0,
+      cancellationRate: statistics.cancellationRate ?? 0,
+      upcoming: {
+        today: statistics.upcoming?.today ?? 0,
+        tomorrow: statistics.upcoming?.tomorrow ?? 0,
+        thisWeek: statistics.upcoming?.thisWeek ?? 0,
+        thisMonth: statistics.upcoming?.thisMonth ?? 0,
+      },
+      topDestinations: statistics.topDestinations ?? [],
+    };
+  }, [statistics]);
+
+  // Rendu des statistiques
+  const renderStatistics = () => {
+    if (!isAdmin) return null;
+    
+    if (loading.statistics) {
+      return (
+        <div className="flex justify-center py-8">
+          <RefreshCw className="w-8 h-8 text-sky-500 animate-spin" />
+        </div>
+      );
+    }
+    
+    if (!safeStatistics) {
+      return (
+        <div className="bg-gray-50 rounded-xl p-8 text-center">
+          <p className="text-gray-500">Aucune statistique disponible</p>
+        </div>
+      );
+    }
+    
+    return (
+      <>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[
+            {
+              Icon: BarChart2,
+              color: "text-blue-500",
+              bg: "bg-blue-50",
+              value: safeStatistics.total,
+              label: "Total",
+            },
+            {
+              Icon: CheckCircle,
+              color: "text-emerald-600",
+              bg: "bg-emerald-50",
+              value: safeStatistics.byStatus.confirmed,
+              label: "Confirmés",
+            },
+            {
+              Icon: AlertCircle,
+              color: "text-amber-500",
+              bg: "bg-amber-50",
+              value: safeStatistics.byStatus.pending,
+              label: "En attente",
+            },
+            {
+              Icon: XCircle,
+              color: "text-red-500",
+              bg: "bg-red-50",
+              value: safeStatistics.byStatus.cancelled,
+              label: "Annulés",
+            },
+            {
+              Icon: CheckCircle,
+              color: "text-sky-500",
+              bg: "bg-sky-50",
+              value: safeStatistics.byStatus.completed,
+              label: "Terminés",
+            },
+          ].map(({ Icon, color, bg, value, label }) => (
+            <div
+              key={label}
+              className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+            >
+              <div
+                className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}
+              >
+                <Icon className={`w-4 h-4 ${color}`} />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {value}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Taux complétion / annulation */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-500" /> Taux
+            </h3>
+            {[
+              {
+                label: "Complétion",
+                pct: safeStatistics.completionRate,
+                color: "bg-emerald-500",
+                textColor: "text-emerald-600",
+              },
+              {
+                label: "Annulation",
+                pct: safeStatistics.cancellationRate,
+                color: "bg-red-400",
+                textColor: "text-red-500",
+              },
+            ].map(({ label, pct, color, textColor }) => (
+              <div key={label}>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>{label}</span>
+                  <span className={`font-semibold ${textColor}`}>
+                    {pct.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`${color} h-2 rounded-full transition-all duration-500`}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="pt-2 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
+              {[
+                {
+                  label: "Cette semaine",
+                  value: safeStatistics.upcoming.thisWeek,
+                },
+                {
+                  label: "Ce mois",
+                  value: safeStatistics.upcoming.thisMonth,
+                },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-gray-50 rounded-lg p-2">
+                  <p className="text-lg font-bold text-gray-800">{value}</p>
+                  <p className="text-xs text-gray-400">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top destinations */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+              <Star className="w-4 h-4 text-amber-500" /> Top destinations
+            </h3>
+            {safeStatistics.topDestinations.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">
+                Aucune donnée
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {safeStatistics.topDestinations
+                  .slice(0, 5)
+                  .map((d, i) => {
+                    const max = safeStatistics.topDestinations[0]?.count ?? 1;
+                    const pct = Math.round((d.count / max) * 100);
+                    return (
+                      <div
+                        key={d.destination}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="text-xs font-bold text-gray-400 w-4">
+                          {i + 1}
+                        </span>
+                        <div className="flex-1">
+                          <div className="flex justify-between text-xs mb-0.5">
+                            <span className="font-medium text-gray-700 truncate">
+                              {d.destination}
+                            </span>
+                            <span className="text-gray-500 ml-2 shrink-0">
+                              {d.count}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-1.5">
+                            <div
+                              className="bg-sky-500 h-1.5 rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+
+          {/* Prévisions */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+              <CalendarDays className="w-4 h-4 text-indigo-500" /> Prévisions
+            </h3>
+            <div className="space-y-3">
+              {[
+                {
+                  label: "Aujourd'hui",
+                  value: safeStatistics.upcoming.today,
+                  color: "text-sky-600",
+                  Icon: ArrowUpRight,
+                },
+                {
+                  label: "Demain",
+                  value: safeStatistics.upcoming.tomorrow,
+                  color: "text-indigo-600",
+                  Icon: ArrowUpRight,
+                },
+                {
+                  label: "Cette semaine",
+                  value: safeStatistics.upcoming.thisWeek,
+                  color: "text-violet-600",
+                  Icon: TrendingUp,
+                },
+                {
+                  label: "Ce mois",
+                  value: safeStatistics.upcoming.thisMonth,
+                  color: "text-purple-600",
+                  Icon: TrendingDown,
+                },
+              ].map(({ label, value, color, Icon }) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between"
+                >
+                  <div
+                    className={`flex items-center gap-2 text-sm text-gray-600`}
+                  >
+                    <Icon className={`w-4 h-4 ${color}`} />
+                    {label}
+                  </div>
+                  <span className={`text-lg font-bold ${color}`}>
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // Rendu erreur
   if (error) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
@@ -627,7 +903,7 @@ const RendezvousAdmin = () => {
       </Helmet>
 
       <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
-        {/* ── HEADER ── */}
+        {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -665,226 +941,16 @@ const RendezvousAdmin = () => {
           </div>
         </div>
 
-        {/* ── STATISTIQUES ADMIN ── */}
-        {isAdmin && statistics && statistics.byStatus && (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              {[
-                {
-                  Icon: BarChart2,
-                  color: "text-blue-500",
-                  bg: "bg-blue-50",
-                  value: statistics.total,
-                  label: "Total",
-                },
-                {
-                  Icon: CheckCircle,
-                  color: "text-emerald-600",
-                  bg: "bg-emerald-50",
-                  value: statistics.byStatus.confirmed ?? 0,
-                  label: "Confirmés",
-                },
-                {
-                  Icon: AlertCircle,
-                  color: "text-amber-500",
-                  bg: "bg-amber-50",
-                  value: statistics.byStatus.pending ?? 0,
-                  label: "En attente",
-                },
-                {
-                  Icon: XCircle,
-                  color: "text-red-500",
-                  bg: "bg-red-50",
-                  value: statistics.byStatus.cancelled ?? 0,
-                  label: "Annulés",
-                },
-                {
-                  Icon: CheckCircle,
-                  color: "text-sky-500",
-                  bg: "bg-sky-50",
-                  value: statistics.byStatus.completed ?? 0,
-                  label: "Terminés",
-                },
-              ].map(({ Icon, color, bg, value, label }) => (
-                <div
-                  key={label}
-                  className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
-                >
-                  <div
-                    className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}
-                  >
-                    <Icon className={`w-4 h-4 ${color}`} />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {value ?? 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-                </div>
-              ))}
-            </div>
+        {/* STATISTIQUES ADMIN */}
+        {renderStatistics()}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Taux complétion / annulation */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-500" /> Taux
-                </h3>
-                {[
-                  {
-                    label: "Complétion",
-                    pct: statistics.completionRate ?? 0,
-                    color: "bg-emerald-500",
-                    textColor: "text-emerald-600",
-                  },
-                  {
-                    label: "Annulation",
-                    pct: statistics.cancellationRate ?? 0,
-                    color: "bg-red-400",
-                    textColor: "text-red-500",
-                  },
-                ].map(({ label, pct, color, textColor }) => (
-                  <div key={label}>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>{label}</span>
-                      <span className={`font-semibold ${textColor}`}>
-                        {pct?.toFixed(1) ?? 0}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className={`${color} h-2 rounded-full transition-all duration-500`}
-                        style={{ width: `${Math.min(pct ?? 0, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-                <div className="pt-2 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
-                  {[
-                    {
-                      label: "Cette semaine",
-                      value: statistics.upcoming?.thisWeek ?? 0,
-                    },
-                    {
-                      label: "Ce mois",
-                      value: statistics.upcoming?.thisMonth ?? 0,
-                    },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-gray-50 rounded-lg p-2">
-                      <p className="text-lg font-bold text-gray-800">{value}</p>
-                      <p className="text-xs text-gray-400">{label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Top destinations */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
-                  <Star className="w-4 h-4 text-amber-500" /> Top destinations
-                </h3>
-                {(statistics?.topDestinations ?? []).length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-4">
-                    Aucune donnée
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {(statistics?.topDestinations ?? [])
-                      .slice(0, 5)
-                      .map((d, i) => {
-                        const max =
-                          (statistics?.topDestinations ?? [])[0]?.count ?? 1;
-                        const pct = Math.round((d.count / max) * 100);
-                        return (
-                          <div
-                            key={d.destination}
-                            className="flex items-center gap-2"
-                          >
-                            <span className="text-xs font-bold text-gray-400 w-4">
-                              {i + 1}
-                            </span>
-                            <div className="flex-1">
-                              <div className="flex justify-between text-xs mb-0.5">
-                                <span className="font-medium text-gray-700 truncate">
-                                  {d.destination}
-                                </span>
-                                <span className="text-gray-500 ml-2 shrink-0">
-                                  {d.count}
-                                </span>
-                              </div>
-                              <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                <div
-                                  className="bg-sky-500 h-1.5 rounded-full"
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-
-              {/* Prévisions */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
-                  <CalendarDays className="w-4 h-4 text-indigo-500" /> Prévisions
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    {
-                      label: "Aujourd'hui",
-                      value: statistics.upcoming?.today ?? 0,
-                      color: "text-sky-600",
-                      Icon: ArrowUpRight,
-                    },
-                    {
-                      label: "Demain",
-                      value: statistics.upcoming?.tomorrow ?? 0,
-                      color: "text-indigo-600",
-                      Icon: ArrowUpRight,
-                    },
-                    {
-                      label: "Cette semaine",
-                      value: statistics.upcoming?.thisWeek ?? 0,
-                      color: "text-violet-600",
-                      Icon: TrendingUp,
-                    },
-                    {
-                      label: "Ce mois",
-                      value: statistics.upcoming?.thisMonth ?? 0,
-                      color: "text-purple-600",
-                      Icon: TrendingDown,
-                    },
-                  ].map(({ label, value, color, Icon }) => (
-                    <div
-                      key={label}
-                      className="flex items-center justify-between"
-                    >
-                      <div
-                        className={`flex items-center gap-2 text-sm text-gray-600`}
-                      >
-                        <Icon className={`w-4 h-4 ${color}`} />
-                        {label}
-                      </div>
-                      <span className={`text-lg font-bold ${color}`}>
-                        {value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── ONGLETS ── */}
+        {/* ONGLETS */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
           {(
             [
-              { key: "list", label: "Tous", count: pagination.total },
-              { key: "today", label: "Aujourd'hui", count: (todayList || []).length },
-              { key: "upcoming", label: "À venir", count: (upcomingList || []).length },
+              { key: "list", label: "Tous", count: pagination?.total ?? 0 },
+              { key: "today", label: "Aujourd'hui", count: todayList.length },
+              { key: "upcoming", label: "À venir", count: upcomingList.length },
             ] as const
           ).map(({ key, label, count }) => (
             <button
@@ -912,7 +978,7 @@ const RendezvousAdmin = () => {
           ))}
         </div>
 
-        {/* ── BARRE RECHERCHE + FILTRES ── */}
+        {/* BARRE RECHERCHE + FILTRES */}
         {activeTab === "list" && (
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
@@ -965,18 +1031,8 @@ const RendezvousAdmin = () => {
                 {/* Statut */}
                 <div className="relative">
                   <select
-                    value={filters.status ? (Array.isArray(filters.status) ? filters.status[0] : filters.status) ?? "" : ""}
-                    onChange={async (e) => {
-                      try {
-                        setFilters({
-                          ...filters,
-                          status: e.target.value ? e.target.value as RendezvousStatus : undefined,
-                        });
-                        await loadRendezvous();
-                      } catch {
-                        // Erreur gérée par le hook
-                      }
-                    }}
+                    value={filters?.status as string || ""}
+                    onChange={handleStatusFilter}
                     className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
                   >
                     <option value="">Tous les statuts</option>
@@ -992,18 +1048,8 @@ const RendezvousAdmin = () => {
                 {/* Destination */}
                 <div className="relative">
                   <select
-                    value={filters.destination ?? ""}
-                    onChange={async (e) => {
-                      try {
-                        setFilters({
-                          ...filters,
-                          destination: e.target.value || undefined,
-                        });
-                        await loadRendezvous();
-                      } catch {
-                        // Erreur gérée par le hook
-                      }
-                    }}
+                    value={filters?.destination ?? ""}
+                    onChange={handleDestinationFilter}
                     className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
                   >
                     <option value="">Toutes destinations</option>
@@ -1018,41 +1064,15 @@ const RendezvousAdmin = () => {
 
                 <input
                   type="date"
-                  value={filters.dateRange?.start ?? ""}
-                  onChange={async (e) => {
-                    try {
-                      setFilters({
-                        ...filters,
-                        dateRange: {
-                          start: e.target.value,
-                          end: filters.dateRange?.end ?? "",
-                        },
-                      });
-                      await loadRendezvous();
-                    } catch {
-                      // Erreur gérée par le hook
-                    }
-                  }}
+                  value={filters?.dateRange?.start ?? ""}
+                  onChange={handleStartDateFilter}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                 />
 
                 <input
                   type="date"
-                  value={filters.dateRange?.end ?? ""}
-                  onChange={async (e) => {
-                    try {
-                      setFilters({
-                        ...filters,
-                        dateRange: {
-                          start: filters.dateRange?.start ?? "",
-                          end: e.target.value,
-                        },
-                      });
-                      await loadRendezvous();
-                    } catch {
-                      // Erreur gérée par le hook
-                    }
-                  }}
+                  value={filters?.dateRange?.end ?? ""}
+                  onChange={handleEndDateFilter}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -1060,7 +1080,7 @@ const RendezvousAdmin = () => {
           </div>
         )}
 
-        {/* ── PANEL AUJOURD'HUI ── */}
+        {/* PANEL AUJOURD'HUI */}
         {activeTab === "today" && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -1082,13 +1102,13 @@ const RendezvousAdmin = () => {
               <div className="flex justify-center py-10">
                 <RefreshCw className="w-6 h-6 text-sky-500 animate-spin" />
               </div>
-            ) : (todayList || []).length === 0 ? (
+            ) : todayList.length === 0 ? (
               <p className="text-center py-10 text-gray-400 text-sm">
                 Aucun rendez-vous aujourd'hui
               </p>
             ) : (
               <div className="divide-y divide-gray-50">
-                {(todayList || []).map((rdv) => (
+                {todayList.map((rdv) => (
                   <PanelRow
                     key={rdv.id}
                     rdv={rdv}
@@ -1100,7 +1120,7 @@ const RendezvousAdmin = () => {
           </div>
         )}
 
-        {/* ── PANEL À VENIR ── */}
+        {/* PANEL À VENIR */}
         {activeTab === "upcoming" && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -1119,13 +1139,13 @@ const RendezvousAdmin = () => {
               <div className="flex justify-center py-10">
                 <RefreshCw className="w-6 h-6 text-indigo-500 animate-spin" />
               </div>
-            ) : (upcomingList || []).length === 0 ? (
+            ) : upcomingList.length === 0 ? (
               <p className="text-center py-10 text-gray-400 text-sm">
                 Aucun rendez-vous à venir
               </p>
             ) : (
               <div className="divide-y divide-gray-50">
-                {(upcomingList || []).map((rdv) => (
+                {upcomingList.map((rdv) => (
                   <PanelRow
                     key={rdv.id}
                     rdv={rdv}
@@ -1137,14 +1157,14 @@ const RendezvousAdmin = () => {
           </div>
         )}
 
-        {/* ── LISTE PRINCIPALE ── */}
+        {/* LISTE PRINCIPALE */}
         {activeTab === "list" && (
           <>
             {loading.list ? (
               <div className="flex justify-center py-16">
                 <RefreshCw className="w-8 h-8 text-sky-500 animate-spin" />
               </div>
-            ) : (rendezvous || []).length === 0 ? (
+            ) : rendezvous.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 font-medium">Aucun rendez-vous</p>
@@ -1310,8 +1330,8 @@ const RendezvousAdmin = () => {
               </div>
             )}
 
-            {/* ── PAGINATION ── */}
-            {pagination.totalPages > 1 && (
+            {/* PAGINATION */}
+            {pagination && pagination.totalPages > 1 && (
               <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-3 shadow-sm">
                 <p className="text-sm text-gray-500">
                   Page{" "}
@@ -1334,14 +1354,16 @@ const RendezvousAdmin = () => {
                   {Array.from(
                     { length: Math.min(pagination.totalPages, 5) },
                     (_, i) => {
-                      const page =
-                        Math.max(
-                          1,
-                          Math.min(
-                            pagination.page - 2,
-                            pagination.totalPages - 4,
-                          ),
-                        ) + i;
+                      let page = pagination.page;
+                      if (pagination.totalPages <= 5) {
+                        page = i + 1;
+                      } else if (pagination.page <= 3) {
+                        page = i + 1;
+                      } else if (pagination.page >= pagination.totalPages - 2) {
+                        page = pagination.totalPages - 4 + i;
+                      } else {
+                        page = pagination.page - 2 + i;
+                      }
                       return (
                         <button
                           key={page}
@@ -1372,854 +1394,857 @@ const RendezvousAdmin = () => {
         )}
       </div>
 
-      {/* MODAUX */}
-      {modal.type && modal.rdv && (
+      {/* MODAL DÉTAIL */}
+      {modal.type === "detail" && modal.rdv && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            {/* DÉTAIL */}
-            {modal.type === "detail" && (
-              <>
-                <ModalHeader
-                  title="Détails du rendez-vous"
-                  onClose={closeModal}
-                />
-                <div className="p-6 space-y-5">
-                  {loading.details ? (
-                    <div className="flex justify-center py-8">
-                      <RefreshCw className="w-6 h-6 text-sky-500 animate-spin" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-linear-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                          {getInitials(modal.rdv.firstName, modal.rdv.lastName)}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900 text-lg">
-                            {modal.rdv.firstName} {modal.rdv.lastName}
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap gap-2">
-                            <StatusBadge status={modal.rdv.status} />
-                            {modal.rdv.isToday && (
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-700 border border-sky-200">
-                                Aujourd'hui
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        {[
-                          {
-                            Icon: Mail,
-                            label: "Email",
-                            value: modal.rdv.email,
-                          },
-                          {
-                            Icon: Phone,
-                            label: "Téléphone",
-                            value: modal.rdv.telephone,
-                          },
-                          {
-                            Icon: MapPin,
-                            label: "Destination",
-                            value: modal.rdv.effectiveDestination,
-                          },
-                          {
-                            Icon: GraduationCap,
-                            label: "Niveau",
-                            value: modal.rdv.effectiveNiveauEtude,
-                          },
-                          {
-                            Icon: BookOpen,
-                            label: "Filière",
-                            value: modal.rdv.effectiveFiliere,
-                          },
-                          {
-                            Icon: Calendar,
-                            label: "Date",
-                            value: modal.rdv.date,
-                          },
-                          {
-                            Icon: Clock,
-                            label: "Heure",
-                            value: timeSlotToDisplay(modal.rdv.time),
-                          },
-                        ].map(({ Icon, label, value }) => (
-                          <div
-                            key={label}
-                            className="bg-gray-50 rounded-xl p-3"
-                          >
-                            <div className="flex items-center gap-2 text-gray-400 mb-1">
-                              <Icon className="w-3.5 h-3.5" />
-                              <span className="text-xs">{label}</span>
-                            </div>
-                            <p className="font-semibold text-gray-900 text-sm truncate">
-                              {value}
-                            </p>
-                          </div>
-                        ))}
-
-                        {modal.rdv.avisAdmin && (
-                          <div
-                            className={`rounded-xl p-3 col-span-2 border ${
-                              modal.rdv.avisAdmin === AdminOpinion.FAVORABLE
-                                ? "bg-emerald-50 border-emerald-200"
-                                : "bg-red-50 border-red-200"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 text-gray-400 mb-1">
-                              {modal.rdv.avisAdmin === AdminOpinion.FAVORABLE ? (
-                                <ThumbsUp className="w-3.5 h-3.5 text-emerald-500" />
-                              ) : (
-                                <ThumbsDown className="w-3.5 h-3.5 text-red-500" />
-                              )}
-                              <span className="text-xs">Avis admin</span>
-                            </div>
-                            <p className="font-semibold text-sm">
-                              {AdminOpinionLabels[modal.rdv.avisAdmin]}
-                            </p>
-                          </div>
-                        )}
-
-                        {modal.rdv.cancellationReason && (
-                          <div className="bg-red-50 rounded-xl p-3 col-span-2 border border-red-100">
-                            <p className="text-xs text-red-400 mb-1">
-                              Raison d'annulation
-                            </p>
-                            <p className="text-sm text-red-700">
-                              {modal.rdv.cancellationReason}
-                            </p>
-                          </div>
-                        )}
-
-                        {modal.rdv.user && (
-                          <div className="bg-sky-50 rounded-xl p-3 col-span-2 border border-sky-100">
-                            <p className="text-xs text-sky-400 mb-1">
-                              Compte utilisateur lié
-                            </p>
-                            <p className="text-sm font-semibold text-sky-800">
-                              {modal.rdv.user.fullName}
-                            </p>
-                            <p className="text-xs text-sky-600">
-                              {modal.rdv.user.email}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        {modal.rdv.status === RendezvousStatus.CONFIRMED && (
-                          <button
-                            onClick={() => {
-                              closeModal();
-                              openModal("complete", modal.rdv!);
-                            }}
-                            className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors"
-                          >
-                            Terminer
-                          </button>
-                        )}
-                        {modal.rdv.canCancel && (
-                          <button
-                            onClick={() => {
-                              closeModal();
-                              openModal("cancel", modal.rdv!);
-                            }}
-                            className="flex-1 py-2.5 border border-amber-300 text-amber-700 rounded-xl text-sm hover:bg-amber-50 transition-colors"
-                          >
-                            Annuler
-                          </button>
-                        )}
-                        {modal.rdv.canModify && (
-                          <button
-                            onClick={() => {
-                              closeModal();
-                              openModal("update", modal.rdv!);
-                            }}
-                            className="flex-1 py-2.5 border border-sky-300 text-sky-700 rounded-xl text-sm hover:bg-sky-50 transition-colors"
-                          >
-                            Modifier
-                          </button>
-                        )}
-                        <button
-                          onClick={closeModal}
-                          className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                        >
-                          Fermer
-                        </button>
-                      </div>
-                    </>
-                  )}
+            <ModalHeader
+              title="Détails du rendez-vous"
+              onClose={closeModal}
+            />
+            <div className="p-6 space-y-5">
+              {loading.details ? (
+                <div className="flex justify-center py-8">
+                  <RefreshCw className="w-6 h-6 text-sky-500 animate-spin" />
                 </div>
-              </>
-            )}
-
-            {/* TERMINER */}
-            {modal.type === "complete" && (
-              <>
-                <ModalHeader
-                  title="Terminer le rendez-vous"
-                  onClose={closeModal}
-                />
-                <div className="p-6 space-y-5">
-                  <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600">
-                    <span className="font-semibold text-gray-900">
-                      {modal.rdv.fullName}
-                    </span>
-                    <span className="mx-2 text-gray-400">·</span>
-                    {modal.rdv.date} à {timeSlotToDisplay(modal.rdv.time)}
+              ) : (
+                <>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-linear-to-br from-sky-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      {getInitials(modal.rdv.firstName, modal.rdv.lastName)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">
+                        {modal.rdv.firstName} {modal.rdv.lastName}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        <StatusBadge status={modal.rdv.status} />
+                        {modal.rdv.isToday && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-700 border border-sky-200">
+                            Aujourd'hui
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      Avis administrateur *
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(
-                        [
-                          AdminOpinion.FAVORABLE,
-                          AdminOpinion.UNFAVORABLE,
-                        ] as const
-                      ).map((op) => (
-                        <button
-                          key={op}
-                          onClick={() => setCompleteOpinion(op)}
-                          className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                            completeOpinion === op
-                              ? op === AdminOpinion.FAVORABLE
-                                ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
-                                : "border-red-400 bg-red-50 text-red-700 shadow-sm"
-                              : "border-gray-200 text-gray-500 hover:border-gray-300"
-                          }`}
-                        >
-                          {op === AdminOpinion.FAVORABLE ? (
-                            <>
-                              <ThumbsUp className="w-4 h-4" /> Favorable
-                            </>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {[
+                      {
+                        Icon: Mail,
+                        label: "Email",
+                        value: modal.rdv.email,
+                      },
+                      {
+                        Icon: Phone,
+                        label: "Téléphone",
+                        value: modal.rdv.telephone,
+                      },
+                      {
+                        Icon: MapPin,
+                        label: "Destination",
+                        value: modal.rdv.effectiveDestination,
+                      },
+                      {
+                        Icon: GraduationCap,
+                        label: "Niveau",
+                        value: modal.rdv.effectiveNiveauEtude,
+                      },
+                      {
+                        Icon: BookOpen,
+                        label: "Filière",
+                        value: modal.rdv.effectiveFiliere,
+                      },
+                      {
+                        Icon: Calendar,
+                        label: "Date",
+                        value: modal.rdv.date,
+                      },
+                      {
+                        Icon: Clock,
+                        label: "Heure",
+                        value: timeSlotToDisplay(modal.rdv.time),
+                      },
+                    ].map(({ Icon, label, value }) => (
+                      <div
+                        key={label}
+                        className="bg-gray-50 rounded-xl p-3"
+                      >
+                        <div className="flex items-center gap-2 text-gray-400 mb-1">
+                          <Icon className="w-3.5 h-3.5" />
+                          <span className="text-xs">{label}</span>
+                        </div>
+                        <p className="font-semibold text-gray-900 text-sm truncate">
+                          {value || "Non renseigné"}
+                        </p>
+                      </div>
+                    ))}
+
+                    {modal.rdv.avisAdmin && (
+                      <div
+                        className={`rounded-xl p-3 col-span-2 border ${
+                          modal.rdv.avisAdmin === AdminOpinion.FAVORABLE
+                            ? "bg-emerald-50 border-emerald-200"
+                            : "bg-red-50 border-red-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-gray-400 mb-1">
+                          {modal.rdv.avisAdmin === AdminOpinion.FAVORABLE ? (
+                            <ThumbsUp className="w-3.5 h-3.5 text-emerald-500" />
                           ) : (
-                            <>
-                              <ThumbsDown className="w-4 h-4" /> Défavorable
-                            </>
+                            <ThumbsDown className="w-3.5 h-3.5 text-red-500" />
                           )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                          <span className="text-xs">Avis admin</span>
+                        </div>
+                        <p className="font-semibold text-sm">
+                          {AdminOpinionLabels[modal.rdv.avisAdmin]}
+                        </p>
+                      </div>
+                    )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Commentaire{" "}
-                      <span className="text-gray-400 font-normal">
-                        (optionnel)
-                      </span>
-                    </label>
-                    <textarea
-                      value={completeComment}
-                      onChange={(e) => setCompleteComment(e.target.value)}
-                      rows={3}
-                      placeholder="Notes sur la consultation…"
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 resize-none"
-                    />
-                  </div>
+                    {modal.rdv.cancellationReason && (
+                      <div className="bg-red-50 rounded-xl p-3 col-span-2 border border-red-100">
+                        <p className="text-xs text-red-400 mb-1">
+                          Raison d'annulation
+                        </p>
+                        <p className="text-sm text-red-700">
+                          {modal.rdv.cancellationReason}
+                        </p>
+                      </div>
+                    )}
 
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleComplete}
-                      disabled={loading.complete}
-                      className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {loading.complete ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CheckCircle className="w-4 h-4" />
-                      )}
-                      Confirmer
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* ANNULER */}
-            {modal.type === "cancel" && (
-              <>
-                <ModalHeader
-                  title="Annuler le rendez-vous"
-                  onClose={closeModal}
-                />
-                <div className="p-6 space-y-5">
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-                    Cette action annulera le rendez-vous de{" "}
-                    <span className="font-semibold">{modal.rdv.fullName}</span>.
-                    Le client sera notifié.
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Raison *
-                    </label>
-                    <textarea
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      rows={4}
-                      maxLength={500}
-                      placeholder="Expliquez la raison…"
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 resize-none"
-                    />
-                    <p className="text-xs text-gray-400 text-right mt-1">
-                      {(cancelReason || '').length}/500
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleCancel}
-                      disabled={loading.cancel || !cancelReason.trim()}
-                      className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {loading.cancel ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Ban className="w-4 h-4" />
-                      )}
-                      Confirmer l'annulation
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      Retour
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* CRÉER */}
-            {modal.type === "create" && (
-              <>
-                <ModalHeader
-                  title="Créer un rendez-vous"
-                  onClose={closeModal}
-                />
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Prénom *
-                      </label>
-                      <input
-                        type="text"
-                        value={createForm.firstName ?? ""}
-                        onChange={(e) =>
-                          setCreateForm({
-                            ...createForm,
-                            firstName: e.target.value,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        placeholder="Prénom"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Nom *
-                      </label>
-                      <input
-                        type="text"
-                        value={createForm.lastName ?? ""}
-                        onChange={(e) =>
-                          setCreateForm({
-                            ...createForm,
-                            lastName: e.target.value,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        placeholder="Nom"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        value={createForm.email ?? ""}
-                        onChange={(e) =>
-                          setCreateForm({
-                            ...createForm,
-                            email: e.target.value,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Téléphone *
-                      </label>
-                      <input
-                        type="tel"
-                        value={createForm.telephone ?? ""}
-                        onChange={(e) =>
-                          setCreateForm({
-                            ...createForm,
-                            telephone: e.target.value,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        placeholder="+33 6 12 34 56 78"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                      Destination *
-                    </label>
-                    <select
-                      value={createForm.destination ?? ""}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setShowOtherDestinationCreate(value === "Autre");
-                        setCreateForm({
-                          ...createForm,
-                          destination: value,
-                          destinationAutre: value !== "Autre" ? "" : createForm.destinationAutre,
-                        });
-                      }}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-none focus:outline-none focus:border-sky-500"
-                      disabled={loadingDestinations}
-                    >
-                      <option value="">Sélectionner</option>
-                      {destinations.map((dest) => (
-                        <option key={dest.id} value={dest.country}>
-                          {dest.country}
-                        </option>
-                      ))}
-                      <option value="Autre">Autre</option>
-                    </select>
-                    
-                    {showOtherDestinationCreate && (
-                      <div className="mt-2">
-                        <input
-                          type="text"
-                          value={createForm.destinationAutre || ""}
-                          onChange={(e) =>
-                            setCreateForm({
-                              ...createForm,
-                              destinationAutre: e.target.value,
-                            })
-                          }
-                          placeholder="Précisez la destination"
-                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        />
+                    {modal.rdv.user && (
+                      <div className="bg-sky-50 rounded-xl p-3 col-span-2 border border-sky-100">
+                        <p className="text-xs text-sky-400 mb-1">
+                          Compte utilisateur lié
+                        </p>
+                        <p className="text-sm font-semibold text-sky-800">
+                          {modal.rdv.user.fullName}
+                        </p>
+                        <p className="text-xs text-sky-600">
+                          {modal.rdv.user.email}
+                        </p>
                       </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Niveau d'étude *
-                      </label>
-                      <select
-                        value={createForm.niveauEtude ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setShowOtherNiveauCreate(value === "Autre");
-                          setCreateForm({
-                            ...createForm,
-                            niveauEtude: value,
-                            niveauEtudeAutre: value !== "Autre" ? "" : createForm.niveauEtudeAutre,
-                          });
+                  <div className="flex gap-2 pt-1">
+                    {modal.rdv.status === RendezvousStatus.CONFIRMED && (
+                      <button
+                        onClick={() => {
+                          closeModal();
+                          openModal("complete", modal.rdv!);
                         }}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors"
                       >
-                        <option value="">Sélectionner</option>
-                        {NIVEAU_ETUDE_OPTIONS.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      
-                      {showOtherNiveauCreate && (
-                        <div className="mt-2">
-                          <input
-                            type="text"
-                            value={createForm.niveauEtudeAutre || ""}
-                            onChange={(e) =>
-                              setCreateForm({
-                                ...createForm,
-                                niveauEtudeAutre: e.target.value,
-                              })
-                            }
-                            placeholder="Précisez votre niveau"
-                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                          />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Filière *
-                      </label>
-                      <select
-                        value={createForm.filiere ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setShowOtherFiliereCreate(value === "Autre");
-                          setCreateForm({
-                            ...createForm,
-                            filiere: value,
-                            filiereAutre: value !== "Autre" ? "" : createForm.filiereAutre,
-                          });
+                        Terminer
+                      </button>
+                    )}
+                    {modal.rdv.canCancel && (
+                      <button
+                        onClick={() => {
+                          closeModal();
+                          openModal("cancel", modal.rdv!);
                         }}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                        className="flex-1 py-2.5 border border-amber-300 text-amber-700 rounded-xl text-sm hover:bg-amber-50 transition-colors"
                       >
-                        <option value="">Sélectionner</option>
-                        {FILIERE_OPTIONS.map((f) => (
-                          <option key={f} value={f}>
-                            {f}
-                          </option>
-                        ))}
-                      </select>
-                      
-                      {showOtherFiliereCreate && (
-                        <div className="mt-2">
-                          <input
-                            type="text"
-                            value={createForm.filiereAutre || ""}
-                            onChange={(e) =>
-                              setCreateForm({
-                                ...createForm,
-                                filiereAutre: e.target.value,
-                              })
-                            }
-                            placeholder="Précisez la filière"
-                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                          />
-                        </div>
-                      )}
-                    </div>
+                        Annuler
+                      </button>
+                    )}
+                    {modal.rdv.canModify && (
+                      <button
+                        onClick={() => {
+                          closeModal();
+                          openModal("update", modal.rdv!);
+                        }}
+                        className="flex-1 py-2.5 border border-sky-300 text-sky-700 rounded-xl text-sm hover:bg-sky-50 transition-colors"
+                      >
+                        Modifier
+                      </button>
+                    )}
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                    >
+                      Fermer
+                    </button>
                   </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Date *
-                      </label>
+      {/* MODAL TERMINER */}
+      {modal.type === "complete" && modal.rdv && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <ModalHeader
+              title="Terminer le rendez-vous"
+              onClose={closeModal}
+            />
+            <div className="p-6 space-y-5">
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600">
+                <span className="font-semibold text-gray-900">
+                  {modal.rdv.fullName}
+                </span>
+                <span className="mx-2 text-gray-400">·</span>
+                {modal.rdv.date} à {timeSlotToDisplay(modal.rdv.time)}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Avis administrateur *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(
+                    [
+                      AdminOpinion.FAVORABLE,
+                      AdminOpinion.UNFAVORABLE,
+                    ] as const
+                  ).map((op) => (
+                    <button
+                      key={op}
+                      onClick={() => setCompleteOpinion(op)}
+                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                        completeOpinion === op
+                          ? op === AdminOpinion.FAVORABLE
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
+                            : "border-red-400 bg-red-50 text-red-700 shadow-sm"
+                          : "border-gray-200 text-gray-500 hover:border-gray-300"
+                      }`}
+                    >
+                      {op === AdminOpinion.FAVORABLE ? (
+                        <>
+                          <ThumbsUp className="w-4 h-4" /> Favorable
+                        </>
+                      ) : (
+                        <>
+                          <ThumbsDown className="w-4 h-4" /> Défavorable
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Commentaire{" "}
+                  <span className="text-gray-400 font-normal">
+                    (optionnel)
+                  </span>
+                </label>
+                <textarea
+                  value={completeComment}
+                  onChange={(e) => setCompleteComment(e.target.value)}
+                  rows={3}
+                  placeholder="Notes sur la consultation…"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleComplete}
+                  disabled={loading.complete}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading.complete ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  Confirmer
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ANNULER */}
+      {modal.type === "cancel" && modal.rdv && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <ModalHeader
+              title="Annuler le rendez-vous"
+              onClose={closeModal}
+            />
+            <div className="p-6 space-y-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                Cette action annulera le rendez-vous de{" "}
+                <span className="font-semibold">{modal.rdv.fullName}</span>.
+                Le client sera notifié.
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Raison *
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={4}
+                  maxLength={500}
+                  placeholder="Expliquez la raison…"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 resize-none"
+                />
+                <p className="text-xs text-gray-400 text-right mt-1">
+                  {cancelReason.length}/500
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancel}
+                  disabled={loading.cancel || !cancelReason.trim()}
+                  className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading.cancel ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Ban className="w-4 h-4" />
+                  )}
+                  Confirmer l'annulation
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Retour
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CRÉER */}
+      {modal.type === "create" && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <ModalHeader
+              title="Créer un rendez-vous"
+              onClose={closeModal}
+            />
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Prénom *
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.firstName}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        firstName: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                    placeholder="Prénom"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Nom *
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.lastName}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        lastName: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                    placeholder="Nom"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={createForm.email}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        email: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Téléphone *
+                  </label>
+                  <input
+                    type="tel"
+                    value={createForm.telephone}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        telephone: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                    placeholder="+33 6 12 34 56 78"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Destination *
+                </label>
+                <select
+                  value={createForm.destination}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setShowOtherDestinationCreate(value === "Autre");
+                    setCreateForm({
+                      ...createForm,
+                      destination: value,
+                      destinationAutre: value !== "Autre" ? "" : createForm.destinationAutre,
+                    });
+                  }}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-none focus:outline-none focus:border-sky-500"
+                  disabled={loadingDestinations}
+                >
+                  <option value="">Sélectionner</option>
+                  {destinations.map((dest) => (
+                    <option key={dest.id} value={dest.country}>
+                      {dest.country}
+                    </option>
+                  ))}
+                  <option value="Autre">Autre</option>
+                </select>
+                
+                {showOtherDestinationCreate && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={createForm.destinationAutre || ""}
+                      onChange={(e) =>
+                        setCreateForm({
+                          ...createForm,
+                          destinationAutre: e.target.value,
+                        })
+                      }
+                      placeholder="Précisez la destination"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Niveau d'étude *
+                  </label>
+                  <select
+                    value={createForm.niveauEtude}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setShowOtherNiveauCreate(value === "Autre");
+                      setCreateForm({
+                        ...createForm,
+                        niveauEtude: value,
+                        niveauEtudeAutre: value !== "Autre" ? "" : createForm.niveauEtudeAutre,
+                      });
+                    }}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {NIVEAU_ETUDE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {showOtherNiveauCreate && (
+                    <div className="mt-2">
                       <input
-                        type="date"
-                        value={createForm.date ?? ""}
+                        type="text"
+                        value={createForm.niveauEtudeAutre || ""}
                         onChange={(e) =>
                           setCreateForm({
                             ...createForm,
-                            date: e.target.value,
+                            niveauEtudeAutre: e.target.value,
                           })
                         }
-                        min={new Date().toISOString().split('T')[0]}
+                        placeholder="Précisez votre niveau"
                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Créneau horaire *
-                      </label>
-                      <select
-                        value={createForm.time ?? ""}
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Filière *
+                  </label>
+                  <select
+                    value={createForm.filiere}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setShowOtherFiliereCreate(value === "Autre");
+                      setCreateForm({
+                        ...createForm,
+                        filiere: value,
+                        filiereAutre: value !== "Autre" ? "" : createForm.filiereAutre,
+                      });
+                    }}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {FILIERE_OPTIONS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {showOtherFiliereCreate && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={createForm.filiereAutre || ""}
                         onChange={(e) =>
                           setCreateForm({
                             ...createForm,
-                            time: e.target.value as TimeSlot,
+                            filiereAutre: e.target.value,
                           })
                         }
+                        placeholder="Précisez la filière"
                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                      >
-                        <option value="">Sélectionner</option>
-                        {TIME_SLOT_OPTIONS.map((time) => (
-                          <option key={time} value={`SLOT_${time.replace(':', '')}`}>
-                            {time}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      onClick={handleCreate}
-                      disabled={loading.create}
-                      className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {loading.create ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Plus className="w-4 h-4" />
-                      )}
-                      Créer
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      Annuler
-                    </button>
-                  </div>
+                  )}
                 </div>
-              </>
-            )}
+              </div>
 
-            {/* MODIFIER */}
-            {modal.type === "update" && (
-              <>
-                <ModalHeader
-                  title="Modifier le rendez-vous"
-                  onClose={closeModal}
-                />
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["firstName", "lastName"] as const).map((field) => (
-                      <div key={field}>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                          {field === "firstName" ? "Prénom" : "Nom"}
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm[field] ?? ""}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              [field]: e.target.value,
-                            })
-                          }
-                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        />
-                      </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.date}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        date: e.target.value,
+                      })
+                    }
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Créneau horaire *
+                  </label>
+                  <select
+                    value={createForm.time}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        time: e.target.value as TimeSlot,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {TIME_SLOT_OPTIONS.map((time) => (
+                      <option key={time} value={`SLOT_${time.replace(':', '')}`}>
+                        {time}
+                      </option>
                     ))}
-                  </div>
+                  </select>
+                </div>
+              </div>
 
-                  <div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleCreate}
+                  disabled={loading.create}
+                  className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading.create ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  Créer
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MODIFIER */}
+      {modal.type === "update" && modal.rdv && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <ModalHeader
+              title="Modifier le rendez-vous"
+              onClose={closeModal}
+            />
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {(["firstName", "lastName"] as const).map((field) => (
+                  <div key={field}>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                      Téléphone
+                      {field === "firstName" ? "Prénom" : "Nom"}
                     </label>
                     <input
-                      type="tel"
-                      value={editForm.telephone ?? ""}
+                      type="text"
+                      value={editForm[field]}
                       onChange={(e) =>
-                        setEditForm({ ...editForm, telephone: e.target.value })
+                        setEditForm({
+                          ...editForm,
+                          [field]: e.target.value,
+                        })
                       }
                       className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
+                ))}
+              </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Date
-                      </label>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Téléphone
+                </label>
+                <input
+                  type="tel"
+                  value={editForm.telephone}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, telephone: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.date}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, date: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Heure
+                  </label>
+                  <select
+                    value={editForm.time}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        time: e.target.value as TimeSlot,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {TIME_SLOT_OPTIONS.map((t) => (
+                      <option key={t} value={`SLOT_${t.replace(':', '')}`}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Niveau d'étude
+                  </label>
+                  <select
+                    value={editForm.niveauEtude}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setShowOtherNiveau(value === "Autre");
+                      setEditForm({
+                        ...editForm,
+                        niveauEtude: value,
+                        niveauEtudeAutre: value !== "Autre" ? "" : editForm.niveauEtudeAutre,
+                      });
+                    }}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {NIVEAU_ETUDE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {showOtherNiveau && (
+                    <div className="mt-2">
                       <input
-                        type="date"
-                        value={editForm.date ?? ""}
+                        type="text"
+                        value={editForm.niveauEtudeAutre || ""}
                         onChange={(e) =>
-                          setEditForm({ ...editForm, date: e.target.value })
+                          setEditForm({
+                            ...editForm,
+                            niveauEtudeAutre: e.target.value,
+                          })
                         }
+                        placeholder="Précisez votre niveau"
                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Heure
-                      </label>
-                      <select
-                        value={editForm.time ?? ""}
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Filière
+                  </label>
+                  <select
+                    value={editForm.filiere}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setShowOtherFiliere(value === "Autre");
+                      setEditForm({
+                        ...editForm,
+                        filiere: value,
+                        filiereAutre: value !== "Autre" ? "" : editForm.filiereAutre,
+                      });
+                    }}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {FILIERE_OPTIONS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {showOtherFiliere && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={editForm.filiereAutre || ""}
                         onChange={(e) =>
                           setEditForm({
                             ...editForm,
-                            time: e.target.value as TimeSlot,
+                            filiereAutre: e.target.value,
                           })
                         }
+                        placeholder="Précisez votre filière"
                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                      >
-                        <option value="">Sélectionner</option>
-                        {TIME_SLOT_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Niveau d'étude
-                      </label>
-                      <select
-                        value={editForm.niveauEtude ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setShowOtherNiveau(value === "Autre");
-                          setEditForm({
-                            ...editForm,
-                            niveauEtude: value,
-                            niveauEtudeAutre: value !== "Autre" ? "" : editForm.niveauEtudeAutre,
-                          });
-                        }}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                      >
-                        <option value="">Sélectionner</option>
-                        {NIVEAU_ETUDE_OPTIONS.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      
-                      {showOtherNiveau && (
-                        <div className="mt-2">
-                          <input
-                            type="text"
-                            value={editForm.niveauEtudeAutre || ""}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                niveauEtudeAutre: e.target.value,
-                              })
-                            }
-                            placeholder="Précisez votre niveau"
-                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                          />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                        Filière
-                      </label>
-                      <select
-                        value={editForm.filiere ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setShowOtherFiliere(value === "Autre");
-                          setEditForm({
-                            ...editForm,
-                            filiere: value,
-                            filiereAutre: value !== "Autre" ? "" : editForm.filiereAutre,
-                          });
-                        }}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                      >
-                        <option value="">Sélectionner</option>
-                        {FILIERE_OPTIONS.map((f) => (
-                          <option key={f} value={f}>
-                            {f}
-                          </option>
-                        ))}
-                      </select>
-                      
-                      {showOtherFiliere && (
-                        <div className="mt-2">
-                          <input
-                            type="text"
-                            value={editForm.filiereAutre || ""}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                filiereAutre: e.target.value,
-                              })
-                            }
-                            placeholder="Précisez votre filière"
-                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                      Destination
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={editForm.destination ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setShowOtherDestination(value === "Autre");
-                          setEditForm({
-                            ...editForm,
-                            destination: value,
-                            destinationAutre: value !== "Autre" ? "" : editForm.destinationAutre,
-                          });
-                        }}
-                        className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
-                      >
-                        <option value="">Sélectionner</option>
-                        {DESTINATION_OPTIONS.map((d) => (
-                          <option key={d} value={d}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
-                    </div>
-                    
-                    {showOtherDestination && (
-                      <div className="mt-2">
-                        <input
-                          type="text"
-                          value={editForm.destinationAutre || ""}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              destinationAutre: e.target.value,
-                            })
-                          }
-                          placeholder="Précisez votre destination"
-                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      onClick={handleUpdate}
-                      disabled={loading.update}
-                      className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {loading.update ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Edit2 className="w-4 h-4" />
-                      )}
-                      Enregistrer
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      Annuler
-                    </button>
-                  </div>
+                  )}
                 </div>
-              </>
-            )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Destination
+                </label>
+                <div className="relative">
+                  <select
+                    value={editForm.destination}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setShowOtherDestination(value === "Autre");
+                      setEditForm({
+                        ...editForm,
+                        destination: value,
+                        destinationAutre: value !== "Autre" ? "" : editForm.destinationAutre,
+                      });
+                    }}
+                    className="w-full appearance-none border border-gray-300 rounded-xl px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-sky-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    {DESTINATION_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                </div>
+                
+                {showOtherDestination && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={editForm.destinationAutre || ""}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          destinationAutre: e.target.value,
+                        })
+                      }
+                      placeholder="Précisez votre destination"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleUpdate}
+                  disabled={loading.update}
+                  className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading.update ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Edit2 className="w-4 h-4" />
+                  )}
+                  Enregistrer
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
