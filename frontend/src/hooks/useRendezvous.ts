@@ -156,6 +156,26 @@ export const useRendezvous = (
     return message;
   };
 
+  // Helper pour obtenir les paramètres par défaut (PENDING + CONFIRMED)
+  const getDefaultParams = useCallback((): RendezvousQueryDto => {
+    return {
+      page: 1,
+      limit: 10,
+      sortBy: "date",
+      sortOrder: "desc",
+    };
+  }, []);
+
+  // Helper pour filtrer par statuts actifs uniquement
+  const getActiveParams = useCallback((params: RendezvousQueryDto = {}): RendezvousQueryDto => {
+    return {
+      ...getDefaultParams(),
+      ...params,
+      // Si un statut est spécifié, l'utiliser, sinon laisser le backend appliquer le filtre par défaut
+      ...(params.status ? {} : {}),
+    };
+  }, [getDefaultParams]);
+
   // Actions admin
   const loadRendezvous = useCallback(
     async (params: RendezvousQueryDto = {}) => {
@@ -165,7 +185,8 @@ export const useRendezvous = (
       setError(null);
 
       try {
-        const mergedParams = { ...initialParamsRef.current, ...params };
+        // Utiliser les helpers pour garantir la logique par défaut du backend
+        const mergedParams = getActiveParams(params);
         const res = await rendezvousService.searchRendezvous(mergedParams);
 
         setRendezvous(res.data || res);
@@ -183,7 +204,7 @@ export const useRendezvous = (
         setLoadingKey("list", false);
       }
     },
-    [isAdmin],
+    [isAdmin, getActiveParams],
   );
 
   const loadRendezvousById = useCallback(async (id: string) => {

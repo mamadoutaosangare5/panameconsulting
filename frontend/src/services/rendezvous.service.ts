@@ -285,8 +285,8 @@ class RendezvousService {
     const today = new Date();
     const dateStr = this.formatDate(today);
 
+    // Utiliser la logique par défaut du backend (PENDING + CONFIRMED)
     const params: RendezvousQueryDto = {
-      status: "CONFIRMED",
       date: dateStr,
       sortBy: "date",
       sortOrder: "asc",

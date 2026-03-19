@@ -111,7 +111,12 @@ const STATUS_CFG: Record<
   },
 };
 
-// Helpers
+// Helper pour afficher la valeur effective ou "Non renseigné"
+  const displayEffectiveValue = (value: string, fallback: string = "Non renseigné") => {
+    if (!value || value.trim() === "") return fallback;
+    if (value.toLowerCase() === "autre") return fallback;
+    return value;
+  };
 const getInitials = (firstName?: string | null, lastName?: string | null) => {
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
   return (fullName || "??")
@@ -164,7 +169,7 @@ const PanelRow = ({ rdv, onView }: { rdv: RendezvousResponseDto; onView: () => v
         {rdv.firstName} {rdv.lastName}
       </p>
       <p className="text-xs text-gray-500 truncate">
-        {rdv.effectiveDestination}
+        {displayEffectiveValue(rdv.effectiveDestination)}
       </p>
     </div>
     <div className="flex items-center gap-3 shrink-0">
@@ -1260,11 +1265,11 @@ const RendezvousAdmin = () => {
                           <div className="flex flex-wrap gap-3 text-sm text-gray-600 mb-3">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                              {rdv.effectiveDestination}
+                              {displayEffectiveValue(rdv.effectiveDestination)}
                             </span>
                             <span className="flex items-center gap-1">
                               <GraduationCap className="w-3.5 h-3.5 text-gray-400" />
-                              {rdv.effectiveNiveauEtude} · {rdv.effectiveFiliere}
+                              {displayEffectiveValue(rdv.effectiveNiveauEtude)} · {displayEffectiveValue(rdv.effectiveFiliere)}
                             </span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5 text-gray-400" />
@@ -1507,17 +1512,17 @@ const RendezvousAdmin = () => {
                       {
                         Icon: MapPin,
                         label: "Destination",
-                        value: modal.rdv.effectiveDestination,
+                        value: displayEffectiveValue(modal.rdv.effectiveDestination),
                       },
                       {
                         Icon: GraduationCap,
                         label: "Niveau",
-                        value: modal.rdv.effectiveNiveauEtude,
+                        value: displayEffectiveValue(modal.rdv.effectiveNiveauEtude),
                       },
                       {
                         Icon: BookOpen,
                         label: "Filière",
-                        value: modal.rdv.effectiveFiliere,
+                        value: displayEffectiveValue(modal.rdv.effectiveFiliere),
                       },
                       {
                         Icon: Calendar,

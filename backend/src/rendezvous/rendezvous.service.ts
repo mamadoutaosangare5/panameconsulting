@@ -395,7 +395,7 @@ export class RendezvousService {
   }
 
   addEffectiveFields(rendezvous: Rendezvous) {
-    return {
+    const result = {
       ...rendezvous,
       effectiveDestination:
         rendezvous.destinationAutre || rendezvous.destination,
@@ -403,6 +403,7 @@ export class RendezvousService {
         rendezvous.niveauEtudeAutre || rendezvous.niveauEtude,
       effectiveFiliere: rendezvous.filiereAutre || rendezvous.filiere,
     };
+    return result;
   }
 
   async findById(id: string, currentUser: CurrentUser) {
@@ -823,7 +824,14 @@ export class RendezvousService {
 
     const [total, confirmed, completed, cancelled, pending] = await Promise.all(
       [
-        this.prisma.rendezvous.count({ where }),
+        this.prisma.rendezvous.count({
+          where: {
+            ...where,
+            status: {
+              in: [RendezvousStatus.CONFIRMED, RendezvousStatus.PENDING],
+            },
+          },
+        }),
         this.prisma.rendezvous.count({
           where: { ...where, status: RendezvousStatus.CONFIRMED },
         }),
